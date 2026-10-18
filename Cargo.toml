@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = [
+    "quire_py",
+]   # + crates/quire-<part> (planned: core, io, fetch, cli, app)
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"   # installed toolchain; dependencies need >= 1.95 (see .knowledge/engineering.md)
+authors = ["jesusdpa1 <jesuspenalozaa2@gmail.com>"]
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+# Versions as in lumen (checked on crates.io 2026-10-14); add each to a crate with `<name>.workspace = true`.
+# Python bindings (built by maturin, see pyproject.toml)
+pyo3 = { version = "0.29.3" }

@@ -1,0 +1,24 @@
+[build-system]
+requires = ["maturin>=1.15,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "quire"
+version = "0.1.0"
+description = "Reference manager in Rust (library, BibTeX/CSL import and export, DOI lookup), with a Python SDK"
+readme = "README.md"
+authors = [{ name = "jesusdpa1", email = "jesuspenalozaa2@gmail.com" }]
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.maturin]
+manifest-path = "quire_py/Cargo.toml"
+module-name = "quire_bindings.quire_bindings"
+python-source = "quire_py"
+features = ["extension-module"]
+
+[tool.ruff]
+src = ["quire_py/quire_bindings", "quire_py/quire"]
+
+[dependency-groups]
+dev = ["maturin>=1.15", "pytest>=9.0", "ruff>=0.16"]
