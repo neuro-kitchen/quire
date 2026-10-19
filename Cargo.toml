@@ -79,6 +79,8 @@ hayagriva = { version = "0.10.1", default-features = false, features = ["biblate
 # Files (content-addressed attachments; PDF checks)
 blake3 = "1.8.7"
 pdf-inspector = "1.25.2"
+# PDF objects (the parser pdf-inspector uses): revealing invisible OCR text layers
+lopdf = "0.45.0"
 
 # IDs
 uuid = { version = "1.28.0", features = ["v7"] }

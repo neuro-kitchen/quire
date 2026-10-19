@@ -3332,6 +3332,7 @@ dependencies = [
  "biblatex",
  "hayagriva",
  "insta",
+ "lopdf",
  "pdf-inspector",
  "quire-model",
  "serde_json",
