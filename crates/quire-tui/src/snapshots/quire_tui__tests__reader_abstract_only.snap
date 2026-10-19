@@ -1,0 +1,14 @@
+---
+source: crates/quire-tui/src/lib.rs
+expression: "screen(&mut state, 80, 10)"
+---
+" vaswani2017 Attention Is All You Need                                      70% "
+"  Abstract  │  no text: p in the library gets the PDF                           "
+"    Attention Is All You Need                                                   "
+"                                                                                "
+"    Vaswani                                                                     "
+"                                                                                "
+"    2017                                                                        "
+"                                                                                "
+"                                                                                "
+" ← → tabs · f follow figure · j/k scroll · t contents · / search · +/- width · J"
