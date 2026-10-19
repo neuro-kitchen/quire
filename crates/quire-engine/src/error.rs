@@ -17,6 +17,9 @@ pub enum EngineError {
     Fetch(#[from] quire_fetch::FetchError),
 
     #[error(transparent)]
+    Sync(#[from] quire_sync::SyncError),
+
+    #[error(transparent)]
     Format(#[from] quire_io::IoError),
 
     #[error("database: {0}")]
@@ -30,6 +33,10 @@ pub enum EngineError {
 
     #[error("configuration: {0}")]
     Config(String),
+
+    /// The user's editor could not run or failed.
+    #[error("editor: {0}")]
+    Editor(String),
 
     /// A downloaded PDF that is not the reference's paper.
     #[error("not this paper's PDF: {0}")]
@@ -51,11 +58,6 @@ pub enum EngineError {
 pub type Result<T> = std::result::Result<T, EngineError>;
 
 impl EngineError {
-    /// Whether the institutional proxy asked for a new login (`quire access login`).
-    pub fn is_proxy_login(&self) -> bool {
-        matches!(self, Self::Fetch(error) if error.is_proxy_login())
-    }
-
     /// Whether a site's "are you human" check stopped a lookup.
     pub fn is_blocked(&self) -> bool {
         matches!(self, Self::Fetch(error) if error.is_blocked())

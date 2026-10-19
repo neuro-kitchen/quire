@@ -7,15 +7,17 @@
 
 mod attachments;
 mod auto_export;
-mod codec;
+pub(crate) mod codec;
 mod highlights;
 mod issues;
 mod links;
 mod projects;
 mod references;
+mod search;
+mod sync;
 mod tags;
 
-use quire_core::{AutoExport, FailedInput, Library, RawRecord, ReferenceFilter, Result};
+use quire_core::{AutoExport, FailedInput, Library, RawRecord, ReferenceFilter, Result, SearchHit};
 use quire_model::{
     Attachment, AttachmentId, CiteKey, DeviceId, Highlight, HighlightId, Identifier, Issue, Note, NoteId, PdfAttempt,
     Project, ProjectId, Reference, ReferenceId, Slug, Tag, TagId, TagKind, Timestamp,
@@ -253,5 +255,13 @@ impl Library for SqliteLibrary<'_> {
 
     fn update_highlight(&mut self, highlight: &Highlight) -> Result<()> {
         highlights::update(self.conn, highlight)
+    }
+
+    fn search(&self, query: &str, in_text: bool, limit: usize) -> Result<Vec<SearchHit>> {
+        search::search(self.conn, query, in_text, limit)
+    }
+
+    fn index_paper_text(&mut self, reference: ReferenceId, text: Option<&str>) -> Result<()> {
+        search::index_paper_text(self.conn, reference, text)
     }
 }

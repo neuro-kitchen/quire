@@ -8,7 +8,7 @@ use quire_model::{
 };
 
 use crate::error::Result;
-use crate::ports::{AutoExport, FailedInput, Library, RawRecord, ReferenceFilter};
+use crate::ports::{AutoExport, FailedInput, Library, RawRecord, ReferenceFilter, SearchHit};
 
 pub struct MemoryLibrary {
     device: DeviceId,
@@ -364,6 +364,39 @@ impl Library for MemoryLibrary {
         if let Some(slot) = self.highlights.iter_mut().find(|h| h.id == highlight.id) {
             *slot = highlight.clone();
         }
+        Ok(())
+    }
+
+    /// Naive: every word of the query (field prefixes and `*` dropped) in the title, abstract or
+    /// a creator's name. Enough for use-case tests; SQLite does the real ranking.
+    fn search(&self, query: &str, _in_text: bool, limit: usize) -> Result<Vec<SearchHit>> {
+        let words: Vec<String> = query
+            .split_whitespace()
+            .map(|w| w.rsplit(':').next().unwrap_or(w).trim_matches(['"', '*']).to_lowercase())
+            .filter(|w| !w.is_empty() && w != "and" && w != "or")
+            .collect();
+        let hits = self
+            .references
+            .iter()
+            .filter(|r| !r.meta.is_deleted())
+            .filter(|r| {
+                let names: Vec<String> = r.data.creators.iter().map(|c| c.sort_name()).collect();
+                let text = format!(
+                    "{} {} {}",
+                    r.data.title().unwrap_or_default(),
+                    r.data.get(quire_model::TextField::Abstract).unwrap_or_default(),
+                    names.join(" ")
+                )
+                .to_lowercase();
+                words.iter().all(|w| text.contains(w.as_str()))
+            })
+            .map(|r| SearchHit { reference: r.id, score: 1.0, snippet: String::new(), in_text: false })
+            .take(limit)
+            .collect();
+        Ok(hits)
+    }
+
+    fn index_paper_text(&mut self, _reference: ReferenceId, _text: Option<&str>) -> Result<()> {
         Ok(())
     }
 }

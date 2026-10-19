@@ -4,20 +4,20 @@
 //! - [`references`]: add (by identifier or URL), import `.bib`, list, show, copy, trash, restore.
 //! - [`projects`]: create, rename, remove, tree, link, unlink.
 //! - [`abstracts`]: filling missing abstracts (Europe PMC, the PDF).
-//! - [`access`]: the institutional proxy session.
 //! - [`exports`]: export through profiles; automatic exports.
 //! - [`pdfs`]: find, download, attach and import PDFs.
 //! - [`update`]: refetch and edit references.
 //! - [`tags`]: tags, notes and related references.
 
 mod abstracts;
-mod access;
 mod duplicates;
 mod exports;
 mod highlights;
 mod pdfs;
 mod projects;
 mod references;
+mod search;
+mod sync;
 mod tags;
 mod text;
 mod update;
@@ -30,11 +30,11 @@ use quire_model::DeviceId;
 use quire_store::SqliteLibrary;
 
 pub use abstracts::AbstractOutcome;
-pub use access::AccessStatus;
 pub use duplicates::DuplicateGroup;
 pub use exports::{AutoExportInfo, AutoExportOutcome, DEFAULT_PROFILE, ExportRequest, write_if_changed};
 pub use pdfs::{Attached, PdfOutcome, PdfStatus};
 pub use projects::ProjectSummary;
+pub use search::DEFAULT_LIMIT as SEARCH_LIMIT;
 pub use text::{PaperText, TextSource, online_candidate};
 
 use crate::config::Config;
@@ -99,11 +99,7 @@ impl Engine {
             })
             .await??;
         let email = config.user.email.as_deref();
-        let mut fetcher = Fetcher::with_endpoints(email, options.endpoints.unwrap_or_default())?;
-        // The proxy session, if the user logged in (`quire access login`).
-        if let Some(session) = access::load(&config_file, &config.access) {
-            fetcher = fetcher.with_proxy(session)?;
-        }
+        let fetcher = Fetcher::with_endpoints(email, options.endpoints.unwrap_or_default())?;
         tracing::debug!(library = %library_dir.display(), %device, "library open");
         let (changes, _) = tokio::sync::broadcast::channel(CHANGE_BUFFER);
         Ok(Self { conn, device, config, config_file, library, fetcher, changed: AtomicBool::new(false), changes })

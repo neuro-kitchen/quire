@@ -52,6 +52,18 @@ pub struct AutoExport {
     pub written_at: Option<Timestamp>,
 }
 
+/// A reference found by a full-text search.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SearchHit {
+    pub reference: ReferenceId,
+    /// Higher is better.
+    pub score: f64,
+    /// The matching words in context, marked `«…»`.
+    pub snippet: String,
+    /// Found only in the paper's text (not its metadata, tags or notes).
+    pub in_text: bool,
+}
+
 /// Which references to list.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ReferenceFilter {
@@ -181,4 +193,11 @@ pub trait Library {
     fn insert_highlight(&mut self, highlight: &Highlight) -> Result<()>;
     /// Writes a highlight's changes (comment, reference, soft delete).
     fn update_highlight(&mut self, highlight: &Highlight) -> Result<()>;
+
+    // Full-text search
+    /// References matching the FTS5 `query` (see `library::search::fts_query`), best first; with
+    /// `in_text`, papers' text too.
+    fn search(&self, query: &str, in_text: bool, limit: usize) -> Result<Vec<SearchHit>>;
+    /// Replaces the indexed text of `reference`'s paper (`None` removes it).
+    fn index_paper_text(&mut self, reference: ReferenceId, text: Option<&str>) -> Result<()>;
 }
