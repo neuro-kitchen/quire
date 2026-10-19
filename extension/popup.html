@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>quire</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header><strong>quire</strong> <span id="library" class="dim"></span></header>
+  <p id="setup" hidden>
+    Start the local server with <code>quire serve</code>, then paste the token from
+    <code>quire serve --token</code> in the <a href="#" id="open-options">options</a>.
+  </p>
+  <main id="main" hidden>
+    <label>Project <select id="project"><option value="">(none)</option></select></label>
+    <button id="save">Save this page</button>
+    <form id="add-form">
+      <input id="input" placeholder="DOI, arXiv ID, PMID or URL" autocomplete="off">
+      <button type="submit">Add</button>
+    </form>
+  </main>
+  <p id="result" aria-live="polite"></p>
+  <ul id="issues" class="dim"></ul>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

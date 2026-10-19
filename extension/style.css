@@ -1,0 +1,11 @@
+:root { color-scheme: light dark; --accent: #2b7bb9; --problem: #c0392b; }
+body { font: 13px/1.4 system-ui, sans-serif; margin: 12px; min-width: 300px; }
+header { margin-bottom: 8px; }
+label { display: block; margin: 6px 0; }
+input, select { width: 100%; box-sizing: border-box; padding: 4px; }
+button { margin: 6px 0; padding: 5px 10px; cursor: pointer; }
+#add-form { display: flex; gap: 6px; align-items: center; }
+#add-form input { flex: 1; }
+.dim { opacity: 0.7; }
+.problem { color: var(--problem); }
+code { font-size: 12px; }
