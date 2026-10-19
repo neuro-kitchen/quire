@@ -1,10 +1,14 @@
 //! Checking references: lints computed from the fields (no title, no date, title in capitals, …)
-//! plus the issues recorded when they were fetched (`.knowledge/roadmap.md`, M3).
+//! plus the issues recorded when they were fetched (`.knowledge/roadmap.md`, M3), and possible
+//! duplicates ([`crate::library::duplicates`]).
 
 use quire_model::{EntryKind, Issue, IssueCode, Reference, ReferenceData, ReferenceId, TextField};
 
+use std::collections::{HashMap, HashSet};
+
 use crate::error::Result;
-use crate::ports::Library;
+use crate::library::duplicates;
+use crate::ports::{Library, ReferenceFilter};
 
 /// A reference and everything wrong with it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -90,9 +94,28 @@ pub fn issues(library: &impl Library, reference: &Reference) -> Result<Vec<Issue
     Ok(all)
 }
 
-/// Every reference of `references` with its issues (none for a clean one).
+/// Every reference of `references` with its issues (none for a clean one), possible duplicates
+/// included (found against the whole library).
 pub fn with_issues(library: &impl Library, references: Vec<Reference>) -> Result<Vec<Checked>> {
-    references.into_iter().map(|reference| Ok(Checked { issues: issues(library, &reference)?, reference })).collect()
+    let all = library.references(&ReferenceFilter::default())?;
+    let dismissed: HashSet<_> =
+        library.dismissed_duplicates()?.into_iter().map(|(a, b)| duplicates::ordered(a, b)).collect();
+    let found = duplicates::index(&all, &dismissed);
+    let keys: HashMap<ReferenceId, &str> = all.iter().map(|r| (r.id, r.cite_key.as_str())).collect();
+    references
+        .into_iter()
+        .map(|reference| {
+            let mut issues = issues(library, &reference)?;
+            for m in found.get(&reference.id).into_iter().flatten() {
+                let other = keys.get(&m.other).copied().unwrap_or("?");
+                issues.push(Issue {
+                    detail: Some(format!("{other} ({})", m.reason.describe())),
+                    ..Issue::new(IssueCode::PossibleDuplicate)
+                });
+            }
+            Ok(Checked { issues, reference })
+        })
+        .collect()
 }
 
 /// The references among `references` that have issues.

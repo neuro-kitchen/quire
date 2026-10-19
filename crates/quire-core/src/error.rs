@@ -44,8 +44,18 @@ pub enum CoreError {
     #[error("a note needs some text")]
     EmptyNote,
 
+    #[error("no highlight `{0}`")]
+    HighlightNotFound(String),
+
+    #[error("a highlight needs some text")]
+    EmptyHighlight,
+
     #[error("`{0}` cannot be related to itself")]
     SelfRelation(String),
+
+    /// Merging or separating a reference with itself.
+    #[error("`{0}` and `{1}` are the same reference")]
+    SameReference(String, String),
 
     /// A cite key chosen by hand is used by another reference.
     #[error("cite key `{0}` is already used")]

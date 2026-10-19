@@ -3,8 +3,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use quire_model::{
-    Attachment, AttachmentId, CiteKey, DeviceId, Identifier, Issue, Note, NoteId, PdfAttempt, Project, ProjectId,
-    Reference, ReferenceId, Slug, Tag, TagId, TagKind, Timestamp,
+    Attachment, AttachmentId, CiteKey, DeviceId, Highlight, HighlightId, Identifier, Issue, Note, NoteId, PdfAttempt,
+    Project, ProjectId, Reference, ReferenceId, Slug, Tag, TagId, TagKind, Timestamp,
 };
 
 use crate::error::Result;
@@ -24,6 +24,8 @@ pub struct MemoryLibrary {
     reference_tags: BTreeMap<(ReferenceId, TagId), TagKind>,
     notes: Vec<Note>,
     relations: BTreeSet<(ReferenceId, ReferenceId)>,
+    dismissed: BTreeSet<(ReferenceId, ReferenceId)>,
+    highlights: Vec<Highlight>,
 }
 
 impl Default for MemoryLibrary {
@@ -42,6 +44,8 @@ impl Default for MemoryLibrary {
             reference_tags: BTreeMap::new(),
             notes: Vec::new(),
             relations: BTreeSet::new(),
+            dismissed: BTreeSet::new(),
+            highlights: Vec::new(),
         }
     }
 }
@@ -333,5 +337,33 @@ impl Library for MemoryLibrary {
                 }
             })
             .collect())
+    }
+
+    fn dismiss_duplicate(&mut self, a: ReferenceId, b: ReferenceId) -> Result<bool> {
+        Ok(self.dismissed.insert(if a < b { (a, b) } else { (b, a) }))
+    }
+
+    fn dismissed_duplicates(&self) -> Result<Vec<(ReferenceId, ReferenceId)>> {
+        Ok(self.dismissed.iter().copied().collect())
+    }
+
+    fn highlights_of(&self, reference: ReferenceId) -> Result<Vec<Highlight>> {
+        Ok(self.highlights.iter().filter(|h| h.reference == reference && !h.meta.is_deleted()).cloned().collect())
+    }
+
+    fn highlight(&self, id: HighlightId) -> Result<Option<Highlight>> {
+        Ok(self.highlights.iter().find(|h| h.id == id).cloned())
+    }
+
+    fn insert_highlight(&mut self, highlight: &Highlight) -> Result<()> {
+        self.highlights.push(highlight.clone());
+        Ok(())
+    }
+
+    fn update_highlight(&mut self, highlight: &Highlight) -> Result<()> {
+        if let Some(slot) = self.highlights.iter_mut().find(|h| h.id == highlight.id) {
+            *slot = highlight.clone();
+        }
+        Ok(())
     }
 }
