@@ -1,0 +1,18 @@
+[package]
+name = "quire-io"
+description = "quire import/export: CSL-JSON and BibTeX/BibLaTeX (via the Typst `biblatex` crate)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+quire-model.workspace = true
+biblatex.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+insta.workspace = true

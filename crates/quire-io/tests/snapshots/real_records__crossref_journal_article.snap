@@ -1,0 +1,19 @@
+---
+source: crates/quire-io/tests/real_records.rs
+expression: "bib(\"kucsko2013\", data)"
+---
+@article{kucsko2013,
+  author = {Kucsko, G. and Maurer, P. C. and Yao, N. Y. and Kubo, M. and Noh, H. J. and Lo, P. K. and Park, H. and Lukin, M. D.},
+  date = {2013-07-31},
+  doi = {10.1038/nature12373},
+  issn = {0028-0836},
+  journaltitle = {Nature},
+  language = {en},
+  number = {7460},
+  pages = {54--58},
+  publisher = {Springer Science and Business Media LLC},
+  shortjournal = {Nature},
+  title = {Nanometre-scale thermometry in a living cell},
+  url = {http://dx.doi.org/10.1038/nature12373},
+  volume = {500},
+}

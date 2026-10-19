@@ -1,0 +1,15 @@
+---
+source: crates/quire-io/src/bib/export.rs
+expression: text
+---
+@article{kucsko2013,
+  author = {Kucsko, G.},
+  year = {2013},
+  month = {07},
+  day = {31},
+  doi = {10.1038/nature12373},
+  journal = {Nature},
+  number = {7460},
+  pages = {54--58},
+  title = {Nanometre-scale thermometry in a living cell},
+}
