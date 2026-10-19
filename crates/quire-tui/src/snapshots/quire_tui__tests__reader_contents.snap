@@ -1,0 +1,18 @@
+---
+source: crates/quire-tui/src/lib.rs
+expression: "screen(&mut state, 80, 14)"
+---
+" vaswani2017 Attention Is All You Need                                     100% "
+"  Abstract  │  Paper · PDF  │  Figures 1                                        "
+"    1 Introduction                                                              "
+"                                                                                "
+"    Recurrent neural networks, long short-term memory and gated recurrent       "
+"    neural networks have been firmly established (Figure 1) as state of the     "
+"    a┌ Contents (Enter jumps, Esc closes) ────────────────────────────────┐     "
+"     │  1 Introduction                                                    │     "
+"     │  2 Background                                                      │     "
+"    2└────────────────────────────────────────────────────────────────────┘     "
+"                                                                                "
+"    The goal of reducing sequential computation also forms the foundation of    "
+"    the Extended Neural GPU.                                                    "
+" ← → tabs · f follow figure · v highlight · a note · j/k scroll · t contents · /"

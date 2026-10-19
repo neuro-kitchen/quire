@@ -1,0 +1,300 @@
+<!doctype html><html><head prefix="og: http://ogp.me/ns#">
+
+
+
+
+<link rel="stylesheet" href="/resource/css/screen.css?65f544e86ec6a9033b3c609f45575a4d"/>
+  <!-- allows for  extra head tags -->
+
+
+<!-- hello -->
+<link rel="stylesheet" type="text/css"
+      href="https://fonts.googleapis.com/css?family=Open+Sans:400,400i,600">
+
+<link media="print" rel="stylesheet" type="text/css"  href="/resource/css/print.css"/>
+    <script type="text/javascript">
+        var siteUrlPrefix = "/plosone/";
+    </script>
+  <script src="/resource/js/vendor/modernizr-v2.7.1.js" type="text/javascript"></script>
+  <script src="/resource/js/vendor/detectizr.min.js" type="text/javascript"></script>
+
+  <link rel="shortcut icon" href="/resource/img/favicon.ico" type="image/x-icon"/>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+
+
+
+
+
+
+  <link rel="canonical" href="https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0173392" />
+  <meta name="description" content="Music emotion recognition (MER) field rapidly expanded in the last decade. Many new methods and new audio features are developed to improve the performance of MER algorithms. However, it is very difficult to compare the performance of the new methods because of the data representation diversity and scarcity of publicly available data. In this paper, we address these problems by creating a data set and a benchmark for MER. The data set that we release, a MediaEval Database for Emotional Analysis in Music (DEAM), is the largest available data set of dynamic annotations (valence and arousal annotations for 1,802 songs and song excerpts licensed under Creative Commons with 2Hz time resolution). Using DEAM, we organized the &lsquo;Emotion in Music&rsquo; task at MediaEval Multimedia Evaluation Campaign from 2013 to 2015. The benchmark attracted, in total, 21 active teams to participate in the challenge. We analyze the results of the benchmark: the winning algorithms and feature-sets. We also describe the design of the benchmark, the evaluation procedures and the data cleaning and transformations that we suggest. The results from the benchmark suggest that the recurrent neural network based approaches combined with large feature-sets work best for dynamic MER." />
+
+  <meta name="citation_abstract" content="Music emotion recognition (MER) field rapidly expanded in the last decade. Many new methods and new audio features are developed to improve the performance of MER algorithms. However, it is very difficult to compare the performance of the new methods because of the data representation diversity and scarcity of publicly available data. In this paper, we address these problems by creating a data set and a benchmark for MER. The data set that we release, a MediaEval Database for Emotional Analysis in Music (DEAM), is the largest available data set of dynamic annotations (valence and arousal annotations for 1,802 songs and song excerpts licensed under Creative Commons with 2Hz time resolution). Using DEAM, we organized the &lsquo;Emotion in Music&rsquo; task at MediaEval Multimedia Evaluation Campaign from 2013 to 2015. The benchmark attracted, in total, 21 active teams to participate in the challenge. We analyze the results of the benchmark: the winning algorithms and feature-sets. We also describe the design of the benchmark, the evaluation procedures and the data cleaning and transformations that we suggest. The results from the benchmark suggest that the recurrent neural network based approaches combined with large feature-sets work best for dynamic MER.">
+
+
+  <meta name="keywords" content="Emotions,Machine learning algorithms,Bioacoustics,Algorithms,Recurrent neural networks,Acoustics,Music perception,Linear regression analysis" />
+
+
+<meta name="citation_doi" content="10.1371/journal.pone.0173392"/>
+<meta name="citation_author" content="Anna Aljanaki"/>
+  <meta name="citation_author_institution" content="Utrecht University, Utrecht, the Netherlands"/>
+<meta name="citation_author" content="Yi-Hsuan Yang"/>
+  <meta name="citation_author_institution" content="Academia Sinica, Taipei, Taiwan"/>
+<meta name="citation_author" content="Mohammad Soleymani"/>
+  <meta name="citation_author_institution" content="Swiss Center for Affective Sciences, University of Geneva, Geneva, Switzerland"/>
+
+<meta name="citation_title" content="Developing a benchmark for emotional analysis of music"/>
+<meta itemprop="name" content="Developing a benchmark for emotional analysis of music"/>
+<meta name="citation_journal_title" content="PLOS ONE"/>
+<meta name="citation_journal_abbrev" content="PLOS ONE"/>
+<meta name="citation_date" content="Mar 10, 2017"/>
+<meta name="citation_firstpage" content="e0173392"/>
+<meta name="citation_issue" content="3"/>
+<meta name="citation_volume" content="12"/>
+<meta name="citation_issn" content="1932-6203"/>
+<meta name="citation_publisher" content="Public Library of Science"/>
+
+  <meta name="citation_pdf_url" content="https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0173392&type=printable">
+
+  <meta name="citation_article_type" content="Research Article">
+
+<meta name="dc.identifier" content="10.1371/journal.pone.0173392" />
+
+
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:site" content="plosone"/>
+    <meta name="twitter:title" content="Developing a benchmark for emotional analysis of music" />
+    <meta property="twitter:description" content="Music emotion recognition (MER) field rapidly expanded in the last decade. Many new methods and new audio features are developed to improve the performance of MER algorithms. However, it is very difficult to compare the performance of the new methods because of the data representation diversity and scarcity of publicly available data. In this paper, we address these problems by creating a data set and a benchmark for MER. The data set that we release, a MediaEval Database for Emotional Analysis in Music (DEAM), is the largest available data set of dynamic annotations (valence and arousal annotations for 1,802 songs and song excerpts licensed under Creative Commons with 2Hz time resolution). Using DEAM, we organized the &lsquo;Emotion in Music&rsquo; task at MediaEval Multimedia Evaluation Campaign from 2013 to 2015. The benchmark attracted, in total, 21 active teams to participate in the challenge. We analyze the results of the benchmark: the winning algorithms and feature-sets. We also describe the design of the benchmark, the evaluation procedures and the data cleaning and transformations that we suggest. The results from the benchmark suggest that the recurrent neural network based approaches combined with large feature-sets work best for dynamic MER." />
+    <meta property="twitter:image" content="https://journals.plos.org/plosone/article/figure/image?id=10.1371/journal.pone.0173392.g006&size=inline" />
+
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0173392"/>
+<meta property="og:title" content="Developing a benchmark for emotional analysis of music"/>
+<meta property="og:description" content="Music emotion recognition (MER) field rapidly expanded in the last decade. Many new methods and new audio features are developed to improve the performance of MER algorithms. However, it is very difficult to compare the performance of the new methods because of the data representation diversity and scarcity of publicly available data. In this paper, we address these problems by creating a data set and a benchmark for MER. The data set that we release, a MediaEval Database for Emotional Analysis in Music (DEAM), is the largest available data set of dynamic annotations (valence and arousal annotations for 1,802 songs and song excerpts licensed under Creative Commons with 2Hz time resolution). Using DEAM, we organized the &lsquo;Emotion in Music&rsquo; task at MediaEval Multimedia Evaluation Campaign from 2013 to 2015. The benchmark attracted, in total, 21 active teams to participate in the challenge. We analyze the results of the benchmark: the winning algorithms and feature-sets. We also describe the design of the benchmark, the evaluation procedures and the data cleaning and transformations that we suggest. The results from the benchmark suggest that the recurrent neural network based approaches combined with large feature-sets work best for dynamic MER."/>
+<meta property="og:image" content="https://journals.plos.org/plosone/article/figure/image?id=10.1371/journal.pone.0173392.g006&size=inline"/>
+
+<meta name="citation_reference" content="citation_title=Towards the disintermediation of creative music search: analysing queries to determine important facets;citation_author=C Inskip;citation_author=A Macfarlane;citation_author=P Rafferty;citation_journal_title=International Journal on Digital Libraries;citation_volume=12;citation_number=12;citation_issue=2;citation_first_page=137;citation_last_page=147;citation_publication_date=2012;"/>    
+<meta name="citation_reference" content="citation_title=Machine recognition of music emotion: A review;citation_author=YH Yang;citation_author=HH Chen;citation_journal_title=ACM Transactions on Intelligent Systems and Technology;citation_volume=3;citation_number=3;citation_issue=3;citation_publication_date=2012;"/>    
+
+<meta name="citation_reference" content="Kim YE, Schmidt EM, Migneco R, Morton BG, Richardson P, Scott J, et al. Music emotion recognition: A state of the art review. In: Proceedings of International Society for Music Information Retrieval Conference; 2010. p. 255–266."/>
+
+<meta name="citation_reference" content="Laurier C, Lartillot O, Eerola T, Toiviainen P. Exploring relationships between audio features and emotion in music. In: Proceedings of Triennal Conference of European Society for Cognitive Sciences of Music; 2009. p. 260–264."/>
+<meta name="citation_reference" content="citation_title=A regression approach to music emotion recognition;citation_author=YH Yang;citation_author=YC Lin;citation_author=YF Su;citation_author=HH Chen;citation_journal_title=IEEE Transactions on Audio, Speech, and Language Processing;citation_volume=16;citation_number=16;citation_issue=2;citation_first_page=448;citation_last_page=457;citation_publication_date=2008;"/>    
+
+<meta name="citation_reference" content="Eerola T. Modelling emotions in music: Advances in conceptual, contextual and validity issues. In: Proceedings of AES International Confernece; 2014."/>
+
+<meta name="citation_reference" content="Barthet M, Fazekas G, Sandler M. Multidisciplinary perspectives on music emotion recognition: Implications for content and context-based models. In: Proceedings of International Symposium on Computer Music Modelling &amp;amp; Retrieval; 2012. p. 492–507."/>
+<meta name="citation_reference" content="citation_title=Cross-dataset and cross-cultural music mood prediction: A case on Western and Chinese Pop songs;citation_author=X Hu;citation_author=YH Yang;citation_journal_title=IEEE Transactions on Affective Computing;citation_issue=99;citation_first_page=1;citation_publication_date=2016;"/>    
+<meta name="citation_reference" content="citation_title=Measuring music-induced emotion: A comparison of emotion models, personality biases, and intensity of experiences;citation_author=JK Vuoskoski;citation_author=T Eerola;citation_journal_title=Musicae Scientiae;citation_volume=15;citation_number=15;citation_issue=2;citation_first_page=159;citation_last_page=173;citation_publication_date=2011;"/>    
+
+<meta name="citation_reference" content="Aljanaki A, Wiering F, Veltkamp RC. Computational modeling of induced emotion using GEMS. In: Proceedings of International Society for Music Information Retrieval Conference; 2014. p. 373–378."/>
+
+<meta name="citation_reference" content="Hu X, Downie JS, Laurier C, Bay M, Ehmann AF. The 2007 MIREX Audio Mood Classification Task: Lessons learned. In: Proceedings of International Society for Music Information Retrieval Conference; 2008. p. 462–467."/>
+<meta name="citation_reference" content="citation_title=Update of the Hevner adjective checklist;citation_author=E Schubert;citation_journal_title=Perceptual Motor Skills;citation_volume=96;citation_number=96;citation_first_page=1117;citation_last_page=1122;citation_publication_date=2003;"/>    
+
+<meta name="citation_reference" content="Laurier C, Sordo M, Serrà J, Herrera P. Music mood representations from social tags. In: Proceedings of International Society for Music Information Retrieval Conference; 2009. p. 381–386."/>
+<meta name="citation_reference" content="citation_title=A circumplex model of affect;citation_author=J Russell;citation_journal_title=Journal of Personality and Social Psychology;citation_volume=39;citation_number=39;citation_first_page=1161;citation_last_page=1178;citation_publication_date=1980;"/>    
+<meta name="citation_reference" content="citation_title=The Biopsychology of Mood and Arousal;citation_author=RE Thayer;citation_publication_date=1989;citation_publisher=Oxford University Press"/>    
+
+<meta name="citation_reference" content="Laurier C, Herrera P. Audio Music Mood Classification using support vector machine. In: MIREX task on Audio Mood Classification; 2007."/>
+<meta name="citation_reference" content="citation_title=A fifteen-year history of the Continuous Response Digital Interface: Issues relating to validity and reliability;citation_author=JM Geringer;citation_author=CK Madsen;citation_author=D Gregory;citation_journal_title=Bulletin of the Council for Research in Music Education;citation_volume=160;citation_number=160;citation_first_page=1;citation_last_page=15;citation_publication_date=2004;"/>    
+
+<meta name="citation_reference" content="Schubert E. Continuous response to music using a two dimensional emotion space. In: Proceedings of International Conference of Music Perception and Cognition; 1996. p. 263–268."/>
+<meta name="citation_reference" content="citation_title=Modeling perceived emotion with continuous musical features;citation_author=E Schubert;citation_journal_title=Music Perception: An Interdisciplinary Journal;citation_volume=21;citation_number=21;citation_issue=4;citation_first_page=561;citation_last_page=585;citation_publication_date=2004;"/>    
+<meta name="citation_reference" content="citation_title=Modeling emotional content of music using system identification;citation_author=MD Korhonen;citation_author=DA Clausi;citation_author=ME Jernigan;citation_journal_title=IEEE Transactions on Systems, Man, and Cybernetics;citation_volume=36;citation_number=36;citation_issue=3;citation_first_page=588;citation_last_page=599;citation_publication_date=2006;"/>    
+
+<meta name="citation_reference" content="Cabrera D. PsySound: A computer program for psychoacoustical analysis. Proceedings of Australian Acoustical Society Conference. 1999;p. 47–54."/>
+
+<meta name="citation_reference" content="Schmidt EM, Kim YE. Prediction of time-varying musical mood distributions using Kalman filtering. In: Proceedings of IEEE International Conference on Machine Learning and Applications; 2010. p. 655–660."/>
+
+<meta name="citation_reference" content="Schmidt EM, Kim YE. Modeling musical emotion dynamics with conditional random fields. In: Proceedings of International Society for Music Information Retrieval Conference; 2011."/>
+
+<meta name="citation_reference" content="Panda R, Paiva RP. Using support vector machines for automatic mood tracking in audio music. In: Proceedings of 130th Audio Engineering Society Convention; 2011."/>
+
+<meta name="citation_reference" content="Imbrasaite V, Baltrušaitis T, Robinson P. Emotion tracking in music using continuous conditional random fields and relative feature representation. In: Proceedings of IEEE International Conference on Multimedia and Expo Workshops; 2013. p. 1–6."/>
+
+<meta name="citation_reference" content="Imbrasaite V, Baltrušaitis T, Robinson P. CCNF for continuous emotion tracking in music: Comparison with CCRF and relative feature representation. In: Proceedings of IEEE International Conference on Multimedia and Expo.; 2014."/>
+
+<meta name="citation_reference" content="Wang JC, Yang YH, Wang HM, Jeng SK. The Acoustic Emotion Gaussians model for emotion-based music annotation and retrieval. In: Proceedings of ACM International Conference on Multimedia; 2012. p. 89–98."/>
+
+<meta name="citation_reference" content="Markov K, Iwata M, Matsui T. Music emotion recognition using Gaussian processes. In: Working Notes Proceedings of the MediaEval 2013 Workshop; 2013."/>
+<meta name="citation_reference" content="citation_title=Continuous prediction of spontaneous affect from multiple cues and modalities in valence-arousal space;citation_author=MA Nicolaou;citation_author=H Gunes;citation_author=M Pantic;citation_journal_title=IEEE Transactions on Affective Computing;citation_volume=2;citation_number=2;citation_issue=2;citation_first_page=92;citation_last_page=105;citation_publication_date=2011;"/>    
+
+<meta name="citation_reference" content="Speck JA, Schmidt EM, Morton BG, Kim YE. A comparative study of collaborative vs. traditional musical mood annotation. In: Proceedings of International Society for Music Information Retrieval Conference; 2011."/>
+
+<meta name="citation_reference" content="Schuller B, Valstar M, Eyben F, McKeown G, Cowie R, Pantic M. Avec 2011–the first international audio/visual emotion challenge. In: International Conference on Affective Computing and Intelligent Interaction. Springer; 2011. p. 415–424."/>
+
+<meta name="citation_reference" content="Schuller B, Valster M, Eyben F, Cowie R, Pantic M. AVEC 2012: the continuous audio/visual emotion challenge. In: Proceedings of the 14th ACM international conference on Multimodal interaction. ACM; 2012. p. 449–456."/>
+
+<meta name="citation_reference" content="Valstar M, Schuller B, Smith K, Eyben F, Jiang B, Bilakhia S, et al. AVEC 2013: the continuous audio/visual emotion and depression recognition challenge. In: Proceedings of the 3rd ACM international workshop on Audio/visual emotion challenge. ACM; 2013. p. 3–10."/>
+
+<meta name="citation_reference" content="Valstar M, Schuller B, Smith K, Almaev T, Eyben F, Krajewski J, et al. Avec 2014: 3d dimensional affect and depression recognition challenge. In: Proceedings of the 4th International Workshop on Audio/Visual Emotion Challenge. ACM; 2014. p. 3–10."/>
+
+<meta name="citation_reference" content="Ringeval F, Schuller B, Valstar M, Cowie R, Pantic M. AVEC 2015: The 5th International Audio/Visual Emotion Challenge and Workshop. In: Proceedings of ACM International Conference on Multimedia; 2015. p. 1335–1336."/>
+<meta name="citation_reference" content="citation_title=The SEMAINE Database: Annotated Multimodal Records of Emotionally Colored Conversations between a Person and a Limited Agent;citation_author=G McKeown;citation_author=M Valstar;citation_author=R Cowie;citation_author=M Pantic;citation_author=M Schroder;citation_journal_title=IEEE Transactions on Affective Computing;citation_volume=3;citation_number=3;citation_issue=1;citation_first_page=5;citation_last_page=17;citation_publication_date=2012;"/>    
+
+<meta name="citation_reference" content="Ringeval F, Sonderegger A, Sauer J, Lalanne D. Introducing the RECOLA multimodal corpus of remote collaborative and affective interactions. In: Automatic Face and Gesture Recognition (FG), 2013 10th IEEE International Conference and Workshops on; 2013. p. 1–8."/>
+<meta name="citation_reference" content="citation_title=DEAP: A database for emotion analysis using physiological signals;citation_author=S Koelstra;citation_author=C Mühl;citation_author=M Soleymani;citation_author=JS Lee;citation_author=A Yazdani;citation_author=T Ebrahimi;citation_journal_title=IEEE Transactions on Affective Computing;citation_volume=3;citation_number=3;citation_issue=1;citation_first_page=18;citation_last_page=31;citation_publication_date=2012;"/>    
+
+<meta name="citation_reference" content="Chen YA, Wang JC, Yang YH, Chen HH. The AMG1608 dataset for music emotion recognition. In: Proceedings of IEEE International Conference on Acoustics, Speech and Signal Processing; 2015. p. 693–697."/>
+
+<meta name="citation_reference" content="Bittner R, Salamon J, Tierney M, Mauch M, Cannam C, Bello JP. MedleyDB: A multitrack dataset for annotation-intensive MIR research. In: Proceedings of the International Society for Music Information Retrieval Conference; 2014."/>
+
+<meta name="citation_reference" content="Aljanaki A, Yang YH, Soleymani M. Emotion in Music task at MediaEval 2015. In: Working Notes Proceedings of the MediaEval 2015 Workshop; 2015."/>
+
+<meta name="citation_reference" content="Soleymani M, Larson M. Crowdsourcing for affective annotation of video: Development of a viewer-reported boredom corpus. In: Workshop on Crowdsourcing for Search Evaluation; 2010."/>
+<meta name="citation_reference" content="citation_title=SAM: The Self-Assessment Manikin an efficient cross-cultural measurement of emotional response;citation_author=JD Morris;citation_journal_title=J Advertising Research;citation_volume=35;citation_number=35;citation_issue=8;citation_first_page=63;citation_last_page=68;citation_publication_date=1995;"/>    
+<meta name="citation_reference" content="citation_title=Modeling continuous self-report measures of perceived emotion using generalized additive mixed models;citation_author=GJ McKeown;citation_author=I Sneddon;citation_journal_title=Psychological Methods;citation_volume=19;citation_number=19;citation_issue=1;citation_first_page=155;citation_last_page=174;citation_publication_date=2014;"/>    
+<meta name="citation_reference" content="citation_title=Studying emotion induced by music through a crowdsourcing game;citation_author=A Aljanaki;citation_author=F Wiering;citation_author=RC Veltkamp;citation_journal_title=Information Processing and Management;citation_volume=52;citation_number=52;citation_issue=1;citation_first_page=115;citation_last_page=128;citation_publication_date=2016;"/>    
+<meta name="citation_reference" content="citation_title=Reliability issues regarding the beginning, middle and end of continuous emotion ratings to music;citation_author=E Schubert;citation_journal_title=Psychology of Music;citation_volume=41;citation_number=41;citation_issue=3;citation_first_page=350;citation_last_page=371;citation_publication_date=2013;"/>    
+<meta name="citation_reference" content="citation_title=Emotion in motion: Investigating the time-course of emotional judgments of musical stimuli;citation_author=JP Bachorik;citation_author=M Bangert;citation_author=P Loui;citation_author=K Larke;citation_author=J Berger;citation_author=R Rowe;citation_journal_title=Music Perception;citation_volume=26;citation_number=26;citation_issue=4;citation_first_page=355;citation_last_page=364;citation_publication_date=2009;"/>    
+
+<meta name="citation_reference" content="Soleymani M, Aljanaki A, Yang YH. Emotional Analysis of Music: A comparison of methods. In: Proceedings of ACM International Conference on Multimedia; 2014."/>
+
+<meta name="citation_reference" content="Soleymani M, Caro MN, Schmidt EM, Yang YH. The MediaEval 2013 Brave New Task: Emotion in Music. In: Working Notes Proceedings of the MediaEval 2013 Workshop; 2013."/>
+
+<meta name="citation_reference" content="Aljanaki A, Yang YH, Soleymani M. Emotion in Music task at MediaEval 2014. In: Working Notes Proceedings of the MediaEval 2014 Workshop; 2014."/>
+
+<meta name="citation_reference" content="Kumar N, Gupta R, Guha T, Vaz C, van Segbroeck M, Kim J, et al. Affective feature design and predicting continuous affective dimensions from music. In: Working Notes Proceedings of the MediaEval 2014 Workshop; 2014."/>
+<meta name="citation_reference" content="citation_title=A concordance correlation coefficient to evaluate reproducibility;citation_author=LIK Lin;citation_journal_title=Biometrics (International Biometric Society);citation_volume=45;citation_number=45;citation_issue=1;citation_first_page=255;citation_last_page=268;citation_publication_date=1989;"/>    
+
+<meta name="citation_reference" content="Eyben F, Weninger F, Gross F, Schuller B. Recent developments in openSMILE, the Munich Open-source Multimedia Feature Extractor. In: Proceedings of ACM International Conference on Multimedia; 2013. p. 835–838."/>
+
+<meta name="citation_reference" content="Weninger F, Eyben F, Schuller B. The TUM Approach to the MediaEval Music Emotion Task Using Generic Affective Audio Features. In: Working Notes Proceedings of the MediaEval 2013 Workshop; 2013."/>
+
+<meta name="citation_reference" content="Coutinho E, Weninger F, Schuller B, Scherer KR. The Munich LSTM-RNN approach to the MediaEval 2014 Emotion in Music Task. In: Working Notes Proceedings of the MediaEval 2014 Workshop; 2014."/>
+
+<meta name="citation_reference" content="Markov K, Matsui T. Dynamic music emotion recognition using state-space models. In: Working Notes Proceedings of the MediaEval 2014 Workshop; 2014."/>
+
+<meta name="citation_reference" content="Aljanaki A, Wiering F, Veltkamp RC. MIRUtrecht participation in MediaEval 2013: Emotion in Music Task. In: Working Notes Proceedings of the MediaEval 2013 Workshop; 2013."/>
+
+<meta name="citation_reference" content="Yang W, Cai K, Wu B, Wang Y, Chen X, Yang D, et al. Beatsens solution for MediaEval 2014 Emotion in Music Task. In: Working Notes Proceedings of the MediaEval 2014 Workshop; 2014."/>
+
+<meta name="citation_reference" content="Fan Y, Xu M. MediaEval 2014: THU-HCSIL approach to emotion in music task using multi-level regression. In: Working Notes Proceedings of the MediaEval 2014 Workshop; 2014."/>
+
+<meta name="citation_reference" content="Xu M, Li X, Xianyu H, Tian J, Meng F, Chen W. Multi-scale approaches to the MediaEval 2015 “Emotion in Music” Task. In: Working Notes Proceedings of the MediaEval 2015 Workshop; 2015."/>
+
+<meta name="citation_reference" content="Coutinho E, Trigeorgis G, Zafeiriou S, Schuller B. Automatically estimating emotion in music with deep long-short term memory recurrent neural networks. In: Working Notes Proceedings of the MediaEval 2015 Workshop; 2015."/>
+
+<meta name="citation_reference" content="Gupta R, Narayanan S. Predicting affect in music using regression methods on low level features. In: Working Notes Proceedings of the MediaEval 2015 Workshop; 2015."/>
+
+<meta name="citation_reference" content="Liu Y, Liu Y, Gu Z. Affective feature extraction for music emotion prediction. In: Working Notes Proceedings of the MediaEval 2015 Workshop; 2015."/>
+
+<meta name="citation_reference" content="Cai K, Yang W, Cheng Y, Yang D, Chen X. PKU-AIPL solution for MediaEval 2015 Emotion in Music Task. In: Working Notes Proceedings of the MediaEval 2015 Workshop; 2015."/>
+
+<meta name="citation_reference" content="Pellegrini T, Barriere V. Time-continuous estimation of emotion in music with recurrent neural networks. In: Working Notes Proceedings of the MediaEval 2015 Workshop; 2015."/>
+
+<meta name="citation_reference" content="Cai K, Yang W, Cheng Y, Yang D, Chen X. PKU-AIPL’ Solution for MediaEval 2015 Emotion in Music Task. In: Working Notes Proceedings of the MediaEval 2015 Workshop; 2015."/>
+
+<meta name="citation_reference" content="Patra BG, Maitra P, Das D, Bandyopadhyay S. MediaEval 2015: Music Emotion Recognition based on feed-forward neural network. In: Working Notes Proceedings of the MediaEval 2015 Workshop; 2015."/>
+
+<meta name="citation_reference" content="Chmulik M, Guoth I, Malik M, Jarina R. UNIZA system for the “Emotion in Music” task at MediaEval 2015. In: Working Notes Proceedings of the MediaEval 2015 Workshop; 2015."/>
+
+<meta name="citation_reference" content="Aljanaki A, Wiering F, Veltkamp R. MediaEval 2015: A segmentation-based approach to continuous emotion tracking. In: Working Notes Proceedings of the MediaEval 2015 Workshop; 2015."/>
+
+<meta name="citation_reference" content="Weber M, Krismayer T, Wöß J, Aigmüller L, Birnzain P. MediaEval 2015: JKU-Tinnitus approach to Emotion in Music Task. In: Working Notes Proceedings of the MediaEval 2015 Workshop; 2015."/>
+<meta name="citation_reference" content="citation_title=Automated music emotion recognition: A systematic evaluation;citation_author=A Huq;citation_author=JP Bello;citation_author=R Rowe;citation_journal_title=Journal of New Music Research;citation_volume=39;citation_number=39;citation_issue=3;citation_first_page=227;citation_last_page=244;citation_publication_date=2010;"/>    
+<meta name="citation_reference" content="citation_title=Modeling the affective content of music with a Gaussian mixture model;citation_author=JC Wang;citation_author=YH Yang;citation_author=HM Wang;citation_author=SK Jeng;citation_journal_title=IEEE Transactions on Affective Computing;citation_volume=6;citation_number=6;citation_issue=1;citation_first_page=56;citation_last_page=68;citation_publication_date=2015;"/>    
+<meta name="citation_reference" content="citation_title=Corpus development for affective video indexing;citation_author=M Soleymani;citation_author=M Larson;citation_author=T Pun;citation_author=A Hanjalic;citation_journal_title=IEEE Transactions on Multimedia;citation_volume=16;citation_number=16;citation_issue=4;citation_first_page=1075;citation_last_page=1089;citation_publication_date=2014;"/>    
+<meta name="citation_reference" content="citation_title=Beyond valence and activity in the emotional connotations of music;citation_author=G Collier;citation_journal_title=Psychology of Music;citation_volume=35;citation_number=35;citation_issue=1;citation_first_page=110;citation_last_page=131;citation_publication_date=2007;"/>    
+
+<meta name="citation_reference" content="Aljanaki A, Wiering F, Veltkamp RC. Emotion based segmentation of musical audio. In: Proceedings of International Society for Music Information Retrieval Conference; 2015."/>
+
+<meta name="citation_reference" content="Su D, Fung P. Personalized music emotion classification via active learning. In: Proceedings of ACM International Workshop on Music Information Retrieval with User-Centered and Multimodal Strategies; 2012. p. 51–62."/>
+
+<meta name="citation_reference" content="Chen YA, Wang JC, Yang YH, Chen HH. Linear regression-based adaptation of music emotion recognition models for personalization. In: Proceedings of IEEE International Conference Acoustics, Speech &amp;amp; Signal Processing; 2014. p. 2149–2153."/>
+
+<meta name="citation_reference" content="Schmidt EM, Kim YE. Learning rhythm and melody features with deep belief networks. In: Proceedings of International Society for Music Information Retrieval Conference; 2013."/>
+
+<meta name="citation_reference" content="Panda R, Rocha B, Paiva R. Dimensional music emotion recognition: Combining standard and melodic audio features. In: Proceedings of International Symposium on Computer Music Modelling &amp;amp; Retrieval; 2013."/>
+
+<meta name="citation_reference" content="Coutinho E, Deng J, Schuller B. Transfer learning emotion manifestation across music and speech. In: 2014 International Joint Conference on Neural Networks (IJCNN); 2014. p. 3592–3598."/>
+
+<meta name="citation_reference" content="He L, Jiang D, Yang L, Pei E, Wu P, Sahli H. Multimodal Affective Dimension Prediction Using Deep Bidirectional Long Short-Term Memory Recurrent Neural Networks. In: Proceedings of the 5th International Workshop on Audio/Visual Emotion Challenge. AVEC’15. New York, NY, USA: ACM; 2015. p. 73–80."/>
+
+
+<script type="text/javascript">
+    var WombatConfig = WombatConfig || {};
+    WombatConfig.journalKey = "PLoSONE";
+    WombatConfig.journalName = "PLOS One";
+    WombatConfig.figurePath = "/plosone/article/figure/image";
+    WombatConfig.figShareInstitutionString = "plos";
+    WombatConfig.doiResolverPrefix = "https://dx.plos.org/";
+</script>
+
+<script type="text/javascript">
+  var WombatConfig = WombatConfig || {};
+  WombatConfig.metrics = WombatConfig.metrics || {};
+  WombatConfig.metrics.referenceUrl      = "http://lagotto.io/plos";
+  WombatConfig.metrics.googleScholarUrl  = "https://scholar.google.com/scholar";
+  WombatConfig.metrics.googleScholarCitationUrl  = WombatConfig.metrics.googleScholarUrl + "?hl=en&lr=&q=";
+  WombatConfig.metrics.crossrefUrl  = "https://www.crossref.org";
+</script>
+<script defer="defer" src="/resource/js/defer.js?2e8afd3b305f91b42788"></script><script src="/resource/js/sync.js?2e8afd3b305f91b42788"></script>
+<script src="/resource/js/vendor/jquery.min.js" type="text/javascript"></script>
+
+          <script type="text/javascript" src="https://widgets.figshare.com/static/figshare.js"></script>
+
+<script src="/resource/js/vendor/fastclick/lib/fastclick.js" type="text/javascript"></script>
+<script src="/resource/js/vendor/foundation/foundation.js" type="text/javascript"></script>
+<script src="/resource/js/vendor/underscore-min.js" type="text/javascript"></script>
+<script src="/resource/js/vendor/underscore.string.min.js" type="text/javascript"></script>
+<script src="/resource/js/vendor/moment.js" type="text/javascript"></script>
+
+
+<script src="/resource/js/vendor/jquery-ui-effects.min.js" type="text/javascript"></script>
+
+<script src="/resource/js/vendor/foundation/foundation.tooltip.js" type="text/javascript"></script>
+<script src="/resource/js/vendor/foundation/foundation.dropdown.js" type="text/javascript"></script>
+<script src="/resource/js/vendor/foundation/foundation.tab.js" type="text/javascript"></script>
+<script src="/resource/js/vendor/foundation/foundation.reveal.js" type="text/javascript"></script>
+<script src="/resource/js/vendor/foundation/foundation.slider.js" type="text/javascript"></script>
+
+<script src="/resource/js/util/utils.js" type="text/javascript"></script>
+<script src="/resource/js/components/toggle.js" type="text/javascript"></script>
+<script src="/resource/js/components/truncate_elem.js" type="text/javascript"></script>
+<script src="/resource/js/components/tooltip_hover.js" type="text/javascript"></script>
+<script src="/resource/js/vendor/jquery.dotdotdot.js" type="text/javascript"></script>
+
+
+<!-- DoubleClick overall ad setup script -->
+<script type='text/javascript'>
+  var googletag = googletag || {};
+  googletag.cmd = googletag.cmd || [];
+  if (window.plosCookieConsent?.hasConsented('advertising')) {
+    (function() {
+      var gads = document.createElement('script');
+      gads.async = true;
+      gads.type = 'text/javascript';
+      var useSSL = 'https:' == document.location.protocol;
+      gads.src = (useSSL ? 'https:' : 'http:') +
+          '//www.googletagservices.com/tag/js/gpt.js';
+      var node = document.getElementsByTagName('script')[0];
+      node.parentNode.insertBefore(gads, node);
+    })();
+  }
+</script>
+
+<!-- DoubleClick ad slot setup script -->
+
+  <script id="doubleClickSetupScript" type='text/javascript'>
+    googletag.cmd.push(function() {
+  googletag.defineSlot('/75507958/PONE_728x90_ATF', [728, 90], 'div-gpt-ad-1458247671871-0').addService(googletag.pubads());
+  googletag.defineSlot('/75507958/PONE_160x600_BTF', [160, 600], 'div-gpt-ad-1458247671871-1').addService(googletag.pubads());
+      googletag.pubads().enableSingleRequest();
+      googletag.enableServices();
+    });
+  </script>
+
+<!--For Google Tag manager to be able to track site information  -->
+<script>
+
+  dataLayer = [{
+    'mobileSite': 'false',
+    'desktopSite': 'true'
+  }];
+
+</script>
+
+    <title>Developing a benchmark for emotional analysis of music | PLOS One</title>
+</head><body></body></html>

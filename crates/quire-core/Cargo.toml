@@ -1,0 +1,14 @@
+[package]
+name = "quire-core"
+description = "quire use cases (add, deduplicate, projects, export selection), cite keys, and the storage port"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+quire-model.workspace = true
+deunicode.workspace = true
+thiserror.workspace = true

@@ -1,0 +1,21 @@
+---
+source: crates/quire-fetch/src/fulltext/jats.rs
+expression: md
+---
+## 1. Introduction
+
+Injury is common [1] and costs \$5. See *strain* ${ε}_{a}$:
+
+$$M = 2$$ (1)
+
+which holds.
+
+### 1.1 Model
+
+Text.
+
+Figure 1: Overall framework. **(a)** Axon.
+
+## References
+
+[1] Gennarelli TA. Diffuse axonal injury. 1982.

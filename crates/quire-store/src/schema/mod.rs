@@ -1,0 +1,26 @@
+//! Schema migrations, applied in order at open. The version is kept in SQLite's `user_version`
+//! (`rusqlite_migration`). Migrations are append-only: never edit one that has shipped.
+
+use rusqlite_migration::{M, Migrations};
+
+/// Every migration, oldest first.
+pub fn migrations() -> Migrations<'static> {
+    Migrations::new(vec![
+        M::up(include_str!("001_initial.sql")),
+        M::up(include_str!("002_issues.sql")),
+        M::up(include_str!("003_auto_export.sql")),
+        M::up(include_str!("004_attachment.sql")),
+        M::up(include_str!("005_pdf_attempt.sql")),
+        M::up(include_str!("006_tags_notes_relations.sql")),
+        M::up(include_str!("007_duplicate_dismissal.sql")),
+        M::up(include_str!("008_highlight.sql")),
+    ])
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn migrations_are_valid() {
+        super::migrations().validate().unwrap();
+    }
+}

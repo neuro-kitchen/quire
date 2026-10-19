@@ -1,0 +1,20 @@
+[package]
+name = "quire_py"
+description = "The quire Python SDK & PyO3 native bindings"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+name = "quire_bindings"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+## Enable `pyo3/extension-module` when building the Python wheel via maturin,
+## while keeping it off during `cargo test --workspace` to avoid linker errors.
+extension-module = ["pyo3/extension-module"]
+
+[dependencies]
+pyo3.workspace = true
