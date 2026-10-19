@@ -81,7 +81,9 @@ pub fn insert(conn: &Connection, a: &Attachment) -> Result<()> {
 }
 
 pub fn update(conn: &Connection, a: &Attachment) -> Result<()> {
-    let sql = "UPDATE attachment SET filename = ?2, pdf_kind = ?3, pages = ?4, updated_at = ?5, updated_by = ?6, deleted_at = ?7 WHERE id = ?1";
+    // `reference_id` too: merging duplicates moves attachments to the kept reference.
+    let sql = "UPDATE attachment SET filename = ?2, pdf_kind = ?3, pages = ?4, updated_at = ?5, updated_by = ?6,
+               deleted_at = ?7, reference_id = ?8 WHERE id = ?1";
     conn.execute(
         sql,
         params![
@@ -92,6 +94,7 @@ pub fn update(conn: &Connection, a: &Attachment) -> Result<()> {
             a.meta.updated_at.as_millis(),
             id_blob(a.meta.updated_by),
             a.meta.deleted_at.map(|t| t.as_millis()),
+            id_blob(a.reference),
         ],
     )
     .or_core()?;

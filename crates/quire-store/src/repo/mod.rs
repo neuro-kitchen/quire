@@ -8,6 +8,7 @@
 mod attachments;
 mod auto_export;
 mod codec;
+mod highlights;
 mod issues;
 mod links;
 mod projects;
@@ -16,8 +17,8 @@ mod tags;
 
 use quire_core::{AutoExport, FailedInput, Library, RawRecord, ReferenceFilter, Result};
 use quire_model::{
-    Attachment, AttachmentId, CiteKey, DeviceId, Identifier, Issue, Note, NoteId, PdfAttempt, Project, ProjectId,
-    Reference, ReferenceId, Slug, Tag, TagId, TagKind, Timestamp,
+    Attachment, AttachmentId, CiteKey, DeviceId, Highlight, HighlightId, Identifier, Issue, Note, NoteId, PdfAttempt,
+    Project, ProjectId, Reference, ReferenceId, Slug, Tag, TagId, TagKind, Timestamp,
 };
 use rusqlite::Connection;
 
@@ -228,5 +229,29 @@ impl Library for SqliteLibrary<'_> {
 
     fn related(&self, reference: ReferenceId) -> Result<Vec<ReferenceId>> {
         tags::related(self.conn, reference)
+    }
+
+    fn dismiss_duplicate(&mut self, a: ReferenceId, b: ReferenceId) -> Result<bool> {
+        tags::dismiss_duplicate(self.conn, a, b, self.device)
+    }
+
+    fn dismissed_duplicates(&self) -> Result<Vec<(ReferenceId, ReferenceId)>> {
+        tags::dismissed_duplicates(self.conn)
+    }
+
+    fn highlights_of(&self, reference: ReferenceId) -> Result<Vec<Highlight>> {
+        highlights::of(self.conn, reference)
+    }
+
+    fn highlight(&self, id: HighlightId) -> Result<Option<Highlight>> {
+        highlights::by_id(self.conn, id)
+    }
+
+    fn insert_highlight(&mut self, highlight: &Highlight) -> Result<()> {
+        highlights::insert(self.conn, highlight)
+    }
+
+    fn update_highlight(&mut self, highlight: &Highlight) -> Result<()> {
+        highlights::update(self.conn, highlight)
     }
 }
