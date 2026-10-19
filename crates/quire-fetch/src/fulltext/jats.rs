@@ -1,11 +1,13 @@
-//! JATS XML (Europe PMC's open-access full text) → reader Markdown ([`super`] has the format).
+//! JATS XML (Europe PMC's open-access full text) → reader Markdown ([`quire_io::paper_markdown`]
+//! has the format).
 //! Sections nest with their `<title>`; `<disp-formula>`, `<fig>`, `<table-wrap>` and lists can sit
-//! inside a `<p>`, which is then cut around them.
+//! inside a `<p>`, which is then cut around them, or all sit in a `<floats-group>` after the body.
 
 use roxmltree::{Document, Node};
 
-use super::{Writer, figure_label, tex_from_tex_math};
+use super::{Writer, tex_from_tex_math};
 use crate::fulltext::mathml;
+use quire_io::paper_markdown::normalize_label;
 
 /// The article's body and reference list as reader Markdown.
 pub fn to_markdown(xml: &str) -> Result<String, roxmltree::Error> {
@@ -14,6 +16,10 @@ pub fn to_markdown(xml: &str) -> Result<String, roxmltree::Error> {
     let article = doc.root_element();
     if let Some(body) = article.children().find(|n| n.has_tag_name("body")) {
         blocks(body, 1, &mut out);
+    }
+    // Figures and tables kept apart from the text (MDPI and others put them all at the end).
+    if let Some(floats) = article.children().find(|n| n.has_tag_name("floats-group")) {
+        blocks(floats, 1, &mut out);
     }
     if let Some(back) = article.children().find(|n| n.has_tag_name("back")) {
         for part in back.children().filter(Node::is_element) {
@@ -99,7 +105,7 @@ fn caption(node: Node, default: &str) -> String {
         let parts: Vec<String> = c.children().filter(Node::is_element).map(inline).collect();
         parts.iter().map(|p| p.trim()).filter(|p| !p.is_empty()).collect::<Vec<_>>().join(" ")
     });
-    format!("{}: {}", figure_label(&label), caption.unwrap_or_default())
+    format!("{}: {}", normalize_label(&label), caption.unwrap_or_default())
 }
 
 fn figure(node: Node, out: &mut Writer) {
@@ -180,6 +186,15 @@ mod tests {
             <back><ref-list><title>References</title><ref id="r1"><label>1</label><mixed-citation><surname>Gennarelli</surname> TA. <article-title>Diffuse axonal injury</article-title>. <year>1982</year>.</mixed-citation></ref></ref-list></back></article>"#;
         let md = to_markdown(xml).unwrap();
         insta::assert_snapshot!(md);
+    }
+
+    #[test]
+    fn floats_group() {
+        let xml = r#"<article><body><sec><title>Intro</title><p>See Figure 1.</p></sec></body>
+            <back><ref-list><ref><label>1</label><mixed-citation>A. 2020.</mixed-citation></ref></ref-list></back>
+            <floats-group><fig><label>Figure 1.</label><caption><p>General block diagram.</p></caption></fig></floats-group></article>"#;
+        let md = to_markdown(xml).unwrap();
+        assert!(md.contains("See Figure 1.\n\nFigure 1: General block diagram.\n\n## References"), "{md}");
     }
 
     #[test]

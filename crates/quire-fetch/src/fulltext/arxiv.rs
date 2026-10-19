@@ -1,5 +1,5 @@
-//! arXiv's HTML papers (LaTeXML, `https://arxiv.org/html/<id>`) → reader Markdown ([`super`] has
-//! the format). Seen on 1706.03762v7 (2026-10-19): `<article class="ltx_document">` holds the
+//! arXiv's HTML papers (LaTeXML, `https://arxiv.org/html/<id>`) → reader Markdown ([`quire_io::paper_markdown`]
+//! has the format). Seen on 1706.03762v7 (2026-10-19): `<article class="ltx_document">` holds the
 //! title, authors and abstract (left out: the reader shows them from the library), then
 //! `<section class="ltx_section">`s with `<h2>`–`<h6>` titles, `<div class="ltx_para">` of
 //! `<p class="ltx_p">`, `<math alttext="LaTeX">`, equations as `<table class="ltx_equation">`
@@ -10,6 +10,7 @@
 use scraper::{ElementRef, Html, Node};
 
 use super::Writer;
+use quire_io::paper_markdown::normalize_label;
 
 /// The paper's sections and references as reader Markdown.
 pub fn to_markdown(html: &str) -> String {
@@ -96,7 +97,7 @@ fn normalize_caption(caption: &str, kind: &str) -> String {
     if label.is_empty() || label.split_whitespace().count() > 3 {
         return format!("{kind}: {caption}");
     }
-    format!("{}: {}", super::figure_label(label), rest.trim())
+    format!("{}: {}", normalize_label(label), rest.trim())
 }
 
 fn rows(tabular: ElementRef) -> Vec<Vec<String>> {
