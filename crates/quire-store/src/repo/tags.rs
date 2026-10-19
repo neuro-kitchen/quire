@@ -243,3 +243,21 @@ pub fn related(conn: &Connection, reference: ReferenceId) -> Result<Vec<Referenc
     let rows = statement.query_map([id_blob(reference)], |row| id_at(row, "other")).or_core()?;
     rows.collect::<rusqlite::Result<Vec<_>>>().or_core()
 }
+
+/// Records that `a` and `b` are not duplicates; `false` if already recorded.
+pub fn dismiss_duplicate(
+    conn: &Connection,
+    a: ReferenceId,
+    b: ReferenceId,
+    device: quire_model::DeviceId,
+) -> Result<bool> {
+    let (a, b) = ordered(a, b);
+    let sql = "INSERT OR IGNORE INTO duplicate_dismissal (a, b, created_at, updated_by) VALUES (?1, ?2, ?3, ?4)";
+    Ok(conn.execute(sql, params![a, b, Timestamp::now().as_millis(), id_blob(device)]).or_core()? > 0)
+}
+
+pub fn dismissed_duplicates(conn: &Connection) -> Result<Vec<(ReferenceId, ReferenceId)>> {
+    let mut statement = conn.prepare("SELECT a, b FROM duplicate_dismissal").or_core()?;
+    let rows = statement.query_map([], |row| Ok((id_at(row, "a")?, id_at(row, "b")?))).or_core()?;
+    rows.collect::<rusqlite::Result<Vec<_>>>().or_core()
+}

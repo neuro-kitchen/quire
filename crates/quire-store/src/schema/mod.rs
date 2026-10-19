@@ -12,6 +12,8 @@ pub fn migrations() -> Migrations<'static> {
         M::up(include_str!("004_attachment.sql")),
         M::up(include_str!("005_pdf_attempt.sql")),
         M::up(include_str!("006_tags_notes_relations.sql")),
+        M::up(include_str!("007_duplicate_dismissal.sql")),
+        M::up(include_str!("008_highlight.sql")),
     ])
 }
 
