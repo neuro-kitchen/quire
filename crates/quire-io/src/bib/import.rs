@@ -1,11 +1,11 @@
 //! `.bib` text → cite keys + [`ReferenceData`]. Fields quire does not model are kept in `extra`
 //! as `biblatex.<field>` and written back on export, so a `.bib` round trip loses nothing.
 
-use biblatex::{Bibliography, ChunksExt, DateValue, Entry, Person, PermissiveType};
-use quire_model::{Date, Doi, EntryKind, Identifier, Pmcid, Pmid, ReferenceData};
+use biblatex::{Bibliography, ChunksExt, DateValue, Entry, PermissiveType, Person};
+use quire_model::{Date, Doi, EntryKind, Identifier, Pmcid, Pmid, ReferenceData, TextField};
 
-use super::fields::{from_biblatex, READ_ORDER};
-use super::names::{from_person, NAME_FIELDS};
+use super::fields::{READ_ORDER, from_biblatex};
+use super::names::{NAME_FIELDS, from_person};
 use super::types::from_biblatex as kind_from_biblatex;
 use crate::error::{IoError, Result};
 
@@ -13,7 +13,8 @@ use crate::error::{IoError, Result};
 pub const EXTRA_PREFIX: &str = "biblatex.";
 
 /// Fields read into structured parts (dates, identifiers), not text fields or `extra`.
-const STRUCTURED: &[&str] = &["date", "year", "month", "day", "doi", "eprint", "eprinttype", "archiveprefix", "pmid", "pmcid"];
+const STRUCTURED: &[&str] =
+    &["date", "year", "month", "day", "doi", "eprint", "eprinttype", "archiveprefix", "pmid", "pmcid"];
 
 /// One entry of a `.bib` file: its cite key as written (it may not be a valid quire key) and
 /// its content.
@@ -56,6 +57,19 @@ fn record(entry: &Entry) -> BibRecord {
             data.extra.insert(format!("{EXTRA_PREFIX}{field}"), value);
         }
     }
+    // The Typst-friendly form (`preprints = "article"`): `@article` with `journaltitle = {arXiv}`.
+    let arxiv = data.identifiers.iter().any(|id| matches!(id, Identifier::Arxiv(_)));
+    if bib_type == "article"
+        && arxiv
+        && data.get(TextField::ContainerTitle).is_some_and(|c| c.eq_ignore_ascii_case("arxiv"))
+    {
+        data.kind = EntryKind::Article;
+        if let Some(container) = data.text.remove(&TextField::ContainerTitle)
+            && data.get(TextField::Publisher).is_none()
+        {
+            data.set(TextField::Publisher, container);
+        }
+    }
     BibRecord { cite_key: entry.key.clone(), data }
 }
 
@@ -96,7 +110,7 @@ mod tests {
     use super::*;
     use quire_model::{CiteKey, DeviceId, EntryKind, IdentifierKind, Origin, Reference, TextField};
 
-    use crate::bib::{to_bib, BibFormat};
+    use crate::bib::{BibFormat, to_bib};
 
     const BIB: &str = r#"
 @article{kucsko2013,
@@ -153,6 +167,16 @@ mod tests {
             let keys = |d: &ReferenceData| d.identifiers.iter().map(Identifier::key).collect::<Vec<_>>();
             assert_eq!(keys(&back.data), keys(&record.data), "{text}");
         }
+    }
+
+    #[test]
+    fn article_in_arxiv_is_a_preprint() {
+        let bib = "@article{v, title = {T}, journaltitle = {arXiv}, eprint = {1706.03762}, eprinttype = {arxiv}}";
+        let data = &from_bib(bib).unwrap()[0].data;
+        assert_eq!(
+            (data.kind, data.get(TextField::Publisher), data.get(TextField::ContainerTitle)),
+            (EntryKind::Article, Some("arXiv"), None)
+        );
     }
 
     #[test]
