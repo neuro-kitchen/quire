@@ -2,7 +2,7 @@
 
 use quire_core::{RawRecord, ReferenceFilter, Result};
 use quire_model::{CiteKey, Identifier, Reference, ReferenceId};
-use rusqlite::{params, params_from_iter, Connection, OptionalExtension, Row};
+use rusqlite::{Connection, OptionalExtension, Row, params, params_from_iter};
 
 use super::codec::{id_at, id_blob, json_at, meta_at, parsed_at};
 use crate::error::OrCore;
@@ -29,7 +29,7 @@ pub fn by_id(conn: &Connection, id: ReferenceId) -> Result<Option<Reference>> {
 }
 
 pub fn by_cite_key(conn: &Connection, key: &CiteKey) -> Result<Option<Reference>> {
-    one(conn, "cite_key = ?1 AND deleted_at IS NULL", [key.as_str()])
+    one(conn, "cite_key = ?1", [key.as_str()])
 }
 
 pub fn by_identifier(conn: &Connection, identifier: &Identifier) -> Result<Option<Reference>> {
@@ -64,10 +64,15 @@ pub fn insert(conn: &Connection, reference: &Reference, raw: Option<&RawRecord>)
     .or_core()?;
     insert_identifiers(conn, reference)?;
     if let Some(raw) = raw {
-        let sql = "INSERT INTO raw_record (reference_id, source, format, body, received_at) VALUES (?1, ?2, ?3, ?4, ?5)";
-        conn.execute(sql, params![id_blob(reference.id), raw.source, raw.format, raw.body, raw.received_at.as_millis()])
-            .or_core()?;
+        insert_raw(conn, reference.id, raw)?;
     }
+    Ok(())
+}
+
+pub fn insert_raw(conn: &Connection, reference: ReferenceId, raw: &RawRecord) -> Result<()> {
+    let sql = "INSERT INTO raw_record (reference_id, source, format, body, received_at) VALUES (?1, ?2, ?3, ?4, ?5)";
+    conn.execute(sql, params![id_blob(reference), raw.source, raw.format, raw.body, raw.received_at.as_millis()])
+        .or_core()?;
     Ok(())
 }
 
@@ -117,6 +122,11 @@ pub fn list(conn: &Connection, filter: &ReferenceFilter) -> Result<Vec<Reference
             "id IN (SELECT reference_id FROM project_reference WHERE deleted_at IS NULL AND project_id IN ({marks}))"
         ));
         values.extend(projects.iter().map(|p| id_blob(*p)));
+    }
+    for tag in &filter.tags {
+        conditions
+            .push("id IN (SELECT reference_id FROM reference_tag WHERE deleted_at IS NULL AND tag_id = ?)".to_string());
+        values.push(id_blob(*tag));
     }
     let filter = if conditions.is_empty() { "1".to_string() } else { conditions.join(" AND ") };
     let sql = format!("SELECT {COLUMNS} FROM reference WHERE {filter} ORDER BY cite_key");
