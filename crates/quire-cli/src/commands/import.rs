@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use clap::Args;
 use quire_engine::{Added, Engine, SlugPath};
 
-use crate::output;
+use crate::output::{self, Tone};
 
 #[derive(Args, Debug)]
 pub struct ImportArgs {
@@ -20,15 +20,14 @@ pub async fn run(engine: &Engine, args: &ImportArgs) -> anyhow::Result<()> {
     let results = engine.import_bib(&args.file, args.project.as_ref()).await?;
     let mut new = 0;
     for added in &results {
-        let label = match added {
-            Added::New(_) => {
+        match added {
+            Added::New(reference) => {
                 new += 1;
-                "added   "
+                output::report(Tone::Ok, "added", output::summary(reference));
             }
-            Added::Existing(_) => "existing",
-        };
-        println!("{label}  {}", output::line(added.reference()));
+            Added::Existing(reference) => output::report(Tone::Warn, "existing", output::summary(reference)),
+        }
     }
-    eprintln!("{} entries: {new} new, {} already in the library", results.len(), results.len() - new);
+    output::hint(format!("{} entries: {new} new, {} already in the library", results.len(), results.len() - new));
     Ok(())
 }

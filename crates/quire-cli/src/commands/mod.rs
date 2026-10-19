@@ -1,13 +1,24 @@
-//! One module per command (file name = command name); each defines its arguments and `run`.
-//! `link` also serves `unlink`, `trash` serves `rm` and `restore`.
+//! One module per command or command group; each defines its arguments and `run`.
+//!
+//! - [`reference`]: `ref add|list|show|link|unlink|rm|restore|copy` (and the `add`, `list`,
+//!   `show` shortcuts).
+//! - [`project`], [`library`], [`config`], [`folder`], [`pdf`], [`access`], [`tag`], [`note`]: their
+//!   groups.
+//! - [`editor`]: the user's editor, shared.
+//! - [`import`], [`export`], [`init`], [`serve`], [`completions`]: single commands.
 
-pub mod add;
+pub mod access;
+pub mod completions;
 pub mod config;
+pub mod editor;
 pub mod export;
+pub mod folder;
 pub mod import;
 pub mod init;
-pub mod link;
-pub mod list;
+pub mod library;
+pub mod note;
+pub mod pdf;
 pub mod project;
-pub mod show;
-pub mod trash;
+pub mod reference;
+pub mod serve;
+pub mod tag;
