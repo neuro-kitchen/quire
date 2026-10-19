@@ -46,7 +46,7 @@ pub struct PaperText {
 
 /// Version of the stored full texts: raised when the converters change, so texts are fetched
 /// and converted again.
-const FORMAT: u32 = 1;
+const FORMAT: u32 = 2;
 /// How long "no full text online" is believed before asking again (papers get HTML versions
 /// and open-access copies later).
 const RETRY_AFTER: Duration = Duration::from_secs(30 * 24 * 3600);
@@ -85,6 +85,27 @@ impl Engine {
         }
         let (reference, markdown, _) = self.paper_text(&reference.id.to_string()).await?;
         Ok((reference, PaperText { markdown, source: TextSource::Pdf }))
+    }
+
+    /// Removes the stored texts of the reference `query` names (its full text or "none" marker,
+    /// and each PDF's converted Markdown), so [`Engine::reader_text`] fetches or converts again.
+    /// Returns how many files were removed.
+    pub async fn forget_text(&self, query: &str) -> Result<usize> {
+        let (reference, _) = self.show(query).await?;
+        let mut paths = vec![self.text_path(&reference)];
+        let store = self.files();
+        for attachment in self.attachments(&reference).await? {
+            paths.push(store.path(&attachment.hash, "md"));
+        }
+        let mut removed = 0;
+        for path in paths {
+            match std::fs::remove_file(&path) {
+                Ok(()) => removed += 1,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(EngineError::File { path, source: error }),
+            }
+        }
+        Ok(removed)
     }
 
     fn text_path(&self, reference: &Reference) -> PathBuf {

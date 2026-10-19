@@ -241,10 +241,19 @@ impl Engine {
             return Ok((reference, body.to_string(), true));
         }
         let bytes = std::fs::read(&pdf_path).map_err(EngineError::file(&pdf_path))?;
+        let pages = attachment.pages.unwrap_or(1);
         // Conversion is CPU work (tens of ms per page): off the async threads.
-        let markdown = tokio::task::spawn_blocking(move || pdf::to_markdown(&bytes))
-            .await
-            .map_err(|e| EngineError::Pdf(format!("converting the PDF failed: {e}")))??;
+        let markdown = tokio::task::spawn_blocking(move || {
+            let converted = pdf::to_markdown(&bytes);
+            // Only stamps read (a scan whose OCR text pdf-inspector drops): poppler, if installed.
+            let sparse = converted.as_deref().map_or(true, |m| pdf::is_sparse(m, pages));
+            match sparse.then(|| poppler_text(&pdf_path)).flatten() {
+                Some(text) => Ok(pdf::plain::to_markdown(&text)),
+                None => converted,
+            }
+        })
+        .await
+        .map_err(|e| EngineError::Pdf(format!("converting the PDF failed: {e}")))??;
         let temporary = cache.with_extension("md.partial");
         std::fs::write(&temporary, format!("{header}{markdown}")).map_err(EngineError::file(&temporary))?;
         std::fs::rename(&temporary, &cache).map_err(EngineError::file(&cache))?;
@@ -340,4 +349,19 @@ fn attempt_outcome(reference: &Reference, error: &quire_fetch::FetchError) -> Pd
     } else {
         PdfAttempt::NotFound
     }
+}
+
+/// The text poppler's `pdftotext` reads from `path`, if it is installed and reads more than a
+/// stamp.
+fn poppler_text(path: &Path) -> Option<String> {
+    let output = std::process::Command::new("pdftotext")
+        .args(["-enc", "UTF-8"])
+        .arg(path)
+        .arg("-")
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .ok()?;
+    let text = String::from_utf8(output.stdout).ok()?;
+    (output.status.success() && text.split_whitespace().count() > 100).then_some(text)
 }

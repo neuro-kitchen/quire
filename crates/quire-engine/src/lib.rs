@@ -24,21 +24,23 @@ pub mod secrets;
 
 pub use config::Config;
 pub use engine::{
-    AbstractOutcome, Attached, AutoExportInfo, AutoExportOutcome, Change, Engine, ExportRequest, OpenOptions,
-    PaperText, PdfOutcome, PdfStatus, ProjectSummary, TextSource, online_candidate,
+    AbstractOutcome, Attached, AutoExportInfo, AutoExportOutcome, Change, DuplicateGroup, Engine, ExportRequest,
+    OpenOptions, PaperText, PdfOutcome, PdfStatus, ProjectSummary, TextSource, online_candidate,
 };
 pub use error::{EngineError, Result};
 pub use folder::FolderFile;
 pub use libraries::{LibraryChoice, LibraryInfo};
 
 // Types front ends receive from the engine.
+pub use quire_core::library::duplicates::{Merged, Reason as DuplicateReason};
 pub use quire_core::library::update::{FieldChange, Outcome, Updated};
 pub use quire_core::{Added, Checked, CoreError, FailedInput};
 pub use quire_fetch::{Endpoints, FetchError};
+pub use quire_io::paper_markdown;
 pub use quire_io::pdf::PdfMatch;
 pub use quire_io::{ExportFormat, ExportOptions};
 pub use quire_model::{
-    Attachment, Issue, IssueCode, Note, NoteId, PdfAttempt, PdfKind, Project, Reference, Severity, SlugPath, Tag,
-    TagKind,
+    Attachment, Field, Highlight, HighlightId, Issue, IssueCode, Note, NoteId, PdfAttempt, PdfKind, Project, Reference,
+    Severity, SlugPath, Tag, TagKind,
 };
 pub use secrets::Store as SecretStore;

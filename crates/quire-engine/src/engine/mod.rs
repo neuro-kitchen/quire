@@ -12,7 +12,9 @@
 
 mod abstracts;
 mod access;
+mod duplicates;
 mod exports;
+mod highlights;
 mod pdfs;
 mod projects;
 mod references;
@@ -29,6 +31,7 @@ use quire_store::SqliteLibrary;
 
 pub use abstracts::AbstractOutcome;
 pub use access::AccessStatus;
+pub use duplicates::DuplicateGroup;
 pub use exports::{AutoExportInfo, AutoExportOutcome, DEFAULT_PROFILE, ExportRequest, write_if_changed};
 pub use pdfs::{Attached, PdfOutcome, PdfStatus};
 pub use projects::ProjectSummary;
