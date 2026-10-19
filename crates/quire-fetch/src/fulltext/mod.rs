@@ -5,16 +5,8 @@
 //! - [`jats`]: Europe PMC's JATS XML, for open-access papers in PubMed Central; equations as
 //!   TeX or MathML ([`mathml`] turns MathML into LaTeX).
 //!
-//! Both become the same Markdown, which the reader also uses for PDF text:
-//!
-//! - `## 3 Model` headings (deeper sections, more `#`);
-//! - paragraphs with `*italic*`, `**bold**`, `<sup>`/`<sub>`, inline math as `$LaTeX$` (a literal
-//!   dollar is `\$`);
-//! - display equations as their own paragraph: `$$LaTeX$$ (1)`;
-//! - `Figure 1: caption` and `Table 1: caption` paragraphs, a table's rows after its caption as
-//!   `|a|b|` lines;
-//! - `- item` lists;
-//! - `## References`, then `[1] citation` paragraphs.
+//! Both become the reader's Markdown, described in [`quire_io::paper_markdown`] (one place for
+//! the format, shared with the PDF cleanup and the reader).
 
 pub mod arxiv;
 pub mod jats;
@@ -204,19 +196,6 @@ pub(crate) fn wrap(marker: &str, text: &str) -> String {
     format!("{start}{marker}{trimmed}{marker}{end}")
 }
 
-/// `Fig 1` / `Fig. 1.` / `FIGURE 1` → `Figure 1`; `Table 2.` → `Table 2`.
-pub(crate) fn figure_label(label: &str) -> String {
-    let label = collapse(label);
-    let label = label.trim_end_matches([':', '.']);
-    let (name, number) = label.split_once(' ').unwrap_or((label, ""));
-    let name = match name.trim_end_matches('.').to_lowercase().as_str() {
-        "fig" | "figure" => "Figure",
-        "table" | "tab" => "Table",
-        _ => name,
-    };
-    format!("{name} {number}").trim().to_string()
-}
-
 /// The formula inside a `<tex-math>`, which often holds a whole LaTeX document
 /// (`\documentclass…\begin{document}$$x$$\end{document}`).
 pub(crate) fn tex_from_tex_math(text: &str) -> String {
@@ -237,9 +216,6 @@ mod tests {
 
     #[test]
     fn helpers() {
-        assert_eq!(figure_label("Fig. 1."), "Figure 1");
-        assert_eq!(figure_label("FIGURE 3"), "Figure 3");
-        assert_eq!(figure_label("Table 2:"), "Table 2");
         assert_eq!(wrap("*", " strain "), " *strain* ");
         assert_eq!(
             tex_from_tex_math(

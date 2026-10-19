@@ -71,6 +71,9 @@ fn element(node: Node) -> String {
         "mfrac" => format!("\\frac{{{}}}{{{}}}", nth(node, 0), nth(node, 1)),
         "msqrt" => format!("\\sqrt{{{}}}", all(node)),
         "mroot" => format!("\\sqrt[{}]{{{}}}", nth(node, 1), nth(node, 0)),
+        // Over or under nothing (an `<mspace>`): a typesetting trick to place a character, as in
+        // MDPI's slanted fraction `¹/√|a|`. The character alone.
+        "mover" | "munder" if nth(node, 0).trim().is_empty() => nth(node, 1),
         "mover" => {
             let over = children(node).nth(1).map(token).unwrap_or_default();
             match accent(&over) {
@@ -120,6 +123,12 @@ mod tests {
                 "<mtable><mtr><mtd><mi>a</mi></mtd><mtd><mi>b</mi></mtd></mtr><mtr><mtd><mi>c</mi></mtd></mtr></mtable>"
             ),
             r"a & b \\ c"
+        );
+        assert_eq!(
+            tex(
+                r#"<mover accent="true"><mspace height=".6"/><mn>1</mn></mover><mo>/</mo><munder><mspace depth="-.8"/><msqrt><mi>a</mi></msqrt></munder>"#
+            ),
+            r"1/\sqrt{a}"
         );
         assert_eq!(tex("<semantics><mi>y</mi><annotation encoding=\"x\">ignored</annotation></semantics>"), "y");
     }
