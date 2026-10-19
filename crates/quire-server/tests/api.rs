@@ -67,6 +67,9 @@ async fn token_cors_page_and_pdf() {
     let status: Value =
         client.get(format!("{base}/v1/status")).bearer_auth(TOKEN).send().await.unwrap().json().await.unwrap();
     assert_eq!(status["app"], "quire");
+    let projects: Value =
+        client.get(format!("{base}/v1/projects")).bearer_auth(TOKEN).send().await.unwrap().json().await.unwrap();
+    assert_eq!(projects, json!([]), "a new library has no projects");
 
     // A page the browser shows (no identifier, so nothing is fetched).
     let html = r#"<html><head><meta name="citation_title" content="A Blocked Paper"><meta name="citation_author" content="Doe, Jane">

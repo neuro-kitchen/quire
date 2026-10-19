@@ -151,7 +151,7 @@ mod tests {
         }
         assert!(delete("test-secret", &file).unwrap());
         assert!(!file.exists());
-        assert_eq!(set("test-secret", "ezproxy=abc", &file).unwrap(), Store::File(file.clone()));
-        assert_eq!(get("test-secret", &file).unwrap().0, "ezproxy=abc");
+        assert_eq!(set("test-secret", "secret-value", &file).unwrap(), Store::File(file.clone()));
+        assert_eq!(get("test-secret", &file).unwrap().0, "secret-value");
     }
 }

@@ -145,8 +145,6 @@ pub struct Fetcher {
     pub(crate) endpoints: Endpoints,
     /// The contact email, for Unpaywall's `email` parameter.
     pub(crate) email: Option<String>,
-    /// The institutional proxy with the user's session, if logged in.
-    pub(crate) proxy: Option<crate::proxy::Proxy>,
 }
 
 impl Fetcher {
@@ -156,7 +154,7 @@ impl Fetcher {
     }
 
     pub fn with_endpoints(email: Option<&str>, endpoints: Endpoints) -> Result<Self> {
-        Ok(Self { http: Http::new(email)?, endpoints, email: email.map(str::to_string), proxy: None })
+        Ok(Self { http: Http::new(email)?, endpoints, email: email.map(str::to_string) })
     }
 
     pub async fn fetch(&self, lookup: &Lookup) -> Result<Fetched> {

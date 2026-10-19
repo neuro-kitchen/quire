@@ -56,6 +56,13 @@ impl Engine {
     /// The text of the paper `query` names for reader mode: a stored full text, else one from
     /// arXiv or Europe PMC (then stored), else its PDF's text. An error when there is none.
     pub async fn reader_text(&self, query: &str) -> Result<(Reference, PaperText)> {
+        let (reference, text) = self.find_reader_text(query).await?;
+        // Searchable from now on (texts stored before the index existed get indexed here too).
+        self.index_paper_text(reference.id, Some(text.markdown.clone())).await?;
+        Ok((reference, text))
+    }
+
+    async fn find_reader_text(&self, query: &str) -> Result<(Reference, PaperText)> {
         let (reference, _) = self.show(query).await?;
         let path = self.text_path(&reference);
         let mut ask_online = online_candidate(&reference);
@@ -97,6 +104,7 @@ impl Engine {
         for attachment in self.attachments(&reference).await? {
             paths.push(store.path(&attachment.hash, "md"));
         }
+        self.index_paper_text(reference.id, None).await?;
         let mut removed = 0;
         for path in paths {
             match std::fs::remove_file(&path) {
@@ -106,6 +114,38 @@ impl Engine {
             }
         }
         Ok(removed)
+    }
+
+    /// Indexes the texts already stored (full texts and converted PDFs) for search, without
+    /// fetching or converting anything; returns how many were indexed. For texts stored before
+    /// the index existed.
+    pub async fn index_stored_texts(&self) -> Result<usize> {
+        let mut indexed = 0;
+        for reference in self.list(None, false, false).await? {
+            let stored = match read_stored(&self.text_path(&reference)) {
+                Some(Stored::Text(text)) => Some(text.markdown),
+                _ => self.stored_pdf_text(&reference).await?,
+            };
+            if let Some(text) = stored {
+                self.index_paper_text(reference.id, Some(text)).await?;
+                indexed += 1;
+            }
+        }
+        Ok(indexed)
+    }
+
+    /// The converted text of the reference's first PDF, if stored (any converter version).
+    async fn stored_pdf_text(&self, reference: &Reference) -> Result<Option<String>> {
+        let store = self.files();
+        for attachment in self.attachments(reference).await? {
+            if let Ok(text) = std::fs::read_to_string(store.path(&attachment.hash, "md"))
+                && let Some((header, body)) = text.split_once('\n')
+                && header.starts_with("<!-- quire reader text:")
+            {
+                return Ok(Some(body.to_string()));
+            }
+        }
+        Ok(None)
     }
 
     fn text_path(&self, reference: &Reference) -> PathBuf {

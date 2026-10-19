@@ -39,7 +39,7 @@ pub async fn run(context: &Context, args: &ConfigArgs) -> anyhow::Result<()> {
             config::set(&file, key, value)?;
             output::report(Tone::Ok, "set", format!("{} = {value}", style::paint(style::KEY, key)));
             if key == "access.proxy" {
-                offer_login(context).await?;
+                output::hint("`quire pdf get --browser` opens publishers' pages through it in your browser.");
             }
         }
         Action::Unset { key } => {
@@ -63,24 +63,4 @@ pub async fn run(context: &Context, args: &ConfigArgs) -> anyhow::Result<()> {
         }
     }
     Ok(())
-}
-
-/// After setting a proxy: offer to log in now, so `pdf get` can use it right away.
-async fn offer_login(context: &Context) -> anyhow::Result<()> {
-    use std::io::{BufRead, IsTerminal, Write};
-    if !std::io::stdin().is_terminal() {
-        output::hint("Log in with `quire access login` so `quire pdf get` can download through the proxy.");
-        return Ok(());
-    }
-    eprint!("Log in to the proxy now, so PDFs download through it? [Y/n] ");
-    std::io::stderr().flush()?;
-    let mut answer = String::new();
-    std::io::stdin().lock().read_line(&mut answer)?;
-    if answer.trim().eq_ignore_ascii_case("n") {
-        output::hint("Later: `quire access login`.");
-        return Ok(());
-    }
-    // A fresh engine: the one in `context` was not opened, and must see the new proxy.
-    let engine = context.open(context.choice()).await?;
-    super::access::login(&engine, true).await
 }
