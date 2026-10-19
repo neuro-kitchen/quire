@@ -1,0 +1,5 @@
+# quire: this folder's library, project and bibliography file.
+project = "typst-test"
+recursive = true
+output = "refs.bib"
+profile = "paper"
