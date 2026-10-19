@@ -2,7 +2,7 @@
 //!
 //! - [`get`]: find and download; `--browser` for publishers that block automated downloads.
 //! - [`import`]: attach a PDF file, or add the paper it is.
-//! - [`files`]: `list`, `open`, `path`, `text`, `rm`.
+//! - [`files`]: `list`, `open`, `path`, `text`, `extract`, `rm`.
 //! - [`browser`]: opening pages and files, watching the downloads folder.
 
 pub mod browser;
@@ -34,8 +34,10 @@ enum Action {
     Open(files::QueryArgs),
     /// Print the path of a reference's PDF
     Path(files::QueryArgs),
-    /// Print the paper as one-column Markdown (stored next to the PDF after the first time)
-    Text(files::QueryArgs),
+    /// Print the paper's text as reader mode shows it (arXiv / Europe PMC full text, else the PDF's)
+    Text(files::TextArgs),
+    /// Extract papers' text again (after a quire update, or to retry online sources)
+    Extract(files::ExtractArgs),
     /// Re-check attached PDFs against their references (DOI or title); changes nothing
     Verify(files::ListArgs),
     /// Remove a reference's PDFs (the files stay in the store)
@@ -52,6 +54,7 @@ pub async fn run(context: &Context, args: &PdfArgs) -> anyhow::Result<ExitCode> 
         Action::Open(args) => files::open(engine, args).await.and(done),
         Action::Path(args) => files::path(engine, args).await.and(done),
         Action::Text(args) => files::text(engine, args).await.and(done),
+        Action::Extract(args) => files::extract(context, args).await.and(done),
         Action::Verify(args) => files::verify(context, args).await.and(done),
         Action::Rm(args) => files::remove(engine, args).await.and(done),
     }
