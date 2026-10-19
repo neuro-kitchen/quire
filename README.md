@@ -4,12 +4,30 @@ A reference manager written in Rust: a local library of references and PDFs, Bib
 import and export, and metadata lookup by DOI. A quire is a gathered set of pages; here, a gathered set of sources.
 
 ## Status
-Empty Cargo workspace (2026-10-18). Crates are added under `crates/quire-<part>`.
+First milestone (2026-10-18): a CLI that manages projects, adds references by DOI, arXiv ID, PMID, PMCID or
+URL, imports `.bib` files, and exports BibLaTeX, BibTeX or CSL-JSON. No PDFs, sync, TUI or GUI yet.
+
+```bash
+cargo build -p quire-cli                      # binary: target/debug/quire
+quire init                                    # library + contact email (asked for by Crossref/NCBI)
+quire project new Thesis
+quire project new "Chapter 2" --parent thesis
+quire add 10.1038/nature12373 arXiv:1706.03762 -p thesis
+quire add pmid:31452104 https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0173392 -p thesis/chapter-2
+quire list -p thesis -r
+quire export -p thesis -r -o refs.bib         # --format bibtex | csl-json
+```
 
 ## Layout (as in lumen and dsp-kitchen)
 | Path | Purpose |
 |---|---|
-| `crates/` | Workspace crates `quire-*` (planned: core, io, fetch, cli, app) |
+| `crates/quire-model` | Domain types, no I/O: IDs, identifiers, references, creators, dates, projects |
+| `crates/quire-io` | CSL-JSON and BibTeX/BibLaTeX import/export (via Typst's `biblatex`) |
+| `crates/quire-core` | Use cases (add, dedup, projects, export selection), cite keys, the `Library` port |
+| `crates/quire-store` | SQLite storage: schema, migrations, `Library` implementation |
+| `crates/quire-fetch` | Metadata lookup: doi.org, NCBI, web-page tags; rate-limited HTTP |
+| `crates/quire-engine` | Facade for every front end: config, paths, async API |
+| `crates/quire-cli` | The `quire` command line |
 | `quire_py/` | Python SDK: PyO3 crate (`src/`, native module `quire_bindings`) + Python package `quire/`, tests |
 | `playground/` | Experiments and small test programs |
 | `docs/` | Documentation |
