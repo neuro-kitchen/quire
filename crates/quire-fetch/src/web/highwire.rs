@@ -3,7 +3,7 @@
 //! (`citation_doi`, `citation_arxiv_id`, `citation_pmid`, `dc.identifier`) is reported so the
 //! caller can fetch the registry's record instead.
 
-use quire_model::{Creator, CreatorRole, Date, EntryKind, Identifier, ReferenceData, TextField};
+use quire_model::{Date, EntryKind, Identifier, ReferenceData, TextField};
 use url::Url;
 
 use super::meta::Tags;
@@ -20,11 +20,28 @@ pub struct PageMetadata {
 /// Text fields read from the first tag present.
 const TEXT_TAGS: &[(TextField, &[&str])] = &[
     (TextField::Title, &["citation_title", "dc.title", "og:title"]),
-    (TextField::ContainerTitle, &["citation_journal_title", "citation_conference_title", "citation_book_title", "prism.publicationname", "og:site_name"]),
+    (
+        TextField::ContainerTitle,
+        &[
+            "citation_journal_title",
+            "citation_conference_title",
+            "citation_book_title",
+            "prism.publicationname",
+            "og:site_name",
+        ],
+    ),
     (TextField::ContainerTitleShort, &["citation_journal_abbrev"]),
     (TextField::Volume, &["citation_volume", "prism.volume"]),
     (TextField::Issue, &["citation_issue", "prism.number"]),
-    (TextField::Publisher, &["citation_publisher", "citation_dissertation_institution", "citation_technical_report_institution", "dc.publisher"]),
+    (
+        TextField::Publisher,
+        &[
+            "citation_publisher",
+            "citation_dissertation_institution",
+            "citation_technical_report_institution",
+            "dc.publisher",
+        ],
+    ),
     (TextField::Number, &["citation_technical_report_number"]),
     (TextField::Issn, &["citation_issn", "prism.issn"]),
     (TextField::Isbn, &["citation_isbn"]),
@@ -32,7 +49,15 @@ const TEXT_TAGS: &[(TextField, &[&str])] = &[
     (TextField::Abstract, &["citation_abstract", "dc.description"]),
 ];
 
-const DATE_TAGS: &[&str] = &["citation_publication_date", "citation_date", "citation_cover_date", "citation_online_date", "dc.date", "prism.publicationdate", "article:published_time"];
+const DATE_TAGS: &[&str] = &[
+    "citation_publication_date",
+    "citation_date",
+    "citation_cover_date",
+    "citation_online_date",
+    "dc.date",
+    "prism.publicationdate",
+    "article:published_time",
+];
 
 const AUTHOR_TAGS: &[&str] = &["citation_author", "dc.creator", "author"];
 
@@ -56,8 +81,11 @@ pub fn from_tags(tags: &Tags, url: &Url) -> Option<PageMetadata> {
     }
     data.issued = DATE_TAGS.iter().find_map(|name| tags.all(name).find_map(date));
     let authors = AUTHOR_TAGS.iter().map(|name| tags.all(name).collect::<Vec<_>>()).find(|list| !list.is_empty());
-    data.creators = authors.unwrap_or_default().into_iter().map(person).collect();
-    data.set(TextField::Url, tags.first(&["citation_public_url", "citation_abstract_html_url", "og:url"]).unwrap_or(url.as_str()));
+    data.creators = authors.unwrap_or_default().into_iter().map(crate::names::person).collect();
+    data.set(
+        TextField::Url,
+        tags.first(&["citation_public_url", "citation_abstract_html_url", "og:url"]).unwrap_or(url.as_str()),
+    );
     if let Some(pdf) = tags.first(&["citation_pdf_url"]) {
         data.extra.insert("pdf-url".into(), pdf.into());
     }
@@ -101,22 +129,10 @@ fn identifier(tags: &Tags) -> Option<Identifier> {
 
 /// `2013/07/31`, `2013-07-31`, `2013-07`, `2013`, or an ISO date-time; the longest prefix that
 /// is a valid date.
-fn date(text: &str) -> Option<Date> {
+pub(crate) fn date(text: &str) -> Option<Date> {
     let normalised = text.trim().replace('/', "-");
     let head: String = normalised.chars().take(10).collect();
     [10, 7, 4].iter().filter_map(|len| head.get(..*len)).find_map(|prefix| prefix.parse().ok())
-}
-
-/// `Last, First` or `First Last` (the last word is the family name).
-fn person(name: &str) -> Creator {
-    let given = |g: &str| Some(g.trim().to_string()).filter(|g| !g.is_empty());
-    match name.split_once(',') {
-        Some((family, rest)) => Creator::person(CreatorRole::Author, family.trim(), given(rest)),
-        None => match name.trim().rsplit_once(' ') {
-            Some((first, family)) => Creator::person(CreatorRole::Author, family, given(first)),
-            None => Creator::person(CreatorRole::Author, name.trim(), None),
-        },
-    }
 }
 
 #[cfg(test)]
@@ -124,7 +140,10 @@ mod tests {
     use super::*;
 
     fn tags(pairs: &[(&str, &str)]) -> Tags {
-        Tags { pairs: pairs.iter().map(|(n, v)| (n.to_string(), v.to_string())).collect(), title: Some("Page title".into()) }
+        Tags {
+            pairs: pairs.iter().map(|(n, v)| (n.to_string(), v.to_string())).collect(),
+            title: Some("Page title".into()),
+        }
     }
 
     fn url() -> Url {

@@ -13,6 +13,7 @@ quire-model.workspace = true
 quire-io.workspace = true
 quire-core.workspace = true
 reqwest.workspace = true
+roxmltree.workspace = true
 scraper.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
@@ -21,5 +22,6 @@ tracing.workspace = true
 url.workspace = true
 
 [dev-dependencies]
+insta.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
 wiremock.workspace = true

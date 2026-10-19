@@ -6,9 +6,9 @@ use quire_core::RawRecord;
 use quire_model::{Doi, Timestamp};
 use url::Url;
 
+use crate::Fetched;
 use crate::error::{FetchError, Result};
 use crate::http::Http;
-use crate::Fetched;
 
 const CSL_JSON: &str = "application/vnd.citationstyles.csl+json";
 
@@ -19,15 +19,15 @@ pub async fn fetch(http: &Http, base: &Url, doi: &Doi) -> Result<Fetched> {
         FetchError::NotFound(_) => FetchError::NotFound(format!("DOI {doi}")),
         other => other,
     })?;
-    let mut items = quire_io::from_csl_json(&body).map_err(|source| FetchError::Parse { url: url.to_string(), source })?;
+    let mut items = quire_io::from_csl_json(&body).map_err(|e| FetchError::parse(&url, e))?;
     let data = items.pop().ok_or_else(|| FetchError::NoMetadata(url.to_string()))?;
     let raw = RawRecord { source: "doi.org".into(), format: "csl-json".into(), body, received_at: Timestamp::now() };
-    Ok(Fetched { data, raw })
+    Ok(Fetched { data, raw, issues: Vec::new() })
 }
 
 /// Percent-encodes what may not appear raw in a URL path (DOIs allow almost any character,
 /// e.g. `<`, `#`, `?`); `/` stays, as doi.org expects `prefix/suffix`.
-fn encode_path(doi: &str) -> String {
+pub(crate) fn encode_path(doi: &str) -> String {
     let mut out = String::with_capacity(doi.len());
     for byte in doi.bytes() {
         match byte {

@@ -6,9 +6,9 @@ use quire_core::RawRecord;
 use quire_model::{Identifier, Timestamp};
 use url::Url;
 
+use crate::Fetched;
 use crate::error::{FetchError, Result};
 use crate::http::Http;
-use crate::Fetched;
 
 /// Which database and number to ask for.
 #[derive(Debug, Clone, Copy)]
@@ -33,7 +33,7 @@ pub async fn fetch(http: &Http, base: &Url, id: PubmedId) -> Result<Fetched> {
         FetchError::NotFound(_) | FetchError::Status { status: 400, .. } => FetchError::NotFound(label.clone()),
         other => other,
     })?;
-    let mut items = quire_io::from_csl_json(&body).map_err(|source| FetchError::Parse { url: url.to_string(), source })?;
+    let mut items = quire_io::from_csl_json(&body).map_err(|e| FetchError::parse(&url, e))?;
     let mut data = items.pop().ok_or_else(|| FetchError::NotFound(label))?;
     let queried = match id {
         PubmedId::Pmid(n) => Identifier::parse(&format!("pmid:{n}")),
@@ -44,5 +44,5 @@ pub async fn fetch(http: &Http, base: &Url, id: PubmedId) -> Result<Fetched> {
         data.identifiers.push(queried);
     }
     let raw = RawRecord { source: "ncbi-ctxp".into(), format: "csl-json".into(), body, received_at: Timestamp::now() };
-    Ok(Fetched { data, raw })
+    Ok(Fetched { data, raw, issues: Vec::new() })
 }

@@ -38,7 +38,11 @@ pub fn read_tags(html: &str) -> Tags {
         })
         .collect();
     let title_selector = Selector::parse("title").expect("valid selector");
-    let title = document.select(&title_selector).next().map(|t| squash(&t.text().collect::<String>())).filter(|t| !t.is_empty());
+    let title = document
+        .select(&title_selector)
+        .next()
+        .map(|t| squash(&t.text().collect::<String>()))
+        .filter(|t| !t.is_empty());
     Tags { pairs, title }
 }
 
