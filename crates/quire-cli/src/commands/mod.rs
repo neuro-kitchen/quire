@@ -2,7 +2,7 @@
 //!
 //! - [`reference`]: `ref add|list|show|link|unlink|rm|restore|copy` (and the `add`, `list`,
 //!   `show` shortcuts).
-//! - [`project`], [`library`], [`config`], [`folder`], [`pdf`], [`access`], [`tag`], [`note`]: their
+//! - [`project`], [`library`], [`config`], [`folder`], [`pdf`], [`access`], [`tag`], [`note`], [`highlight`]: their
 //!   groups.
 //! - [`editor`]: the user's editor, shared.
 //! - [`import`], [`export`], [`init`], [`serve`], [`completions`]: single commands.
@@ -13,6 +13,7 @@ pub mod config;
 pub mod editor;
 pub mod export;
 pub mod folder;
+pub mod highlight;
 pub mod import;
 pub mod init;
 pub mod library;

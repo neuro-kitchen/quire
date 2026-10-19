@@ -1,5 +1,5 @@
 //! `ref <action>`: everything done to references (add, list, show, link, unlink, rm, restore,
-//! copy, check, refetch, edit). `add`, `list` and `show` are also top-level
+//! copy, check, refetch, edit, duplicates, merge, distinct). `add`, `list` and `show` are also top-level
 //! commands.
 //!
 //! One module per action; `link` also serves `unlink`, `trash` serves `rm` and `restore`.
@@ -8,6 +8,7 @@ pub mod abstracts;
 pub mod add;
 pub mod check;
 pub mod copy;
+pub mod duplicates;
 pub mod edit;
 pub mod link;
 pub mod list;
@@ -58,6 +59,12 @@ enum Action {
     Refetch(refetch::RefetchArgs),
     /// Edit a reference in your editor (as TOML)
     Edit(edit::EditArgs),
+    /// List references that look like the same work (preprint and journal version, …)
+    Duplicates(duplicates::DuplicatesArgs),
+    /// Merge duplicates into one reference (the others go to the trash)
+    Merge(duplicates::MergeArgs),
+    /// Record that two references are not duplicates
+    Distinct(duplicates::DistinctArgs),
 }
 
 pub async fn run(context: &Context, args: &RefArgs) -> anyhow::Result<ExitCode> {
@@ -78,6 +85,9 @@ pub async fn run(context: &Context, args: &RefArgs) -> anyhow::Result<ExitCode> 
         Action::Check(args) => check::run(context, args).await.and(done),
         Action::Refetch(args) => refetch::run(context, args).await,
         Action::Edit(args) => edit::run(engine, args).await.and(done),
+        Action::Duplicates(args) => duplicates::list(engine, args).await.and(done),
+        Action::Merge(args) => duplicates::merge(engine, args).await.and(done),
+        Action::Distinct(args) => duplicates::distinct(engine, args).await.and(done),
     }
 }
 
