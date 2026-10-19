@@ -11,6 +11,9 @@
 //! - the reference list under a `References` heading, an appendix possibly after it.
 
 use quire_engine::Reference;
+use quire_engine::paper_markdown::{
+    CaptionKind, FRONT_END, FRONT_START, caption_label, is_label_number, is_references_title,
+};
 use quire_model::TextField;
 
 use super::document::{Block, Kind, Word, words};
@@ -20,10 +23,14 @@ use super::document::{Block, Kind, Word, words};
 pub enum Tab {
     Abstract,
     Paper,
+    /// The PDF's front matter (journal header, authors, affiliations, history, copyright).
+    Front,
     Figures,
     Tables,
     Equations,
     References,
+    /// The user's notes on the paper and highlights in it.
+    Notes,
 }
 
 impl Tab {
@@ -31,12 +38,24 @@ impl Tab {
         match self {
             Self::Abstract => "Abstract",
             Self::Paper => "Paper",
+            Self::Front => "Front matter",
             Self::Figures => "Figures",
             Self::Tables => "Tables",
             Self::Equations => "Equations",
             Self::References => "References",
+            Self::Notes => "Notes",
         }
     }
+}
+
+/// `markdown` cut into its front matter section (`<!-- front -->` … `<!-- /front -->`, written by
+/// the PDF cleanup) and the rest.
+pub fn split_front(markdown: &str) -> (&str, String) {
+    let Some(start) = markdown.find(FRONT_START) else { return ("", markdown.to_string()) };
+    let after = &markdown[start + FRONT_START.len()..];
+    let Some(end) = after.find(FRONT_END) else { return ("", markdown.to_string()) };
+    let body = format!("{}{}", &markdown[..start], &after[end + FRONT_END.len()..]);
+    (after[..end].trim(), body)
 }
 
 /// A figure, table or equation: its label (`Figure 2`, `(1)`) and what is shown for it.
@@ -79,12 +98,6 @@ impl Paper {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum CaptionOf {
-    Figure,
-    Table,
-}
-
 /// Longest paragraph taken as the second half of a cut caption.
 const MAX_CONTINUATION_WORDS: usize = 60;
 /// Longest paragraph taken for a display equation.
@@ -103,7 +116,7 @@ pub fn organize(blocks: Vec<Block>) -> Paper {
         let mut block = blocks[i].clone();
         i += 1;
         if let Kind::Heading(_) = block.kind {
-            in_references = is_references_heading(&block.text());
+            in_references = is_references_title(&block.text());
             numbered = None;
             if in_references {
                 continue;
@@ -127,12 +140,12 @@ pub fn organize(blocks: Vec<Block>) -> Paper {
                 && !ends_sentence(&caption)
                 && next.kind == Kind::Paragraph
                 && next.words.len() <= MAX_CONTINUATION_WORDS
-                && (starts_lowercase(next) || (of == CaptionOf::Table && blocks.get(i + 1).is_some_and(is_row)))
+                && (starts_lowercase(next) || (of == CaptionKind::Table && blocks.get(i + 1).is_some_and(is_row)))
             {
                 caption.words.extend(next.words.iter().cloned());
                 i += 1;
             }
-            if of == CaptionOf::Table {
+            if of == CaptionKind::Table {
                 while let Some(row) = blocks.get(i).filter(|b| is_row(b)) {
                     rows.push(row.clone());
                     i += 1;
@@ -142,8 +155,8 @@ pub fn organize(blocks: Vec<Block>) -> Paper {
             shown.extend(rows);
             let item = Item { label, blocks: shown };
             match of {
-                CaptionOf::Figure => paper.figures.push(item),
-                CaptionOf::Table => paper.tables.push(item),
+                CaptionKind::Figure => paper.figures.push(item),
+                CaptionKind::Table => paper.tables.push(item),
             }
             continue;
         }
@@ -202,11 +215,6 @@ pub fn front_matter(reference: &Reference) -> Vec<Block> {
     blocks
 }
 
-fn is_references_heading(text: &str) -> bool {
-    let text = text.trim().trim_start_matches(|c: char| c.is_ascii_digit() || c == '.' || c == ' ').to_lowercase();
-    matches!(text.as_str(), "references" | "bibliography" | "literature cited" | "references and notes")
-}
-
 /// `[12] …`, `12. …`.
 fn is_numbered_entry(block: &Block) -> bool {
     let Some(first) = block.words.first() else { return false };
@@ -226,35 +234,15 @@ fn starts_lowercase(block: &Block) -> bool {
     block.words.first().and_then(|w| w.text.chars().next()).is_some_and(char::is_lowercase)
 }
 
-/// `Figure 2: …`, `Fig. 3. …`, `Table 1: …`, `Fig. 1 | …`: what it labels, the label, the rest.
-fn caption(block: &Block) -> Option<(CaptionOf, String, Vec<Word>)> {
+/// A caption paragraph ([`caption_label`]): what it labels, the label (`Figure 2`), the rest.
+fn caption(block: &Block) -> Option<(CaptionKind, String, Vec<Word>)> {
     if block.kind != Kind::Paragraph {
         return None;
     }
-    let [first, second, ..] = block.words.as_slice() else { return None };
-    let (of, name) = match first.text.trim_end_matches('.').to_lowercase().as_str() {
-        "figure" | "fig" => (CaptionOf::Figure, "Figure"),
-        "table" | "tab" => (CaptionOf::Table, "Table"),
-        _ => return None,
-    };
-    let number = second.text.trim_end_matches([':', '.', '|']);
-    if !is_number(number) {
-        return None;
-    }
-    let mut rest = 2;
-    let separated = second.text.ends_with([':', '.', '|']) || {
-        let bar = block.words.get(2).is_some_and(|w| matches!(w.text.as_str(), "|" | "–" | "—" | ":"));
-        rest += usize::from(bar);
-        bar
-    };
-    separated.then(|| (of, format!("{name} {number}"), block.words[rest..].to_vec()))
-}
-
-/// `2`, `10`, `S1`, `3a`.
-fn is_number(text: &str) -> bool {
-    let digits = text.trim_start_matches(|c: char| c.is_ascii_uppercase());
-    let digits = digits.trim_end_matches(|c: char| c.is_ascii_lowercase());
-    !digits.is_empty() && digits.len() <= 3 && digits.chars().all(|c| c.is_ascii_digit()) && text.len() <= 5
+    let text = block.text();
+    let label = caption_label(&text)?;
+    let label_words = text[..label.len].split_whitespace().count();
+    Some((label.kind, label.name(), block.words[label_words.min(block.words.len())..].to_vec()))
 }
 
 /// A short paragraph with `=` and a `(N)` word: a display equation, and its number.
@@ -268,7 +256,7 @@ fn equation_number(block: &Block) -> Option<String> {
 /// `(12)` → `12` (also `(3a)`, `(S2)`).
 fn equation_label(word: &str) -> Option<String> {
     let inner = word.strip_prefix('(')?.strip_suffix(')')?;
-    is_number(inner).then(|| inner.to_string())
+    is_label_number(inner).then(|| inner.to_string())
 }
 
 /// Words that name a figure, table or equation when followed by a number.
@@ -278,7 +266,7 @@ const MENTIONS: &[&str] = &["figure", "figures", "fig.", "figs.", "table", "tabl
 fn mark_mentions(words: &mut [Word]) {
     for i in 0..words.len().saturating_sub(1) {
         let name = words[i].text.trim_start_matches('(').to_lowercase();
-        if MENTIONS.contains(&name.as_str()) && is_number(&mention_number(&words[i + 1].text)) {
+        if MENTIONS.contains(&name.as_str()) && is_label_number(&mention_number(&words[i + 1].text)) {
             words[i].emphasis.mention = true;
             words[i + 1].emphasis.mention = true;
         }

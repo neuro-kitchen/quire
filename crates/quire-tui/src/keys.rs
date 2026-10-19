@@ -44,6 +44,8 @@ pub fn action(key: KeyEvent, typing: bool) -> Option<Action> {
         KeyCode::Char('S') => Action::Reverse,
         KeyCode::Char('o') => Action::OpenPdf,
         KeyCode::Char('p') => Action::GetPdf,
+        KeyCode::Char('E') => Action::ExtractText,
+        KeyCode::Char('M') => Action::StartPrompt(Prompt::ConfirmMerge),
         KeyCode::Char('r') => Action::Reload,
         KeyCode::Char(c @ '1'..='9') => Action::ToggleTag(c as u8 - b'0'),
         _ => return None,
@@ -83,6 +85,12 @@ pub fn reader_action(key: KeyEvent, typing: bool) -> Option<Action> {
         KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab => ReaderAction::Tab(1),
         KeyCode::Left | KeyCode::Char('h') | KeyCode::BackTab => ReaderAction::Tab(-1),
         KeyCode::Char('f') => ReaderAction::Follow,
+        KeyCode::Char('R') | KeyCode::Char('E') => ReaderAction::Refresh,
+        KeyCode::Char('v') => ReaderAction::Select,
+        KeyCode::Char('m') => ReaderAction::Mark,
+        KeyCode::Char('c') => ReaderAction::MarkWithComment,
+        KeyCode::Char('x') => ReaderAction::Unmark,
+        KeyCode::Char('a') => ReaderAction::AddNote,
         KeyCode::Char('N') => ReaderAction::PreviousMatch,
         _ => return None,
     };
@@ -90,7 +98,10 @@ pub fn reader_action(key: KeyEvent, typing: bool) -> Option<Action> {
 }
 
 /// Shown at the bottom of the reader.
-pub const READER_HELP: &str = "← → tabs · f follow figure · j/k scroll · t contents · / search · +/- width · J justify · L spacing · T theme · q back";
+/// Shown while selecting sentences to highlight.
+pub const SELECT_HELP: &str = "selecting: j/k next/previous sentence · l/h longer/shorter · m highlight · c highlight with comment · x remove highlight · Esc stop";
+
+pub const READER_HELP: &str = "← → tabs · f follow figure · v highlight · a note · j/k scroll · t contents · / search · +/- width · J/L/T layout · R re-extract · q back";
 
 /// Shown by `?`: key, what it does.
 pub const HELP: &[(&str, &str)] = &[
@@ -106,8 +117,10 @@ pub const HELP: &[(&str, &str)] = &[
     ("t", "toggle a tag by name"),
     ("1-9", "toggle a colored tag"),
     ("p", "get the PDF"),
+    ("E", "extract the text again"),
     ("o", "open the PDF"),
     ("x", "move to the trash"),
+    ("M", "merge a duplicate (≈) or mark distinct"),
     ("r", "reload"),
     ("?", "this help"),
     ("q", "quit"),

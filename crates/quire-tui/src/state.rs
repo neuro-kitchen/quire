@@ -1,7 +1,7 @@
 //! Everything the TUI shows and remembers: the data loaded from the engine and the interface's
 //! own state (focus, selection, filter, sort, prompts). Changed only by [`crate::update`].
 
-use quire_engine::{Issue, Note, PdfStatus, ProjectSummary, Reference, Severity, SlugPath, Tag, TagKind};
+use quire_engine::{Issue, IssueCode, Note, PdfStatus, ProjectSummary, Reference, Severity, SlugPath, Tag, TagKind};
 use std::collections::HashMap;
 
 use quire_model::ReferenceId;
@@ -23,6 +23,12 @@ impl Row {
     pub fn worst(&self) -> Option<Severity> {
         self.issues.iter().map(Issue::severity).max()
     }
+
+    /// The cite key of a reference this one looks like a duplicate of (the first found).
+    pub fn duplicate_of(&self) -> Option<&str> {
+        let issue = self.issues.iter().find(|i| i.code == IssueCode::PossibleDuplicate)?;
+        issue.detail.as_deref()?.split_whitespace().next()
+    }
 }
 
 /// The selected reference's extra information, loaded on selection.
@@ -39,6 +45,8 @@ pub struct Details {
 pub enum Scope {
     All,
     Project(SlugPath),
+    /// References that look like the same work as another.
+    Duplicates,
     Trash,
 }
 
@@ -93,6 +101,8 @@ pub enum Prompt {
     Tag,
     /// `y` to move the selected reference to the trash.
     ConfirmTrash,
+    /// `y` to merge the selected reference's duplicate into it, `d` to mark them distinct.
+    ConfirmMerge,
 }
 
 /// A message in the status bar.
@@ -109,6 +119,8 @@ pub struct State {
     pub projects: Vec<ProjectSummary>,
     /// Colored tags, by position (their number keys).
     pub colored: Vec<Tag>,
+    /// How many pairs of references look like duplicates (shown in the left pane).
+    pub duplicate_pairs: usize,
     pub scope: Scope,
     /// Index into the left pane: 0 = all, 1..=projects = projects, last = trash.
     pub scope_index: usize,
@@ -143,6 +155,7 @@ impl State {
             library,
             projects: Vec::new(),
             colored: Vec::new(),
+            duplicate_pairs: 0,
             scope: Scope::All,
             scope_index: 0,
             rows: Vec::new(),
@@ -165,9 +178,9 @@ impl State {
         }
     }
 
-    /// Entries of the left pane: all, the projects, the trash.
+    /// Entries of the left pane: all, the projects, duplicates, the trash.
     pub fn scope_count(&self) -> usize {
-        self.projects.len() + 2
+        self.projects.len() + 3
     }
 
     /// The scope at `index` of the left pane.
@@ -175,13 +188,15 @@ impl State {
         match index {
             0 => Scope::All,
             i if i <= self.projects.len() => Scope::Project(self.projects[i - 1].path.clone()),
+            i if i == self.projects.len() + 1 => Scope::Duplicates,
             _ => Scope::Trash,
         }
     }
 
     /// The selected row, if the table is not empty.
     pub fn current(&self) -> Option<&Row> {
-        self.visible.get(self.selected).map(|i| &self.rows[*i])
+        // `get`: `visible` may still index the previous rows while new ones are being shown.
+        self.visible.get(self.selected).and_then(|i| self.rows.get(*i))
     }
 
     /// Re-applies filter and sort, keeping the selected reference selected when it is still shown.

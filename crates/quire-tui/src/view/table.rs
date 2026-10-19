@@ -40,6 +40,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &State) {
     let title = match &state.scope {
         Scope::All => " All references ".to_string(),
         Scope::Project(path) => format!(" {path} "),
+        Scope::Duplicates => " Possible duplicates (M merges) ".to_string(),
         Scope::Trash => " Trash ".to_string(),
     };
     let count = if state.filter.is_empty() {
@@ -78,6 +79,8 @@ fn row(row: &Row) -> TableRow<'static> {
     let (pdf, pdf_style) = theme::pdf(row.pdf);
     let mark = match row.worst() {
         Some(Severity::Error) => Span::styled("!", theme::ERROR),
+        // A possible duplicate stands out from other warnings.
+        Some(Severity::Warning) if row.duplicate_of().is_some() => Span::styled("≈", theme::WARN),
         Some(Severity::Warning) => Span::styled("~", theme::WARN),
         None => Span::raw(""),
     };

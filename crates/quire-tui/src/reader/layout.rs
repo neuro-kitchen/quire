@@ -2,7 +2,7 @@
 //! asked), headings set apart, list items with a hanging bullet, tables in aligned columns.
 //! Recomputed only when the text, width or settings change.
 
-use super::document::{Block, Emphasis, Kind};
+use super::document::{Block, Emphasis, Kind, Word};
 
 /// How the reader lays the text out (saved in `config.toml` `[reader]`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,6 +62,15 @@ impl Theme {
 pub struct Piece {
     pub text: String,
     pub emphasis: Emphasis,
+    /// Index of the word in its block (`None` for spaces, bullets and table rows): lets the view
+    /// mark highlighted and selected words.
+    pub word: Option<usize>,
+}
+
+impl Piece {
+    fn plain(text: String) -> Self {
+        Self { text, emphasis: Emphasis::default(), word: None }
+    }
 }
 
 /// One screen line.
@@ -118,7 +127,7 @@ pub fn lay_out(blocks: &[Block], settings: &Settings) -> Laid {
             let cells: Vec<String> =
                 widths.iter().enumerate().map(|(i, w)| cell(block.words.get(i).map_or("", |c| &c.text), *w)).collect();
             laid.lines.push(Line {
-                pieces: vec![Piece { text: cells.join(" │ ").trim_end().to_string(), emphasis }],
+                pieces: vec![Piece { text: cells.join(" │ ").trim_end().to_string(), emphasis, word: None }],
                 block: Some(index),
                 kind: Some(block.kind),
             });
@@ -129,7 +138,7 @@ pub fn lay_out(blocks: &[Block], settings: &Settings) -> Laid {
         let count = rows.len();
         for (row, words) in rows.into_iter().enumerate() {
             let prefix = if row == 0 { first_prefix.to_string() } else { " ".repeat(indent) };
-            let mut pieces = vec![Piece { text: prefix, emphasis: Emphasis::default() }];
+            let mut pieces = vec![Piece::plain(prefix)];
             let last = row + 1 == count;
             pieces.extend(join(&words, width.saturating_sub(indent), justify && !last));
             laid.lines.push(Line { pieces, block: Some(index), kind: Some(block.kind) });
@@ -189,18 +198,18 @@ fn cell(text: &str, width: usize) -> String {
 
 /// Greedy wrapping of `block`'s words into rows of at most `width` characters (a longer word
 /// gets a row of its own).
-fn wrap(block: &Block, width: usize) -> Vec<Vec<(String, Emphasis)>> {
-    let mut rows: Vec<Vec<(String, Emphasis)>> = vec![Vec::new()];
+fn wrap(block: &Block, width: usize) -> Vec<Vec<(usize, &Word)>> {
+    let mut rows: Vec<Vec<(usize, &Word)>> = vec![Vec::new()];
     let mut used = 0;
-    for word in &block.words {
+    for (index, word) in block.words.iter().enumerate() {
         let len = word.text.chars().count();
         let row = rows.last_mut().expect("never empty");
         let needed = if row.is_empty() { len } else { used + 1 + len };
         if !row.is_empty() && needed > width {
-            rows.push(vec![(word.text.clone(), word.emphasis)]);
+            rows.push(vec![(index, word)]);
             used = len;
         } else {
-            row.push((word.text.clone(), word.emphasis));
+            row.push((index, word));
             used = needed;
         }
     }
@@ -210,17 +219,17 @@ fn wrap(block: &Block, width: usize) -> Vec<Vec<(String, Emphasis)>> {
 
 /// A row's words as pieces separated by spaces; justified rows spread the extra space over the
 /// gaps, the first gaps getting one more.
-fn join(words: &[(String, Emphasis)], width: usize, justify: bool) -> Vec<Piece> {
+fn join(words: &[(usize, &Word)], width: usize, justify: bool) -> Vec<Piece> {
     let gaps = words.len().saturating_sub(1);
-    let letters: usize = words.iter().map(|(w, _)| w.chars().count()).sum();
+    let letters: usize = words.iter().map(|(_, w)| w.text.chars().count()).sum();
     let spare = width.saturating_sub(letters + gaps);
     let mut pieces = Vec::with_capacity(words.len() * 2);
-    for (i, (text, emphasis)) in words.iter().enumerate() {
+    for (i, (index, word)) in words.iter().enumerate() {
         if i > 0 {
             let extra = if justify && gaps > 0 { spare / gaps + usize::from(i - 1 < spare % gaps) } else { 0 };
-            pieces.push(Piece { text: " ".repeat(1 + extra), emphasis: Emphasis::default() });
+            pieces.push(Piece::plain(" ".repeat(1 + extra)));
         }
-        pieces.push(Piece { text: text.clone(), emphasis: *emphasis });
+        pieces.push(Piece { text: word.text.clone(), emphasis: word.emphasis, word: Some(*index) });
     }
     pieces
 }

@@ -34,6 +34,15 @@ pub fn footer(frame: &mut Frame, area: Rect, state: &State) {
             let key = state.current().map(|r| r.reference.cite_key.to_string()).unwrap_or_default();
             Line::from(vec![Span::styled(format!(" move {key} to the trash? "), theme::WARN), Span::raw("y / n")])
         }
+        Some(Prompt::ConfirmMerge) => {
+            let row = state.current();
+            let key = row.map(|r| r.reference.cite_key.to_string()).unwrap_or_default();
+            let other = row.and_then(|r| r.duplicate_of()).unwrap_or_default();
+            Line::from(vec![
+                Span::styled(format!(" merge {other} into {key}? "), theme::WARN),
+                Span::raw("y merge · d not duplicates · n cancel"),
+            ])
+        }
         None => match &state.message {
             Some(message) => {
                 Line::styled(format!(" {}", message.text), if message.error { theme::ERROR } else { theme::OK })

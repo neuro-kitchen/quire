@@ -32,11 +32,14 @@ pub enum Action {
     ToggleTag(u8),
     OpenPdf,
     GetPdf,
+    /// Extract the selected paper's text again.
+    ExtractText,
     Reload,
     /// Results from the engine.
     Loaded {
         projects: Vec<ProjectSummary>,
         colored: Vec<Tag>,
+        duplicate_pairs: usize,
     },
     Rows(Vec<Row>),
     DetailsLoaded(Details),
@@ -57,6 +60,12 @@ pub enum Action {
     },
     /// Settings or positions were written (nothing to show).
     Saved,
+    /// A paper's highlights and notes (loaded or changed).
+    Annotations {
+        id: ReferenceId,
+        highlights: Vec<quire_engine::Highlight>,
+        notes: Vec<quire_engine::Note>,
+    },
 }
 
 /// Engine work to run after an update.
@@ -65,12 +74,47 @@ pub enum Effect {
     LoadSidebar,
     LoadRows(Scope),
     LoadDetails(ReferenceId),
-    Add { input: String, project: Option<quire_engine::SlugPath> },
-    ToggleTag { reference: ReferenceId, tag: String },
+    Add {
+        input: String,
+        project: Option<quire_engine::SlugPath>,
+    },
+    ToggleTag {
+        reference: ReferenceId,
+        tag: String,
+    },
     Trash(ReferenceId),
+    /// Merge the reference `other` names into `keep`.
+    Merge {
+        keep: ReferenceId,
+        other: String,
+    },
+    /// Record that two references are not duplicates.
+    Distinct {
+        a: ReferenceId,
+        b: String,
+    },
     OpenPdf(ReferenceId),
     GetPdf(ReferenceId),
+    ExtractText(ReferenceId),
     LoadText(ReferenceId),
+    /// Forget the stored text and extract it again.
+    RefreshText(ReferenceId),
+    /// Load a paper's highlights and notes for the reader.
+    LoadAnnotations(ReferenceId),
+    AddHighlight {
+        reference: ReferenceId,
+        quote: String,
+        prefix: String,
+        comment: Option<String>,
+    },
+    RemoveHighlight {
+        reference: ReferenceId,
+        highlight: quire_engine::HighlightId,
+    },
+    AddNote {
+        reference: ReferenceId,
+        body: String,
+    },
     SaveReaderSettings(Settings),
     SavePositions(Vec<(ReferenceId, usize)>),
 }
@@ -98,6 +142,12 @@ pub fn update(state: &mut State, action: Action) -> Vec<Effect> {
         }
         Action::Reader(action) => return reader_action(state, action),
         Action::Saved => return Vec::new(),
+        Action::Annotations { id, highlights, notes } => {
+            if let Some(reader) = state.reader.as_mut().filter(|r| r.id == id) {
+                reader.set_annotations(highlights, notes);
+            }
+            return Vec::new();
+        }
         _ => {}
     }
     if state.prompt.is_some()
@@ -146,6 +196,10 @@ pub fn update(state: &mut State, action: Action) -> Vec<Effect> {
             if matches!(kind, Prompt::Tag | Prompt::ConfirmTrash) && state.current().is_none() {
                 return Vec::new();
             }
+            if kind == Prompt::ConfirmMerge && state.current().and_then(Row::duplicate_of).is_none() {
+                state.warn("no duplicate to merge (≈ marks possible duplicates)");
+                return Vec::new();
+            }
             state.input = if kind == Prompt::Filter { state.filter.clone() } else { String::new() };
             state.prompt = Some(kind);
         }
@@ -163,12 +217,18 @@ pub fn update(state: &mut State, action: Action) -> Vec<Effect> {
             state.jobs += effects.len();
             return effects;
         }
+        Action::ExtractText => {
+            let effects: Vec<Effect> = selected(state).map(Effect::ExtractText).into_iter().collect();
+            state.jobs += effects.len();
+            return effects;
+        }
         Action::Reload | Action::Changed => {
             return vec![Effect::LoadSidebar, Effect::LoadRows(state.scope.clone())];
         }
-        Action::Loaded { projects, colored } => {
+        Action::Loaded { projects, colored, duplicate_pairs } => {
             state.projects = projects;
             state.colored = colored;
+            state.duplicate_pairs = duplicate_pairs;
             state.scope_index = state.scope_index.min(state.scope_count() - 1);
         }
         Action::Rows(rows) => {
@@ -187,7 +247,9 @@ pub fn update(state: &mut State, action: Action) -> Vec<Effect> {
         }
         // Prompt-only actions outside a prompt: nothing.
         Action::Type(_) | Action::Backspace | Action::Submit => {}
-        Action::Read | Action::Reader(_) | Action::TextLoaded { .. } | Action::Saved => unreachable!("handled above"),
+        Action::Read | Action::Reader(_) | Action::TextLoaded { .. } | Action::Saved | Action::Annotations { .. } => {
+            unreachable!("handled above")
+        }
     }
     Vec::new()
 }
@@ -208,13 +270,23 @@ fn open_reader(state: &mut State) -> Vec<Effect> {
     let resume = state.positions.get(&id).copied();
     let key = reference.cite_key.to_string();
     state.reader = Some(Reader::new(id, key, title, front, has_text, state.reader_settings, resume));
-    if has_text { vec![Effect::LoadText(id)] } else { Vec::new() }
+    let mut effects = vec![Effect::LoadAnnotations(id)];
+    if has_text {
+        effects.push(Effect::LoadText(id));
+    }
+    effects
 }
 
 fn reader_action(state: &mut State, action: ReaderAction) -> Vec<Effect> {
     let Some(reader) = state.reader.as_mut() else { return Vec::new() };
     match reader.apply(action) {
         ReaderEffect::None => Vec::new(),
+        ReaderEffect::Refresh => vec![Effect::RefreshText(reader.id)],
+        ReaderEffect::SaveHighlight { quote, prefix, comment } => {
+            vec![Effect::AddHighlight { reference: reader.id, quote, prefix, comment }]
+        }
+        ReaderEffect::RemoveHighlight(highlight) => vec![Effect::RemoveHighlight { reference: reader.id, highlight }],
+        ReaderEffect::AddNote(body) => vec![Effect::AddNote { reference: reader.id, body }],
         ReaderEffect::SaveSettings => {
             state.reader_settings = reader.settings;
             vec![Effect::SaveReaderSettings(reader.settings)]
@@ -239,6 +311,22 @@ fn prompt(state: &mut State, action: Action) -> Vec<Effect> {
                 state.filter.clear();
                 state.refresh_visible();
                 return details(state);
+            }
+        }
+        Action::Type(c) if kind == Prompt::ConfirmMerge => {
+            state.prompt = None;
+            let Some(row) = state.current() else { return Vec::new() };
+            let (keep, other) = (row.reference.id, row.duplicate_of().unwrap_or_default().to_string());
+            match c {
+                'y' => {
+                    state.jobs += 1;
+                    return vec![Effect::Merge { keep, other }];
+                }
+                'd' => {
+                    state.jobs += 1;
+                    return vec![Effect::Distinct { a: keep, b: other }];
+                }
+                _ => {}
             }
         }
         Action::Type(c) if kind == Prompt::ConfirmTrash => {
@@ -415,8 +503,29 @@ mod tests {
         let mut state = loaded();
         state.focus = Pane::Scopes;
         update(&mut state, Action::Move(5));
-        assert_eq!(state.scope_index, 1, "all + trash only");
+        assert_eq!(state.scope_index, 2, "all, duplicates, trash");
         assert_eq!(update(&mut state, Action::Open), [Effect::LoadRows(Scope::Trash)]);
         assert_eq!(state.focus, Pane::References);
+        state.focus = Pane::Scopes;
+        update(&mut state, Action::Move(-1));
+        assert_eq!(update(&mut state, Action::Open), [Effect::LoadRows(Scope::Duplicates)]);
+    }
+
+    #[test]
+    fn merging_a_duplicate() {
+        let mut state = loaded();
+        update(&mut state, Action::StartPrompt(Prompt::ConfirmMerge));
+        assert!(state.prompt.is_none() && state.message.as_ref().unwrap().error, "no duplicate: refused");
+        let mut row = state.rows[0].clone();
+        row.issues.push(quire_engine::Issue {
+            detail: Some("other2017 (same title)".into()),
+            ..quire_engine::Issue::new(quire_engine::IssueCode::PossibleDuplicate)
+        });
+        update(&mut state, Action::Rows(vec![row]));
+        update(&mut state, Action::StartPrompt(Prompt::ConfirmMerge));
+        let effects = update(&mut state, Action::Type('y'));
+        assert!(matches!(effects.as_slice(), [Effect::Merge { other, .. }] if other == "other2017"));
+        update(&mut state, Action::StartPrompt(Prompt::ConfirmMerge));
+        assert!(matches!(update(&mut state, Action::Type('d')).as_slice(), [Effect::Distinct { .. }]));
     }
 }

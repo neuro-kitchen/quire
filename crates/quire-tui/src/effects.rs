@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
-use quire_engine::{Added, Engine, PdfOutcome};
+use quire_engine::{Added, Engine, IssueCode, PdfOutcome};
 use quire_model::ReferenceId;
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -30,7 +30,8 @@ async fn run(engine: &Engine, effect: Effect) -> anyhow::Result<Action> {
         Effect::LoadSidebar => {
             let projects = engine.project_summaries().await?;
             let colored = engine.tags().await?.into_iter().map(|(t, _)| t).filter(|t| t.position.is_some()).collect();
-            Action::Loaded { projects, colored }
+            let duplicate_pairs = engine.duplicates().await?.iter().map(|g| g.duplicates.len()).sum();
+            Action::Loaded { projects, colored, duplicate_pairs }
         }
         Effect::LoadRows(scope) => Action::Rows(rows(engine, &scope).await?),
         Effect::LoadDetails(id) => {
@@ -56,6 +57,14 @@ async fn run(engine: &Engine, effect: Effect) -> anyhow::Result<Action> {
                 Action::Done { text: format!("tagged {tag}"), ok: true }
             }
         }
+        Effect::Merge { keep, other } => {
+            let merged = engine.merge(&keep.to_string(), &other).await?;
+            Action::Done { text: format!("merged {} into {}", merged.removed.cite_key, merged.kept.cite_key), ok: true }
+        }
+        Effect::Distinct { a, b } => {
+            engine.dismiss_duplicate(&a.to_string(), &b).await?;
+            Action::Done { text: format!("marked as not duplicates of {b}"), ok: true }
+        }
         Effect::Trash(id) => {
             let reference = engine.trash(&id.to_string()).await?;
             Action::Done { text: format!("moved {} to the trash", reference.cite_key), ok: true }
@@ -76,6 +85,37 @@ async fn run(engine: &Engine, effect: Effect) -> anyhow::Result<Action> {
                 Action::Done { text: format!("PDF for {} from {source}", attached.reference.cite_key), ok: true }
             }
         },
+        Effect::ExtractText(id) => {
+            let query = id.to_string();
+            engine.forget_text(&query).await?;
+            let (reference, text) = engine.reader_text(&query).await?;
+            let words = text.markdown.split_whitespace().count();
+            Action::Done {
+                text: format!("re-extracted {}: {} text, {words} words", reference.cite_key, text.source.label()),
+                ok: true,
+            }
+        }
+        Effect::RefreshText(id) => {
+            let query = id.to_string();
+            let text = match engine.forget_text(&query).await {
+                Ok(_) => engine.reader_text(&query).await.map(|(_, text)| text),
+                Err(error) => Err(error),
+            };
+            Action::TextLoaded { id, text: text.map_err(|e| format!("{e:#}")) }
+        }
+        Effect::LoadAnnotations(id) => annotations(engine, id).await?,
+        Effect::AddHighlight { reference, quote, prefix, comment } => {
+            engine.add_highlight(&reference.to_string(), &quote, &prefix, comment.as_deref()).await?;
+            annotations(engine, reference).await?
+        }
+        Effect::RemoveHighlight { reference, highlight } => {
+            engine.remove_highlight(highlight).await?;
+            annotations(engine, reference).await?
+        }
+        Effect::AddNote { reference, body } => {
+            engine.add_note(Some(&reference.to_string()), &body).await?;
+            annotations(engine, reference).await?
+        }
         Effect::LoadText(id) => {
             let text = engine.reader_text(&id.to_string()).await.map(|(_, text)| text);
             Action::TextLoaded { id, text: text.map_err(|e| format!("{e:#}")) }
@@ -97,6 +137,14 @@ async fn run(engine: &Engine, effect: Effect) -> anyhow::Result<Action> {
             Action::Saved
         }
     })
+}
+
+/// A paper's highlights and notes, for the reader.
+async fn annotations(engine: &Engine, id: ReferenceId) -> anyhow::Result<Action> {
+    let query = id.to_string();
+    let (_, highlights) = engine.highlights(&query).await?;
+    let notes = engine.notes(Some(&query)).await?;
+    Ok(Action::Annotations { id, highlights, notes })
 }
 
 /// Where each paper was left in the reader: `<reference>\t<block>` lines in the library folder.
@@ -142,6 +190,10 @@ async fn rows(engine: &Engine, scope: &Scope) -> anyhow::Result<Vec<Row>> {
         Scope::All => engine.list_with_issues(None, false, false, &[]).await?,
         Scope::Project(path) => engine.list_with_issues(Some(path), false, false, &[]).await?,
         Scope::Trash => engine.list_with_issues(None, false, true, &[]).await?,
+        Scope::Duplicates => {
+            let all = engine.list_with_issues(None, false, false, &[]).await?;
+            all.into_iter().filter(|c| c.issues.iter().any(|i| i.code == IssueCode::PossibleDuplicate)).collect()
+        }
     };
     let pdfs = engine.pdf_statuses().await?;
     let mut tags = engine.tags_of(checked.iter().map(|c| c.reference.id).collect()).await?;

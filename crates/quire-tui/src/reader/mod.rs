@@ -4,15 +4,18 @@
 //! - [`math`]: LaTeX → Unicode for equations from arXiv and Europe PMC.
 //! - [`paper`]: blocks → the running text, and figures, tables, equations, references apart.
 //! - [`layout`]: blocks → lines for a width and [`Settings`].
+//! - [`annotate`] and `notes`: highlights (sentences selected with `v`) and notes, the Notes tab.
 //!
 //! The reader opens on the abstract (from the library, so it works without a PDF); `←`/`→` move
 //! between tabs, each keeping its own scroll position. [`Reader`] is changed by
 //! [`Reader::apply`] (pure, tested) from [`ReaderAction`]s. A settings change keeps the reading
 //! position at the same block, not the same line number.
 
+pub mod annotate;
 pub mod document;
 pub mod layout;
 pub mod math;
+mod notes;
 pub mod paper;
 
 use quire_model::ReferenceId;
@@ -31,6 +34,10 @@ pub enum Overlay {
     Contents(usize),
     /// Typing a search.
     Search(String),
+    /// Typing a comment for the selected passage.
+    Comment(String),
+    /// Typing a note on the paper.
+    Note(String),
 }
 
 /// One tab's text and where it is scrolled to.
@@ -95,6 +102,10 @@ pub struct Reader {
     pub current_match: usize,
     /// Block of the paper to scroll to once the text is laid out (a remembered position).
     pub resume: Option<usize>,
+    /// Sentences selected for highlighting (`v`), on the paper tab.
+    pub selection: Option<annotate::Selection>,
+    /// The user's highlights and notes on this paper.
+    pub annotations: notes::Annotations,
 }
 
 /// What the user did in the reader.
@@ -109,6 +120,8 @@ pub enum ReaderAction {
     Tab(isize),
     /// Follow the next figure, table or equation mentioned (from the top of the screen).
     Follow,
+    /// Extract the text again (fetch online or convert the PDF anew).
+    Refresh,
     Wider,
     Narrower,
     Justify,
@@ -122,16 +135,38 @@ pub enum ReaderAction {
     NextMatch,
     PreviousMatch,
     Escape,
+    /// Start (or leave) selecting sentences to highlight.
+    Select,
+    /// Highlight the selection.
+    Mark,
+    /// Highlight the selection with a comment.
+    MarkWithComment,
+    /// Remove the highlight under the selection.
+    Unmark,
+    /// Write a note on the paper.
+    AddNote,
 }
 
 /// What the reader asks of its caller after an action.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReaderEffect {
     None,
     /// The settings changed: save them.
     SaveSettings,
     /// Leave the reader (saving the position).
     Close,
+    /// Extract the text again.
+    Refresh,
+    /// Store a highlight.
+    SaveHighlight {
+        quote: String,
+        prefix: String,
+        comment: Option<String>,
+    },
+    /// Remove a stored highlight.
+    RemoveHighlight(quire_model::HighlightId),
+    /// Store a note on the paper.
+    AddNote(String),
 }
 
 /// Columns moved by `+` / `-`.
@@ -168,12 +203,15 @@ impl Reader {
             matches: Vec::new(),
             current_match: 0,
             resume,
+            selection: None,
+            annotations: notes::Annotations::default(),
         }
     }
 
     /// The paper's text arrived; `math`: it has LaTeX math (from arXiv or Europe PMC, not a PDF).
     pub fn loaded(&mut self, markdown: &str, math: bool) {
-        let paper = paper::organize(document::parse(markdown, math));
+        let (front, body) = paper::split_front(markdown);
+        let paper = paper::organize(document::parse(&body, math));
         let extra = paper.extra_tabs();
         let mut body = Page::new(Tab::Paper, None, paper.body, &self.settings);
         if let Some(block) = self.resume.take() {
@@ -181,11 +219,16 @@ impl Reader {
         }
         self.pages.truncate(1);
         self.pages.push(body);
+        if !front.is_empty() {
+            self.pages.push(Page::new(Tab::Front, None, document::parse(front, math), &self.settings));
+        }
         for (tab, count, blocks) in extra {
             self.pages.push(Page::new(tab, Some(count), blocks, &self.settings));
         }
         self.tab = self.tab.min(self.pages.len() - 1);
         self.text = Text::Loaded;
+        self.selection = None;
+        self.place_annotations();
     }
 
     pub fn failed(&mut self, error: String) {
@@ -311,7 +354,11 @@ impl Reader {
                 }
                 return ReaderEffect::None;
             }
+            (Overlay::Comment(_) | Overlay::Note(_), action) => return self.apply_typing(action),
             (Overlay::None, _) => {}
+        }
+        if self.selection.is_some() {
+            return self.apply_selecting(action);
         }
         let page = (self.height / 2).max(1) as isize;
         let top = self.page().top as isize;
@@ -324,6 +371,18 @@ impl Reader {
                 let tab = (self.tab as isize + by).clamp(0, self.pages.len() as isize - 1) as usize;
                 self.back = None;
                 self.go_to_tab(tab);
+            }
+            ReaderAction::Refresh if self.text != Text::Loading => {
+                // Back to "loading", keeping the place in the paper for when the text returns.
+                self.resume = self.paper_block();
+                self.pages.truncate(1);
+                self.pages.push(Page::new(Tab::Paper, None, Vec::new(), &self.settings));
+                self.tab = self.tab.min(1);
+                self.back = None;
+                self.text = Text::Loading;
+                self.source = None;
+                self.selection = None;
+                return ReaderEffect::Refresh;
             }
             // Enter on the abstract opens the paper.
             ReaderAction::Submit if self.page().tab == Tab::Abstract && self.pages.len() > 1 => self.go_to_tab(1),
@@ -382,6 +441,8 @@ impl Reader {
                 self.go_to_tab(back);
             }
             ReaderAction::Escape => return ReaderEffect::Close,
+            ReaderAction::Select => self.start_selecting(),
+            ReaderAction::AddNote => self.overlay = Overlay::Note(String::new()),
             _ => {}
         }
         ReaderEffect::None
@@ -438,6 +499,19 @@ mod tests {
         r.apply(ReaderAction::Tab(1));
         assert_eq!(r.page().tab, Tab::References);
         assert_eq!(r.apply(ReaderAction::Escape), ReaderEffect::Close);
+        let mut front = open(true, Settings::default(), None);
+        front.loaded(
+            "<!-- front -->\n\nJournal 20 (2010)\n\nA. Author\n\n<!-- /front -->\n\n## 1. Introduction\n\nText.",
+            false,
+        );
+        let tabs: Vec<Tab> = front.pages.iter().map(|p| p.tab).collect();
+        assert_eq!(tabs, [Tab::Abstract, Tab::Paper, Tab::Front]);
+        assert_eq!(front.pages[1].blocks[0].text(), "1. Introduction", "the paper starts at its first section");
+        assert_eq!(front.pages[2].blocks.len(), 2);
+        front.apply(ReaderAction::Submit);
+        assert_eq!(front.apply(ReaderAction::Refresh), ReaderEffect::Refresh);
+        assert_eq!((front.text.clone(), front.pages.len(), front.page().tab), (Text::Loading, 2, Tab::Paper));
+        assert_eq!(front.apply(ReaderAction::Refresh), ReaderEffect::None, "already loading");
         let none = open(false, Settings::default(), None);
         assert_eq!((none.pages.len(), none.text), (1, Text::Missing));
     }
@@ -480,6 +554,43 @@ mod tests {
             r.apply(ReaderAction::Narrower);
         }
         assert_eq!(r.settings.width, MIN_WIDTH);
+    }
+
+    #[test]
+    fn highlighting_sentences() {
+        let mut r = reader("## 1 Intro\n\nFirst sentence here. Second one follows. Third ends it.");
+        r.apply(ReaderAction::Select);
+        assert!(r.selection.is_some());
+        r.apply(ReaderAction::Scroll(1));
+        r.apply(ReaderAction::Tab(1));
+        let effect = r.apply(ReaderAction::Mark);
+        let ReaderEffect::SaveHighlight { quote, prefix, comment: None } = effect else { panic!("{effect:?}") };
+        assert_eq!((quote.as_str(), prefix.as_str()), ("First sentence here. Second one follows.", ""));
+        assert!(r.selection.is_none());
+
+        // Stored, it comes back placed on the words, and the Notes tab lists it.
+        let highlight = quire_model::Highlight::new(r.id, &quote, &prefix, Some("good"), quire_model::DeviceId::new());
+        let note = quire_model::Note::new(Some(r.id), "My note", quire_model::DeviceId::new());
+        r.set_annotations(vec![highlight.clone()], vec![note]);
+        assert_eq!(r.annotations.marks.len(), 1);
+        assert_eq!(r.pages.last().map(|p| (p.tab, p.count)), Some((Tab::Notes, Some(2))));
+        assert_eq!(r.page().tab, Tab::Paper, "still on the paper");
+
+        // `x` on it removes it; `c` asks for a comment first.
+        r.apply(ReaderAction::Select);
+        r.apply(ReaderAction::Scroll(1));
+        assert_eq!(r.apply(ReaderAction::Unmark), ReaderEffect::RemoveHighlight(highlight.id));
+        r.apply(ReaderAction::Select);
+        r.apply(ReaderAction::MarkWithComment);
+        for c in "why".chars() {
+            r.apply(ReaderAction::Type(c));
+        }
+        let effect = r.apply(ReaderAction::Submit);
+        assert!(matches!(effect, ReaderEffect::SaveHighlight { comment: Some(ref c), .. } if c == "why"), "{effect:?}");
+
+        r.apply(ReaderAction::AddNote);
+        r.apply(ReaderAction::Type('n'));
+        assert_eq!(r.apply(ReaderAction::Submit), ReaderEffect::AddNote("n".into()));
     }
 
     #[test]

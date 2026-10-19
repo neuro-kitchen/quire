@@ -8,7 +8,8 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, List, ListItem, ListState, Paragraph};
 
-use crate::keys::READER_HELP;
+use crate::keys::{READER_HELP, SELECT_HELP};
+use crate::reader::annotate::Marked;
 use crate::reader::document::Kind;
 use crate::reader::layout::{self, Piece};
 use crate::reader::{Overlay, Reader, Tab, Text, Theme};
@@ -20,20 +21,28 @@ struct Colors {
     heading: Color,
     dim: Color,
     found: Style,
+    /// Highlighted passages (a soft background, distinct from search matches).
+    marked: Color,
 }
 
 fn colors(theme: Theme) -> Colors {
     let found = |bg| Style::new().bg(bg).fg(Color::Black);
     match theme {
-        Theme::Dark => {
-            Colors { fg: None, bg: None, heading: Color::Cyan, dim: Color::DarkGray, found: found(Color::Yellow) }
-        }
+        Theme::Dark => Colors {
+            fg: None,
+            bg: None,
+            heading: Color::Cyan,
+            dim: Color::DarkGray,
+            found: found(Color::Yellow),
+            marked: Color::Rgb(70, 60, 25),
+        },
         Theme::Light => Colors {
             fg: Some(Color::Rgb(30, 30, 30)),
             bg: Some(Color::Rgb(250, 250, 247)),
             heading: Color::Rgb(20, 70, 140),
             dim: Color::Rgb(130, 130, 130),
             found: found(Color::Rgb(255, 225, 120)),
+            marked: Color::Rgb(255, 243, 190),
         },
         Theme::Sepia => Colors {
             fg: Some(Color::Rgb(91, 70, 54)),
@@ -41,6 +50,7 @@ fn colors(theme: Theme) -> Colors {
             heading: Color::Rgb(140, 70, 30),
             dim: Color::Rgb(160, 140, 120),
             found: found(Color::Rgb(240, 200, 110)),
+            marked: Color::Rgb(236, 222, 170),
         },
         Theme::Contrast => Colors {
             fg: Some(Color::White),
@@ -48,6 +58,7 @@ fn colors(theme: Theme) -> Colors {
             heading: Color::LightYellow,
             dim: Color::Gray,
             found: found(Color::LightYellow),
+            marked: Color::Rgb(60, 60, 0),
         },
     }
 }
@@ -97,15 +108,22 @@ pub fn draw(frame: &mut Frame, reader: &mut Reader) {
         (Text::Loading, Tab::Paper) => vec![Line::styled("Getting the text (arXiv, Europe PMC or the PDF)…", dim)],
         _ => {
             let query = reader.query.to_lowercase();
+            // Highlights and the selection are shown on the paper only.
+            let on_paper = page.tab == Tab::Paper;
+            let marks: Vec<&Marked> =
+                if on_paper { reader.annotations.marks.iter().map(|(_, m)| m).collect() } else { Vec::new() };
+            let selected = if on_paper { reader.selected() } else { None };
+            let words = Words { marks: &marks, selected: selected.as_ref() };
             page.laid.lines[page.top.min(total)..(page.top + reader.height).min(total)]
                 .iter()
-                .map(|line| styled(line, base, &c, &query))
+                .map(|line| styled(line, base, &c, &query, &words))
                 .collect()
         }
     };
     frame.render_widget(Paragraph::new(text), column);
 
     let status = match (&reader.overlay, reader.matches.len()) {
+        _ if reader.selection.is_some() => format!(" {SELECT_HELP}"),
         (Overlay::None, n) if n > 0 => {
             format!(" “{}”: {} of {n} · {READER_HELP}", reader.query, reader.current_match + 1)
         }
@@ -115,15 +133,11 @@ pub fn draw(frame: &mut Frame, reader: &mut Reader) {
 
     match &reader.overlay {
         Overlay::None => {}
-        Overlay::Search(typed) => {
-            let [row] = Layout::vertical([Constraint::Length(3)]).flex(Flex::End).areas(body);
-            let [popup] = Layout::horizontal([Constraint::Length(width.min(60))]).flex(Flex::Center).areas(row);
-            frame.render_widget(Clear, popup);
-            frame.render_widget(
-                Paragraph::new(format!("{typed}▏")).style(base).block(Block::bordered().title(" Search ")),
-                popup,
-            );
+        Overlay::Search(typed) => input_box(frame, body, width, base, " Search ", typed),
+        Overlay::Comment(typed) => {
+            input_box(frame, body, width, base, " Comment on the highlight (Enter saves) ", typed)
         }
+        Overlay::Note(typed) => input_box(frame, body, width, base, " Note on the paper (Enter saves) ", typed),
         Overlay::Contents(selected) => {
             let items: Vec<ListItem> = reader
                 .page()
@@ -180,7 +194,30 @@ fn tab_bar(reader: &Reader, base: Style, c: &Colors) -> Line<'static> {
 }
 
 /// One laid-out line as styled spans: emphasis, headings, table rows, search matches.
-fn styled(line: &layout::Line, base: Style, c: &Colors, query: &str) -> Line<'static> {
+/// A one-line text box at the bottom of the text.
+fn input_box(frame: &mut Frame, body: Rect, width: u16, base: Style, title: &str, typed: &str) {
+    let [row] = Layout::vertical([Constraint::Length(3)]).flex(Flex::End).areas(body);
+    let [popup] = Layout::horizontal([Constraint::Length(width.min(70))]).flex(Flex::Center).areas(row);
+    frame.render_widget(Clear, popup);
+    frame.render_widget(
+        Paragraph::new(format!("{typed}▏")).style(base).block(Block::bordered().title(title.to_string())),
+        popup,
+    );
+}
+
+/// The words to mark on screen: highlighted passages and the selection.
+struct Words<'a> {
+    marks: &'a [&'a Marked],
+    selected: Option<&'a Marked>,
+}
+
+impl Words<'_> {
+    fn covers(marked: &Marked, block: Option<usize>, word: Option<usize>) -> bool {
+        block == Some(marked.block) && word.is_some_and(|w| marked.words.contains(&w))
+    }
+}
+
+fn styled(line: &layout::Line, base: Style, c: &Colors, query: &str, words: &Words) -> Line<'static> {
     let kind_style = match line.kind {
         Some(Kind::Heading(_)) => base.fg(c.heading).add_modifier(Modifier::BOLD),
         Some(Kind::TableRow) => base.fg(c.dim),
@@ -198,6 +235,12 @@ fn styled(line: &layout::Line, base: Style, c: &Colors, query: &str) -> Line<'st
         }
         if piece.emphasis.mention {
             style = style.fg(c.heading).add_modifier(Modifier::UNDERLINED);
+        }
+        if words.marks.iter().any(|m| Words::covers(m, line.block, piece.word)) {
+            style = style.bg(c.marked);
+        }
+        if words.selected.is_some_and(|m| Words::covers(m, line.block, piece.word)) {
+            style = style.add_modifier(Modifier::REVERSED);
         }
         highlight(piece, style, c.found, query, &mut spans);
     }

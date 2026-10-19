@@ -1,4 +1,4 @@
-//! The scopes pane: all references, the projects tree, the trash.
+//! The scopes pane: all references, the projects tree, possible duplicates, the trash.
 
 use ratatui::Frame;
 use ratatui::layout::Rect;
@@ -16,6 +16,8 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &State) {
         let current = state.scope == Scope::Project(summary.path.clone());
         items.push(ListItem::new(entry(&label, Some(summary.references), current)));
     }
+    let pairs = Some(state.duplicate_pairs).filter(|n| *n > 0);
+    items.push(ListItem::new(entry("Duplicates", pairs, state.scope == Scope::Duplicates)));
     items.push(ListItem::new(entry("Trash", None, state.scope == Scope::Trash)));
     let focused = state.focus == Pane::Scopes;
     let block = Block::bordered().title(" Library ").border_style(theme::border(focused));
