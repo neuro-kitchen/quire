@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-pub use citekey::{is_key_byte, CiteKey};
+pub use citekey::{CiteKey, is_key_byte};
 pub use field::{Field, TextField};
 pub use kind::EntryKind;
 pub use provenance::{Origin, Provenance};

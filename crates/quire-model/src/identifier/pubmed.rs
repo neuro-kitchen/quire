@@ -143,7 +143,9 @@ mod tests {
 
     #[test]
     fn pmcid_forms() {
-        for input in ["PMC7614242", "pmc7614242", "pmcid:PMC7614242", "https://pmc.ncbi.nlm.nih.gov/articles/PMC7614242/"] {
+        for input in
+            ["PMC7614242", "pmc7614242", "pmcid:PMC7614242", "https://pmc.ncbi.nlm.nih.gov/articles/PMC7614242/"]
+        {
             assert_eq!(Pmcid::parse(input).unwrap().to_string(), "PMC7614242", "{input}");
         }
         assert!(Pmcid::parse("7614242").is_err());

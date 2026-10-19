@@ -32,7 +32,10 @@ id_kinds! {
     Reference => "ref", "reference";
     /// A project (a group of references; may be nested).
     Project => "prj", "project";
+    /// A label on references (Zotero-style tags).
     Tag => "tag", "tag";
+    /// A note, on a reference or standalone.
+    Note => "note", "note";
     /// The link between a reference and a stored file.
     Attachment => "att", "attachment";
     /// A device holding a copy of the library (for sync).

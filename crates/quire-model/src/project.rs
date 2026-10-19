@@ -169,7 +169,11 @@ mod tests {
 
     #[test]
     fn slug_from_name() {
-        let cases = [("Chapter 2: Methods", "chapter-2-methods"), ("  Introducción ", "introducción"), ("PhD — Thesis!", "phd-thesis")];
+        let cases = [
+            ("Chapter 2: Methods", "chapter-2-methods"),
+            ("  Introducción ", "introducción"),
+            ("PhD — Thesis!", "phd-thesis"),
+        ];
         for (name, slug) in cases {
             assert_eq!(Slug::from_name(name).unwrap().as_str(), slug, "{name}");
         }

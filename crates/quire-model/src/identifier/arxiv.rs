@@ -7,7 +7,7 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use super::{strip_any_prefix, Doi};
+use super::{Doi, strip_any_prefix};
 use crate::error::{ModelError, Result};
 
 const PREFIXES: &[&str] = &[
@@ -44,11 +44,12 @@ impl ArxivId {
         Ok(Self { id, version })
     }
 
-    /// `Some` for labelled or URL forms and for bare new-style IDs (old-style bare IDs need the
-    /// `arXiv:` label, to avoid guessing on any `word/digits` text).
+    /// `Some` for labelled or URL forms, bare new-style IDs, and bare old-style IDs whose archive
+    /// is one of arXiv's (`hep-th/9711200`), so no other `word/digits` text is taken for one.
     pub(super) fn detect(text: &str) -> Option<Result<Self>> {
         let labelled = strip_any_prefix(text, PREFIXES).is_some();
-        (labelled || is_new_style(split_version(text).0)).then(|| Self::parse(text))
+        let bare = split_version(text).0;
+        (labelled || is_new_style(bare) || is_known_old_style(bare)).then(|| Self::parse(text))
     }
 
     /// The ID without version, e.g. `2101.00001`.
@@ -88,6 +89,22 @@ fn is_new_style(id: &str) -> bool {
     let digits = |s: &str| s.bytes().all(|b| b.is_ascii_digit());
     let month_ok = yymm.get(2..).and_then(|mm| mm.parse::<u8>().ok()).is_some_and(|mm| (1..=12).contains(&mm));
     yymm.len() == 4 && digits(yymm) && month_ok && matches!(number.len(), 4 | 5) && digits(number)
+}
+
+/// The archives of old-style IDs (before 2007), from arXiv's identifier documentation.
+const OLD_ARCHIVES: &[&str] = &[
+    "acc-phys", "adap-org", "alg-geom", "ao-sci", "astro-ph", "atom-ph", "bayes-an", "chao-dyn", "chem-ph", "cmp-lg",
+    "comp-gas", "cond-mat", "cs", "dg-ga", "funct-an", "gr-qc", "hep-ex", "hep-lat", "hep-ph", "hep-th", "math",
+    "math-ph", "mtrl-th", "nlin", "nucl-ex", "nucl-th", "patt-sol", "physics", "plasm-ph", "q-alg", "q-bio",
+    "quant-ph", "solv-int", "supr-con",
+];
+
+/// An old-style ID whose archive is one of [`OLD_ARCHIVES`].
+fn is_known_old_style(id: &str) -> bool {
+    canonical_old_style(id).is_some_and(|canonical| {
+        let archive = canonical.split(['/', '.']).next().unwrap_or_default();
+        OLD_ARCHIVES.contains(&archive)
+    })
 }
 
 /// `archive[.XX]/YYMMNNN` in canonical case (archive lower, subject class upper), e.g.
@@ -137,6 +154,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn bare_old_style_needs_a_known_archive() {
+        assert!(ArxivId::detect("hep-th/9711200").is_some());
+        assert!(ArxivId::detect("math.GT/0309136v2").is_some());
+        assert!(ArxivId::detect("notes/1234567").is_none());
+    }
+
+    #[test]
     fn new_style_forms() {
         for input in [
             "1706.03762",
@@ -161,7 +185,7 @@ mod tests {
     fn old_style() {
         assert_eq!(ArxivId::parse("arXiv:hep-th/9901001").unwrap().id(), "hep-th/9901001");
         assert_eq!(ArxivId::parse("math.GT/0309136v1").unwrap().version(), Some(1));
-        assert!(ArxivId::detect("hep-th/9901001").is_none(), "bare old style needs the label");
+        assert!(ArxivId::detect("hep-th/9901001").is_some(), "bare, with a known archive");
     }
 
     #[test]
