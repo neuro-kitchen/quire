@@ -6,7 +6,7 @@ use std::hash::{Hash, Hasher};
 
 use serde::{Deserialize, Serialize};
 
-use super::{percent_decode, strip_any_prefix, ArxivId};
+use super::{ArxivId, percent_decode, strip_any_prefix};
 use crate::error::{ModelError, Result};
 
 /// Forms in which DOIs are pasted, removed before parsing (case-insensitive).

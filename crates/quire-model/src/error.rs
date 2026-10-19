@@ -33,6 +33,15 @@ pub enum ModelError {
     #[error("invalid project slug `{input}`: {reason}")]
     InvalidSlug { input: String, reason: &'static str },
 
+    #[error("invalid tag `{input}`: {reason}")]
+    InvalidTag { input: String, reason: &'static str },
+
+    #[error("unknown tag kind `{0}`")]
+    UnknownTagKind(String),
+
+    #[error("unknown issue code `{0}`")]
+    UnknownIssue(String),
+
     #[error("invalid cite key `{input}`: {reason}")]
     InvalidCiteKey { input: String, reason: &'static str },
 }

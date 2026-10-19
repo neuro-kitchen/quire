@@ -100,6 +100,23 @@ impl Creator {
             Name::Literal { literal } => literal.clone(),
         }
     }
+
+    /// The name as written in bibliographies: `van Gogh, Vincent, Jr.` for a person, the whole
+    /// name otherwise.
+    pub fn display_name(&self) -> String {
+        match &self.name {
+            Name::Person(p) => {
+                let given = [p.given.as_deref(), p.dropping_particle.as_deref()]
+                    .into_iter()
+                    .flatten()
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                let parts = [Some(self.sort_name()), Some(given).filter(|g| !g.is_empty()), p.suffix.clone()];
+                parts.into_iter().flatten().collect::<Vec<_>>().join(", ")
+            }
+            Name::Literal { literal } => literal.clone(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -131,5 +148,6 @@ mod tests {
             p.non_dropping_particle = Some("van".into());
         }
         assert_eq!(creator.sort_name(), "van Gogh");
+        assert_eq!(creator.display_name(), "van Gogh, Vincent");
     }
 }

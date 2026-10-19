@@ -28,7 +28,9 @@ impl Date {
         match (month, day) {
             (Some(m), _) if !(1..=12).contains(&m) => return Err(invalid("month must be 1 to 12")),
             (None, Some(_)) => return Err(invalid("a day needs a month")),
-            (Some(m), Some(d)) if d == 0 || d > days_in_month(year, m) => return Err(invalid("no such day in that month")),
+            (Some(m), Some(d)) if d == 0 || d > days_in_month(year, m) => {
+                return Err(invalid("no such day in that month"));
+            }
             _ => {}
         }
         Ok(Self { year, month, day })

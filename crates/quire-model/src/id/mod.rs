@@ -10,5 +10,6 @@ pub use typed::Id;
 pub type ReferenceId = Id<kind::Reference>;
 pub type ProjectId = Id<kind::Project>;
 pub type TagId = Id<kind::Tag>;
+pub type NoteId = Id<kind::Note>;
 pub type AttachmentId = Id<kind::Attachment>;
 pub type DeviceId = Id<kind::Device>;
