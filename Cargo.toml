@@ -17,7 +17,7 @@ members = [
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.99"   # installed toolchain; dependencies need >= 1.95 (see .knowledge/engineering.md)
-authors = ["jesusdpa1 <jpenalozaa2@gmail.com>"]
+authors = ["jesusdpa1 <17010046+jesusdpa1@users.noreply.github.com>"]
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
