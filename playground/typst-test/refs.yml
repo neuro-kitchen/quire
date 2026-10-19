@@ -1,0 +1,277 @@
+aljanakiDevelopingBenchmarkEmotional2017:
+  type: article
+  title: Developing a benchmark for emotional analysis of music
+  author:
+  - Aljanaki, Anna
+  - Yang, Yi-Hsuan
+  - Soleymani, Mohammad
+  date: 2017-03-10
+  editor: Papadelis, Christos
+  page-range: e0173392
+  url: http://dx.doi.org/10.1371/journal.pone.0173392
+  serial-number:
+    doi: 10.1371/journal.pone.0173392
+    issn: 1932-6203
+  parent:
+    type: periodical
+    title: PLOS ONE
+    publisher: Public Library of Science (PLoS)
+    issue: 3
+    volume: 12
+batemanUniProtUniversalProtein2020:
+  type: article
+  title: 'UniProt: the universal protein knowledgebase in 2021'
+  author:
+  - Bateman, Alex
+  - Martin, Maria-Jesus
+  - Orchard, Sandra
+  - Magrane, Michele
+  - Agivetova, Rahat
+  - Ahmad, Shadab
+  - Alpi, Emanuele
+  - Bowler-Barnett, Emily H
+  - Britto, Ramona
+  - Bursteinas, Borisas
+  - Bye-A-Jee, Hema
+  - Coetzee, Ray
+  - Cukura, Austra
+  - Da Silva, Alan
+  - Denny, Paul
+  - Dogan, Tunca
+  - Ebenezer, ThankGod
+  - Fan, Jun
+  - Castro, Leyla Garcia
+  - Garmiri, Penelope
+  - Georghiou, George
+  - Gonzales, Leonardo
+  - Hatton-Ellis, Emma
+  - Hussein, Abdulrahman
+  - Ignatchenko, Alexandr
+  - Insana, Giuseppe
+  - Ishtiaq, Rizwan
+  - Jokinen, Petteri
+  - Joshi, Vishal
+  - Jyothi, Dushyanth
+  - Lock, Antonia
+  - Lopez, Rodrigo
+  - Luciani, Aurelien
+  - Luo, Jie
+  - Lussi, Yvonne
+  - MacDougall, Alistair
+  - Madeira, Fabio
+  - Mahmoudy, Mahdi
+  - Menchi, Manuela
+  - Mishra, Alok
+  - Moulang, Katie
+  - Nightingale, Andrew
+  - Oliveira, Carla Susana
+  - Pundir, Sangya
+  - Qi, Guoying
+  - Raj, Shriya
+  - Rice, Daniel
+  - Lopez, Milagros Rodriguez
+  - Saidi, Rabie
+  - Sampson, Joseph
+  - Sawford, Tony
+  - Speretta, Elena
+  - Turner, Edward
+  - Tyagi, Nidhi
+  - Vasudev, Preethi
+  - Volynkin, Vladimir
+  - Warner, Kate
+  - Watkins, Xavier
+  - Zaru, Rossana
+  - Zellner, Hermann
+  - Bridge, Alan
+  - Poux, Sylvain
+  - Redaschi, Nicole
+  - Aimo, Lucila
+  - Argoud-Puy, Ghislaine
+  - Auchincloss, Andrea
+  - Axelsen, Kristian
+  - Bansal, Parit
+  - Baratin, Delphine
+  - Blatter, Marie-Claude
+  - Bolleman, Jerven
+  - Boutet, Emmanuel
+  - Breuza, Lionel
+  - Casals-Casas, Cristina
+  - name: Castro
+    given-name: Edouard
+    prefix: de
+  - Echioukh, Kamal Chikh
+  - Coudert, Elisabeth
+  - Cuche, Beatrice
+  - Doche, Mikael
+  - Dornevil, Dolnide
+  - Estreicher, Anne
+  - Famiglietti, Maria Livia
+  - Feuermann, Marc
+  - Gasteiger, Elisabeth
+  - Gehant, Sebastien
+  - Gerritsen, Vivienne
+  - Gos, Arnaud
+  - Gruaz-Gumowski, Nadine
+  - Hinz, Ursula
+  - Hulo, Chantal
+  - Hyka-Nouspikel, Nevila
+  - Jungo, Florence
+  - Keller, Guillaume
+  - Kerhornou, Arnaud
+  - Lara, Vicente
+  - Le Mercier, Philippe
+  - Lieberherr, Damien
+  - Lombardot, Thierry
+  - Martin, Xavier
+  - Masson, Patrick
+  - Morgat, Anne
+  - Neto, Teresa Batista
+  - Paesano, Salvo
+  - Pedruzzi, Ivo
+  - Pilbout, Sandrine
+  - Pourcel, Lucille
+  - Pozzato, Monica
+  - Pruess, Manuela
+  - Rivoire, Catherine
+  - Sigrist, Christian
+  - Sonesson, Karin
+  - Stutz, Andre
+  - Sundaram, Shyamala
+  - Tognolli, Michael
+  - Verbregue, Laure
+  - Wu, Cathy H
+  - Arighi, Cecilia N
+  - Arminski, Leslie
+  - Chen, Chuming
+  - Chen, Yongxing
+  - Garavelli, John S
+  - Huang, Hongzhan
+  - Laiho, Kati
+  - McGarvey, Peter
+  - Natale, Darren A
+  - Ross, Karen
+  - Vinayaka, C R
+  - Wang, Qinghua
+  - Wang, Yuqi
+  - Yeh, Lai-Su
+  - Zhang, Jian
+  - Ruch, Patrick
+  - Teodoro, Douglas
+  date: 2020-11-25
+  page-range: D480-D489
+  url: http://dx.doi.org/10.1093/nar/gkaa1100
+  serial-number:
+    doi: 10.1093/nar/gkaa1100
+    issn: 0305-1048
+  parent:
+    type: periodical
+    title: Nucleic Acids Research
+    publisher: Oxford University Press (OUP)
+    issue: D1
+    volume: 49
+bitencourtferreiraMolegroVirtualDocker2019:
+  type: chapter
+  title: Molegro Virtual Docker for Docking
+  author:
+  - Bitencourt-Ferreira, Gabriela
+  - name: Azevedo
+    given-name: Walter Filgueira
+    prefix: de
+    suffix: Jr.
+  date: 2019
+  page-range: 149-167
+  url: http://dx.doi.org/10.1007/978-1-4939-9752-7_10
+  serial-number:
+    doi: 10.1007/978-1-4939-9752-7_10
+    isbn: '9781493997510'
+    issn: 1064-3745
+  parent:
+    type: book
+    title: Methods in Molecular Biology
+    publisher: Springer New York
+kucskoNanometreScaleThermometry2013:
+  type: article
+  title: Nanometre-scale thermometry in a living cell
+  author:
+  - Kucsko, G.
+  - Maurer, P. C.
+  - Yao, N. Y.
+  - Kubo, M.
+  - Noh, H. J.
+  - Lo, P. K.
+  - Park, H.
+  - Lukin, M. D.
+  date: 2013-07-31
+  page-range: 54-58
+  url: http://dx.doi.org/10.1038/nature12373
+  serial-number:
+    doi: 10.1038/nature12373
+    issn: 0028-0836
+  parent:
+    type: periodical
+    title: Nature
+    publisher: Springer Science, Business Media LLC
+    issue: 7460
+    volume: 500
+maldacenaLargeNLimit1997:
+  type: article
+  title: The Large N Limit of Superconformal Field Theories and Supergravity
+  author: Maldacena, Juan M.
+  date: 1997
+  url: https://arxiv.org/abs/hep-th/9711200
+  serial-number:
+    arxiv: hep-th/9711200
+    doi: 10.48550/arXiv.hep-th/9711200
+    version: '3'
+  parent:
+    type: periodical
+    title: arXiv
+    publisher: arXiv
+oleksyGitHubAvailabilityReport2025:
+  type: web
+  title: 'GitHub Availability Report: September 2025'
+  author: Oleksy, Jakub
+  date: 2025-10-09
+  url: https://github.blog/news-insights/company-news/github-availability-report-september-2025/
+vaswaniAttentionAllYou2017:
+  type: article
+  title: Attention Is All You Need
+  author:
+  - Vaswani, Ashish
+  - Shazeer, Noam
+  - Parmar, Niki
+  - Uszkoreit, Jakob
+  - Jones, Llion
+  - Gomez, Aidan N.
+  - Kaiser, Lukasz
+  - Polosukhin, Illia
+  date: 2017
+  url: https://arxiv.org/abs/1706.03762
+  serial-number:
+    arxiv: '1706.03762'
+    doi: 10.48550/arXiv.1706.03762
+    version: '7'
+  parent:
+    type: periodical
+    title: arXiv
+zhuoHierarchicalSelfAssembly2019:
+  type: article
+  title: Hierarchical self-assembly of organic heterostructure nanowires
+  author:
+  - Zhuo, Ming-Peng
+  - Wu, Jun-Jie
+  - Wang, Xue-Dong
+  - Tao, Yi-Chen
+  - Yuan, Yi
+  - Liao, Liang-Sheng
+  date: 2019-08-26
+  url: http://dx.doi.org/10.1038/s41467-019-11731-7
+  serial-number:
+    doi: 10.1038/s41467-019-11731-7
+    issn: 2041-1723
+  parent:
+    type: periodical
+    title: Nature Communications
+    publisher: Springer Science, Business Media LLC
+    issue: 1
+    volume: 10
