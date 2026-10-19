@@ -1,14 +1,43 @@
 /target
 **/*.rs.bk
-# data and outputs never in git
+
+# Data and outputs never in git
 /data/
 /library/
+.data
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.pdf
+!crates/**/tests/fixtures/*.pdf
+
+# Secrets and local settings: environment files, keys, quire's server token and config
 .env
+.env.*
+!.env.example
+*.pem
+# Public CA certificates bundled into the binary (no keys)
+!crates/quire-fetch/certs/*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+serve-token
+config.toml.bak
+.netrc
+.pypirc
+
 # Python
 .venv/
 __pycache__/
 *.py[oc]
 *.so
 .pytest_cache/
+
+# Notes and editors
 .knowledge
-.data
+.idea/
+.vscode/
+*.swp
+.DS_Store

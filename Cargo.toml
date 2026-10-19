@@ -7,6 +7,8 @@ members = [
     "crates/quire-store",
     "crates/quire-fetch",
     "crates/quire-engine",
+    "crates/quire-server",
+    "crates/quire-tui",
     "crates/quire-cli",
     "quire_py",
 ]
@@ -15,7 +17,7 @@ members = [
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.99"   # installed toolchain; dependencies need >= 1.95 (see .knowledge/engineering.md)
-authors = ["jesusdpa1 <jesuspenalozaa2@gmail.com>"]
+authors = ["jesusdpa1 <jpenalozaa2@gmail.com>"]
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
@@ -29,6 +31,8 @@ quire-core = { path = "crates/quire-core" }
 quire-store = { path = "crates/quire-store" }
 quire-fetch = { path = "crates/quire-fetch" }
 quire-engine = { path = "crates/quire-engine" }
+quire-server = { path = "crates/quire-server" }
+quire-tui = { path = "crates/quire-tui" }
 
 # Configuration & paths (figment skipped: last release 2024, see .knowledge/engineering.md)
 etcetera = "0.11.0"
@@ -36,9 +40,23 @@ toml = "1.1.8"
 toml_edit = "0.25.17"
 
 # Network (reqwest 0.13 defaults to rustls: no OpenSSL)
-reqwest = { version = "0.13.5", features = ["gzip"] }
+reqwest = { version = "0.13.5", features = ["gzip", "cookies"] }
 scraper = "0.27.0"
+roxmltree = "0.21.1"
 url = "2.5.8"
+
+# Secrets in the system keyring (Secret Service, Keychain, Credential Manager)
+keyring = "4.2.0"
+
+# TUI (`quire tui`): ratatui on crossterm 0.29 (the same crossterm for both)
+ratatui = { version = "0.30.2", features = ["crossterm_0_29"] }
+crossterm = { version = "0.29.0", features = ["event-stream"] }
+futures-util = "0.3.34"
+nucleo-matcher = "0.3.1"
+
+# Local server (`quire serve`)
+axum = "0.8.9"
+getrandom = "0.4.3"
 
 # Async & logging
 tokio = { version = "1.53.3", features = ["full"] }
@@ -52,9 +70,15 @@ tokio-rusqlite = "0.8.0"
 
 # Text
 deunicode = "1.6.2"
+unicode-normalization = "0.1.26"
 
 # Bibliography formats
 biblatex = "0.12.0"
+hayagriva = { version = "0.10.1", default-features = false, features = ["biblatex"] }
+
+# Files (content-addressed attachments; PDF checks)
+blake3 = "1.8.7"
+pdf-inspector = "1.25.2"
 
 # IDs
 uuid = { version = "1.28.0", features = ["v7"] }
@@ -68,6 +92,14 @@ anyhow = "1.0.104"
 
 # CLI
 clap = { version = "4.6.7", features = ["derive", "env"] }
+clap_complete = "4.6.11"
+anstream = "1.0.0"
+anstyle = "1.0.14"
+tabled = { version = "0.22.0", default-features = false, features = ["std", "ansi"] }
+terminal_size = "0.4.4"
+indicatif = "0.18.6"
+rpassword = "7.5.4"
+libc = "0.2.191"
 
 # Testing
 insta = "1.49.0"
