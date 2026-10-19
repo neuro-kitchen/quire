@@ -3,13 +3,19 @@
 //! scanned, and which DOIs or arXiv IDs its first pages print, to confirm it is the expected
 //! paper (arXiv PDFs print `arXiv:1706.03762v7` in the margin, not their DOI).
 
+mod ocr_layer;
+pub mod plain;
+pub mod tidy;
+
+pub use ocr_layer::is_sparse;
+
 use quire_model::{Doi, Identifier, PdfKind};
 
 use crate::error::{IoError, Result};
 
 /// The converter behind [`to_markdown`], written into cached reader text so a newer one rebuilds it.
-/// Change it together with the `pdf-inspector` version.
-pub const READER_CONVERTER: &str = "pdf-inspector 1.25.2";
+/// Change it together with the `pdf-inspector` version, and when quire's own processing changes.
+pub const READER_CONVERTER: &str = "pdf-inspector 1.25.2 + quire 4";
 
 /// The whole paper as Markdown in reading order (two-column pages become one column; headings,
 /// lists and tables kept), for reader mode.
@@ -17,13 +23,28 @@ pub fn to_markdown(bytes: &[u8]) -> Result<String> {
     if !looks_like_pdf(bytes) {
         return Err(IoError::NotPdf("the file does not start with %PDF-".into()));
     }
+    let (markdown, pages) = convert(bytes)?;
+    // Only stamps read: a scan whose OCR layer is invisible ([`ocr_layer`]).
+    if markdown.as_deref().is_none_or(|m| ocr_layer::is_sparse(m, pages))
+        && let Some(revealed) = ocr_layer::reveal(bytes)
+        && let Ok((Some(fuller), _)) = convert(&revealed)
+        && fuller.split_whitespace().count() > markdown.as_deref().map_or(0, |m| m.split_whitespace().count())
+    {
+        return Ok(tidy::tidy(&fuller));
+    }
+    match markdown {
+        Some(markdown) if !markdown.trim().is_empty() => Ok(tidy::tidy(&markdown)),
+        _ => Err(IoError::NotPdf("no text layer (a scanned PDF needs OCR)".into())),
+    }
+}
+
+/// `pdf-inspector`'s Markdown (if any text) and page count.
+fn convert(bytes: &[u8]) -> Result<(Option<String>, u32)> {
     let parsed = std::panic::catch_unwind(|| pdf_inspector::process_pdf_mem(bytes))
         .map_err(|_| IoError::NotPdf("the PDF could not be read (malformed)".into()))?;
     let result = parsed.map_err(|e| IoError::NotPdf(e.to_string()))?;
-    match result.markdown {
-        Some(markdown) if !markdown.trim().is_empty() => Ok(markdown),
-        _ => Err(IoError::NotPdf("no text layer (a scanned PDF needs OCR)".into())),
-    }
+    let markdown = result.markdown.filter(|m| !m.trim().is_empty());
+    Ok((markdown, result.page_count))
 }
 
 /// Characters of the first pages kept for comparing titles.
@@ -139,7 +160,16 @@ pub fn inspect(bytes: &[u8]) -> Result<PdfInfo> {
         pdf_inspector::PdfType::Scanned | pdf_inspector::PdfType::ImageBased => PdfKind::Scanned,
         pdf_inspector::PdfType::Mixed => PdfKind::Mixed,
     };
-    let markdown = result.markdown.unwrap_or_default();
+    let mut markdown = result.markdown.unwrap_or_default();
+    // A scan with only its stamp read: its opening from the invisible OCR layer ([`ocr_layer`]).
+    if ocr_layer::is_sparse(&markdown, PAGES_READ.len() as u32)
+        && let Some(revealed) = ocr_layer::reveal(bytes)
+        && let Ok(fuller) =
+            pdf_inspector::process_pdf_mem_with_options(&revealed, pdf_inspector::PdfOptions::new().pages(PAGES_READ))
+        && let Some(text) = fuller.markdown.filter(|m| m.len() > markdown.len())
+    {
+        markdown = text;
+    }
     let identifiers = find_identifiers(&markdown);
     let opening: String = markdown.chars().take(OPENING_CHARS).collect();
     Ok(PdfInfo {

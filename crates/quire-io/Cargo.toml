@@ -13,6 +13,7 @@ quire-model.workspace = true
 biblatex.workspace = true
 hayagriva.workspace = true
 pdf-inspector.workspace = true
+lopdf.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 toml_edit.workspace = true

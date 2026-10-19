@@ -15,6 +15,7 @@ pub mod csl;
 pub mod edit;
 pub mod error;
 pub mod export;
+pub mod paper_markdown;
 pub mod pdf;
 
 pub use bib::{BibFormat, BibOptions, BibRecord, PreprintForm, from_bib, to_bib};
