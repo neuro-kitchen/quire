@@ -80,7 +80,10 @@ mod tests {
 
     #[test]
     fn transliterates_and_strips() {
-        assert_eq!(base_key(&data("Müller-Lüdenscheidt", "Über die Ästhetik", Some(1999))), "mullerludenscheidtUberAsthetik1999");
+        assert_eq!(
+            base_key(&data("Müller-Lüdenscheidt", "Über die Ästhetik", Some(1999))),
+            "mullerludenscheidtUberAsthetik1999"
+        );
         assert_eq!(base_key(&data("O'Brien", "", None)), "obrien");
     }
 

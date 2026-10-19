@@ -4,7 +4,7 @@
 
 use std::str::FromStr;
 
-use quire_model::{CiteKey, Identifier, Origin, ProjectId, Reference, ReferenceData, ReferenceId};
+use quire_model::{CiteKey, Identifier, Issue, Origin, ProjectId, Reference, ReferenceData, ReferenceId};
 
 use crate::citekey::{free_key, unique_key};
 use crate::error::{CoreError, Result};
@@ -21,11 +21,13 @@ pub struct AddRequest {
     /// Cite key to use instead of the formula's (e.g. from an imported `.bib`). Used if valid
     /// and free; if taken, it gets a letter postfix; if invalid, the formula is used.
     pub preferred_key: Option<String>,
+    /// Issues to record with a new reference (e.g. a fallback source was used).
+    pub issues: Vec<Issue>,
 }
 
 impl AddRequest {
     pub fn new(data: ReferenceData, origin: Origin) -> Self {
-        Self { data, origin, raw: None, project: None, preferred_key: None }
+        Self { data, origin, raw: None, project: None, preferred_key: None, issues: Vec::new() }
     }
 }
 
@@ -67,10 +69,37 @@ pub fn add(library: &mut impl Library, request: AddRequest) -> Result<Added> {
     };
     let reference = Reference::new(cite_key, request.data, request.origin, device);
     library.insert_reference(&reference, request.raw.as_ref())?;
+    if !request.issues.is_empty() {
+        library.set_recorded_issues(reference.id, &request.issues)?;
+    }
     if let Some(project) = request.project {
         library.link(reference.id, project)?;
     }
     Ok(Added::New(reference))
+}
+
+/// Adds `reference` from another library, keeping its ID (so the same work is recognisable
+/// across libraries), cite key (postfixed if taken here), data and provenance. A reference with
+/// the same ID or an identifier already here is returned as [`Added::Existing`] and only linked.
+pub fn copy_in(library: &mut impl Library, reference: Reference, project: Option<ProjectId>) -> Result<Added> {
+    let existing = match library.reference(reference.id)? {
+        Some(found) => Some(found),
+        None => find_duplicate(library, &reference.data)?,
+    };
+    if let Some(existing) = existing {
+        if let Some(project) = project {
+            library.link(existing.id, project)?;
+        }
+        return Ok(Added::Existing(existing));
+    }
+    let cite_key = free_key(reference.cite_key.as_str(), |key| library.cite_key_taken(key))?;
+    let mut copy = Reference { cite_key, ..reference };
+    copy.meta.restore(library.device());
+    library.insert_reference(&copy, None)?;
+    if let Some(project) = project {
+        library.link(copy.id, project)?;
+    }
+    Ok(Added::New(copy))
 }
 
 /// The reference holding any of `data`'s identifiers.
@@ -89,7 +118,9 @@ pub fn find(library: &impl Library, query: &str) -> Result<Reference> {
     let query = query.trim();
     let found = if query.starts_with("ref_") {
         library.reference(ReferenceId::from_str(query)?)?
-    } else if let Some(found) = CiteKey::parse(query).ok().map(|key| library.reference_by_cite_key(&key)).transpose()?.flatten() {
+    } else if let Some(found) =
+        CiteKey::parse(query).ok().map(|key| library.reference_by_cite_key(&key)).transpose()?.flatten()
+    {
         Some(found)
     } else {
         Identifier::parse(query).ok().map(|id| library.reference_by_identifier(&id)).transpose()?.flatten()
@@ -177,10 +208,24 @@ mod tests {
     }
 
     #[test]
+    fn copy_keeps_id_and_is_not_duplicated() {
+        let mut source = MemoryLibrary::default();
+        let original =
+            add(&mut source, AddRequest::new(article("10.1/a", "Vaswani"), fetched())).unwrap().reference().clone();
+        let mut target = MemoryLibrary::default();
+        add(&mut target, AddRequest::new(article("10.1/other", "Vaswani"), fetched())).unwrap();
+        let copied = copy_in(&mut target, original.clone(), None).unwrap();
+        assert!(matches!(&copied, Added::New(r) if r.id == original.id));
+        assert_eq!(copied.reference().cite_key.as_str(), "vaswaniAttentionAllYou2017a");
+        assert!(matches!(copy_in(&mut target, original, None).unwrap(), Added::Existing(_)));
+    }
+
+    #[test]
     fn trash_and_re_add_restores() {
         let mut lib = MemoryLibrary::default();
         add(&mut lib, AddRequest::new(article("10.1/a", "Vaswani"), fetched())).unwrap();
         assert!(trash(&mut lib, "doi:10.1/a").unwrap().meta.is_deleted());
+        assert!(find(&lib, "vaswaniAttentionAllYou2017").unwrap().meta.is_deleted(), "found in the trash by key");
         let again = add(&mut lib, AddRequest::new(article("10.1/a", "Vaswani"), fetched())).unwrap();
         assert!(!again.reference().meta.is_deleted());
     }

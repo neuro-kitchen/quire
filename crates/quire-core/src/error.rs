@@ -19,9 +19,33 @@ pub enum CoreError {
     #[error("project `{0}` already exists")]
     ProjectExists(String),
 
+    /// Removing a project that has subprojects without asking for them too.
+    #[error("project `{0}` has subprojects; remove them first or use --recursive")]
+    ProjectHasSubprojects(String),
+
     /// Nothing matches what the user typed (ID, cite key or identifier).
     #[error("no reference `{0}`")]
     ReferenceNotFound(String),
+
+    /// An identifier typed by the user belongs to another reference.
+    #[error("{identifier} already belongs to `{cite_key}`")]
+    IdentifierTaken { identifier: String, cite_key: String },
+
+    #[error("no tag `{0}`")]
+    TagNotFound(String),
+
+    /// A colored tag's position must be 1–9 (0: all nine are taken).
+    #[error("tag position must be 1 to 9 (0 means all nine colored positions are taken)")]
+    TagPosition(u8),
+
+    #[error("no note `{0}`")]
+    NoteNotFound(String),
+
+    #[error("a note needs some text")]
+    EmptyNote,
+
+    #[error("`{0}` cannot be related to itself")]
+    SelfRelation(String),
 
     /// A cite key chosen by hand is used by another reference.
     #[error("cite key `{0}` is already used")]
