@@ -13,3 +13,4 @@ pub type TagId = Id<kind::Tag>;
 pub type NoteId = Id<kind::Note>;
 pub type AttachmentId = Id<kind::Attachment>;
 pub type DeviceId = Id<kind::Device>;
+pub type HighlightId = Id<kind::Highlight>;
