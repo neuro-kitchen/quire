@@ -1,7 +1,7 @@
 //! Projects: created by name under an optional parent, found by slug path (`thesis/chapter-2`),
 //! listed as a tree, and used to collect references for export.
 
-use quire_model::{Project, ProjectId, Reference, SlugPath};
+use quire_model::{Project, ProjectId, Reference, Slug, SlugPath};
 
 use crate::error::{CoreError, Result};
 use crate::library::references::find;
@@ -20,6 +20,43 @@ pub fn create(library: &mut impl Library, name: &str, parent: Option<&SlugPath>)
     }
     library.insert_project(&project)?;
     Ok((path, project))
+}
+
+/// Renames the project at `path`; its slug follows the new name. Returns the new path.
+pub fn rename(library: &mut impl Library, path: &SlugPath, name: &str) -> Result<(SlugPath, Project)> {
+    let mut project = resolve(library, path)?;
+    let slug = Slug::from_name(name)?;
+    let new_path: SlugPath = match path.parent() {
+        Some(parent) => format!("{parent}/{slug}").parse()?,
+        None => slug.to_string().parse()?,
+    };
+    if slug != project.slug && library.child_project(project.parent, &slug)?.is_some() {
+        return Err(CoreError::ProjectExists(new_path.to_string()));
+    }
+    project.name = name.trim().to_string();
+    project.slug = slug;
+    project.meta.touch(library.device());
+    library.update_project(&project)?;
+    Ok((new_path, project))
+}
+
+/// Moves the project at `path` to the trash, with its subprojects if `recursive` (otherwise a
+/// project with subprojects is an error). References stay in the library. Returns how many
+/// projects were removed.
+pub fn remove(library: &mut impl Library, path: &SlugPath, recursive: bool) -> Result<usize> {
+    let project = resolve(library, path)?;
+    let ids = with_descendants(library, project.id, true)?;
+    if ids.len() > 1 && !recursive {
+        return Err(CoreError::ProjectHasSubprojects(path.to_string()));
+    }
+    let device = library.device();
+    for id in &ids {
+        if let Some(mut project) = library.project(*id)? {
+            project.meta.delete(device);
+            library.update_project(&project)?;
+        }
+    }
+    Ok(ids.len())
 }
 
 /// The project at `path`.
@@ -52,7 +89,12 @@ pub fn tree(library: &impl Library) -> Result<Vec<(SlugPath, Project)>> {
     Ok(out)
 }
 
-fn collect(library: &impl Library, parent: Option<ProjectId>, prefix: &str, out: &mut Vec<(SlugPath, Project)>) -> Result<()> {
+fn collect(
+    library: &impl Library,
+    parent: Option<ProjectId>,
+    prefix: &str,
+    out: &mut Vec<(SlugPath, Project)>,
+) -> Result<()> {
     for project in library.child_projects(parent)? {
         let path = format!("{prefix}{}", project.slug);
         let id = project.id;
@@ -76,7 +118,10 @@ pub fn with_descendants(library: &impl Library, project: ProjectId, recursive: b
 /// The references in the project at `path` (and below it if `recursive`), ordered by cite key.
 pub fn references(library: &impl Library, path: &SlugPath, recursive: bool) -> Result<Vec<Reference>> {
     let project = resolve(library, path)?;
-    let filter = ReferenceFilter { projects: Some(with_descendants(library, project.id, recursive)?), include_deleted: false };
+    let filter = ReferenceFilter {
+        projects: Some(with_descendants(library, project.id, recursive)?),
+        ..ReferenceFilter::default()
+    };
     library.references(&filter)
 }
 
@@ -100,7 +145,7 @@ pub fn unlink(library: &mut impl Library, query: &str, path: &SlugPath) -> Resul
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::library::references::{add, AddRequest};
+    use crate::library::references::{AddRequest, add};
     use crate::memory::MemoryLibrary;
     use quire_model::{EntryKind, Identifier, Origin, ReferenceData};
 
@@ -127,6 +172,21 @@ mod tests {
         assert!(matches!(create(&mut lib, "X", Some(&path("nope"))), Err(CoreError::ProjectNotFound(_))));
         let paths: Vec<String> = tree(&lib).unwrap().iter().map(|(p, _)| p.to_string()).collect();
         assert_eq!(paths, ["thesis", "thesis/chapter-2-methods"]);
+    }
+
+    #[test]
+    fn rename_and_remove() {
+        let mut lib = MemoryLibrary::default();
+        create(&mut lib, "Thesis", None).unwrap();
+        create(&mut lib, "Methods", Some(&path("thesis"))).unwrap();
+        create(&mut lib, "Results", Some(&path("thesis"))).unwrap();
+        let (renamed, project) = rename(&mut lib, &path("thesis/methods"), "Chapter 2").unwrap();
+        assert_eq!((renamed.to_string(), project.name.as_str()), ("thesis/chapter-2".into(), "Chapter 2"));
+        assert!(matches!(rename(&mut lib, &path("thesis/results"), "chapter 2"), Err(CoreError::ProjectExists(_))));
+        assert!(matches!(remove(&mut lib, &path("thesis"), false), Err(CoreError::ProjectHasSubprojects(_))));
+        assert_eq!(remove(&mut lib, &path("thesis/results"), false).unwrap(), 1);
+        assert_eq!(remove(&mut lib, &path("thesis"), true).unwrap(), 2);
+        assert!(tree(&lib).unwrap().is_empty());
     }
 
     #[test]

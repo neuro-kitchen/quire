@@ -1,22 +1,48 @@
 //! An in-memory [`Library`] for tests of the use cases.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
-use quire_model::{CiteKey, DeviceId, Identifier, Project, ProjectId, Reference, ReferenceId, Slug};
+use quire_model::{
+    Attachment, AttachmentId, CiteKey, DeviceId, Identifier, Issue, Note, NoteId, PdfAttempt, Project, ProjectId,
+    Reference, ReferenceId, Slug, Tag, TagId, TagKind, Timestamp,
+};
 
 use crate::error::Result;
-use crate::ports::{Library, RawRecord, ReferenceFilter};
+use crate::ports::{AutoExport, FailedInput, Library, RawRecord, ReferenceFilter};
 
 pub struct MemoryLibrary {
     device: DeviceId,
     references: Vec<Reference>,
     projects: Vec<Project>,
     links: BTreeSet<(ReferenceId, ProjectId)>,
+    issues: BTreeMap<ReferenceId, Vec<Issue>>,
+    failures: Vec<FailedInput>,
+    auto_exports: Vec<AutoExport>,
+    attachments: Vec<Attachment>,
+    pdf_attempts: BTreeMap<ReferenceId, PdfAttempt>,
+    tags: Vec<Tag>,
+    reference_tags: BTreeMap<(ReferenceId, TagId), TagKind>,
+    notes: Vec<Note>,
+    relations: BTreeSet<(ReferenceId, ReferenceId)>,
 }
 
 impl Default for MemoryLibrary {
     fn default() -> Self {
-        Self { device: DeviceId::new(), references: Vec::new(), projects: Vec::new(), links: BTreeSet::new() }
+        Self {
+            device: DeviceId::new(),
+            references: Vec::new(),
+            projects: Vec::new(),
+            links: BTreeSet::new(),
+            issues: BTreeMap::new(),
+            failures: Vec::new(),
+            auto_exports: Vec::new(),
+            attachments: Vec::new(),
+            pdf_attempts: BTreeMap::new(),
+            tags: Vec::new(),
+            reference_tags: BTreeMap::new(),
+            notes: Vec::new(),
+            relations: BTreeSet::new(),
+        }
     }
 }
 
@@ -30,7 +56,7 @@ impl Library for MemoryLibrary {
     }
 
     fn reference_by_cite_key(&self, key: &CiteKey) -> Result<Option<Reference>> {
-        Ok(self.references.iter().find(|r| &r.cite_key == key && !r.meta.is_deleted()).cloned())
+        Ok(self.references.iter().find(|r| &r.cite_key == key).cloned())
     }
 
     fn reference_by_identifier(&self, identifier: &Identifier) -> Result<Option<Reference>> {
@@ -54,11 +80,15 @@ impl Library for MemoryLibrary {
         Ok(())
     }
 
+    fn add_raw_record(&mut self, _reference: ReferenceId, _raw: &RawRecord) -> Result<()> {
+        Ok(())
+    }
+
     fn references(&self, filter: &ReferenceFilter) -> Result<Vec<Reference>> {
         let in_projects = |r: &Reference| match &filter.projects {
             Some(projects) => projects.iter().any(|p| self.links.contains(&(r.id, *p))),
             None => true,
-        };
+        } && filter.tags.iter().all(|t| self.reference_tags.contains_key(&(r.id, *t)));
         let mut found: Vec<Reference> = self
             .references
             .iter()
@@ -105,6 +135,203 @@ impl Library for MemoryLibrary {
     }
 
     fn projects_of(&self, reference: ReferenceId) -> Result<Vec<ProjectId>> {
-        Ok(self.links.iter().filter(|(r, _)| *r == reference).map(|(_, p)| *p).collect())
+        let live = |p: &ProjectId| self.projects.iter().any(|project| project.id == *p && !project.meta.is_deleted());
+        Ok(self.links.iter().filter(|(r, p)| *r == reference && live(p)).map(|(_, p)| *p).collect())
+    }
+
+    fn recorded_issues(&self, reference: ReferenceId) -> Result<Vec<Issue>> {
+        Ok(self.issues.get(&reference).cloned().unwrap_or_default())
+    }
+
+    fn set_recorded_issues(&mut self, reference: ReferenceId, issues: &[Issue]) -> Result<()> {
+        self.issues.insert(reference, issues.to_vec());
+        Ok(())
+    }
+
+    fn record_failure(&mut self, input: &str, project: Option<ProjectId>, error: &str) -> Result<()> {
+        let now = Timestamp::now();
+        match self.failures.iter_mut().find(|f| f.input == input) {
+            Some(failure) => {
+                failure.attempts += 1;
+                failure.error = error.into();
+                failure.project = project;
+                failure.last_at = now;
+            }
+            None => self.failures.push(FailedInput {
+                input: input.into(),
+                project,
+                error: error.into(),
+                attempts: 1,
+                first_at: now,
+                last_at: now,
+            }),
+        }
+        Ok(())
+    }
+
+    fn clear_failure(&mut self, input: &str) -> Result<bool> {
+        let before = self.failures.len();
+        self.failures.retain(|f| f.input != input);
+        Ok(self.failures.len() < before)
+    }
+
+    fn failures(&self) -> Result<Vec<FailedInput>> {
+        Ok(self.failures.clone())
+    }
+
+    fn auto_exports(&self) -> Result<Vec<AutoExport>> {
+        Ok(self.auto_exports.clone())
+    }
+
+    fn set_auto_export(&mut self, export: &AutoExport) -> Result<()> {
+        self.auto_exports.retain(|e| e.path != export.path);
+        self.auto_exports.push(export.clone());
+        Ok(())
+    }
+
+    fn remove_auto_export(&mut self, path: &str) -> Result<bool> {
+        let before = self.auto_exports.len();
+        self.auto_exports.retain(|e| e.path != path);
+        Ok(self.auto_exports.len() < before)
+    }
+
+    fn mark_auto_export_written(&mut self, path: &str, at: Timestamp) -> Result<()> {
+        if let Some(export) = self.auto_exports.iter_mut().find(|e| e.path == path) {
+            export.written_at = Some(at);
+        }
+        Ok(())
+    }
+
+    fn attachments_of(&self, reference: ReferenceId) -> Result<Vec<Attachment>> {
+        Ok(self.attachments.iter().filter(|a| a.reference == reference && !a.meta.is_deleted()).cloned().collect())
+    }
+
+    fn attachment(&self, id: AttachmentId) -> Result<Option<Attachment>> {
+        Ok(self.attachments.iter().find(|a| a.id == id).cloned())
+    }
+
+    fn insert_attachment(&mut self, attachment: &Attachment) -> Result<()> {
+        self.attachments.push(attachment.clone());
+        Ok(())
+    }
+
+    fn update_attachment(&mut self, attachment: &Attachment) -> Result<()> {
+        if let Some(slot) = self.attachments.iter_mut().find(|a| a.id == attachment.id) {
+            *slot = attachment.clone();
+        }
+        Ok(())
+    }
+
+    fn references_with_attachments(&self) -> Result<Vec<ReferenceId>> {
+        let mut ids: Vec<ReferenceId> =
+            self.attachments.iter().filter(|a| !a.meta.is_deleted()).map(|a| a.reference).collect();
+        ids.sort();
+        ids.dedup();
+        Ok(ids)
+    }
+
+    fn set_pdf_attempt(&mut self, reference: ReferenceId, attempt: Option<(PdfAttempt, &str)>) -> Result<()> {
+        match attempt {
+            Some((outcome, _)) => self.pdf_attempts.insert(reference, outcome),
+            None => self.pdf_attempts.remove(&reference),
+        };
+        Ok(())
+    }
+
+    fn pdf_attempts(&self) -> Result<Vec<(ReferenceId, PdfAttempt)>> {
+        Ok(self.pdf_attempts.iter().map(|(r, a)| (*r, *a)).collect())
+    }
+
+    fn tags(&self) -> Result<Vec<Tag>> {
+        let mut tags: Vec<Tag> = self.tags.iter().filter(|t| !t.meta.is_deleted()).cloned().collect();
+        tags.sort_by_key(|t| (t.position.is_none(), t.position, t.key()));
+        Ok(tags)
+    }
+
+    fn tag_by_key(&self, key: &str) -> Result<Option<Tag>> {
+        Ok(self.tags.iter().find(|t| t.key() == key && !t.meta.is_deleted()).cloned())
+    }
+
+    fn insert_tag(&mut self, tag: &Tag) -> Result<()> {
+        self.tags.push(tag.clone());
+        Ok(())
+    }
+
+    fn update_tag(&mut self, tag: &Tag) -> Result<()> {
+        if let Some(slot) = self.tags.iter_mut().find(|t| t.id == tag.id) {
+            *slot = tag.clone();
+        }
+        Ok(())
+    }
+
+    fn tag_reference(&mut self, reference: ReferenceId, tag: TagId, kind: TagKind) -> Result<bool> {
+        Ok(self.reference_tags.insert((reference, tag), kind).is_none())
+    }
+
+    fn untag_reference(&mut self, reference: ReferenceId, tag: TagId) -> Result<bool> {
+        Ok(self.reference_tags.remove(&(reference, tag)).is_some())
+    }
+
+    fn tags_of(&self, reference: ReferenceId) -> Result<Vec<(Tag, TagKind)>> {
+        let live = self.tags()?;
+        Ok(live.into_iter().filter_map(|t| self.reference_tags.get(&(reference, t.id)).map(|k| (t, *k))).collect())
+    }
+
+    fn tagged(&self, tag: TagId) -> Result<Vec<ReferenceId>> {
+        Ok(self.reference_tags.keys().filter(|(_, t)| *t == tag).map(|(r, _)| *r).collect())
+    }
+
+    fn notes_of(&self, reference: Option<ReferenceId>) -> Result<Vec<Note>> {
+        Ok(self.notes.iter().filter(|n| n.reference == reference && !n.meta.is_deleted()).cloned().collect())
+    }
+
+    fn note(&self, id: NoteId) -> Result<Option<Note>> {
+        Ok(self.notes.iter().find(|n| n.id == id).cloned())
+    }
+
+    fn insert_note(&mut self, note: &Note) -> Result<()> {
+        self.notes.push(note.clone());
+        Ok(())
+    }
+
+    fn update_note(&mut self, note: &Note) -> Result<()> {
+        if let Some(slot) = self.notes.iter_mut().find(|n| n.id == note.id) {
+            *slot = note.clone();
+        }
+        Ok(())
+    }
+
+    fn note_counts(&self) -> Result<Vec<(ReferenceId, usize)>> {
+        let mut counts: BTreeMap<ReferenceId, usize> = BTreeMap::new();
+        for note in self.notes.iter().filter(|n| !n.meta.is_deleted()) {
+            if let Some(r) = note.reference {
+                *counts.entry(r).or_default() += 1;
+            }
+        }
+        Ok(counts.into_iter().collect())
+    }
+
+    fn relate(&mut self, a: ReferenceId, b: ReferenceId) -> Result<bool> {
+        Ok(self.relations.insert(if a < b { (a, b) } else { (b, a) }))
+    }
+
+    fn unrelate(&mut self, a: ReferenceId, b: ReferenceId) -> Result<bool> {
+        Ok(self.relations.remove(&if a < b { (a, b) } else { (b, a) }))
+    }
+
+    fn related(&self, reference: ReferenceId) -> Result<Vec<ReferenceId>> {
+        Ok(self
+            .relations
+            .iter()
+            .filter_map(|(a, b)| {
+                if *a == reference {
+                    Some(*b)
+                } else if *b == reference {
+                    Some(*a)
+                } else {
+                    None
+                }
+            })
+            .collect())
     }
 }
