@@ -9,6 +9,7 @@ members = [
     "crates/quire-engine",
     "crates/quire-server",
     "crates/quire-tui",
+    "crates/quire-sync",
     "crates/quire-cli",
     "quire_py",
 ]
@@ -33,6 +34,7 @@ quire-fetch = { path = "crates/quire-fetch" }
 quire-engine = { path = "crates/quire-engine" }
 quire-server = { path = "crates/quire-server" }
 quire-tui = { path = "crates/quire-tui" }
+quire-sync = { path = "crates/quire-sync" }
 
 # Configuration & paths (figment skipped: last release 2024, see .knowledge/engineering.md)
 etcetera = "0.11.0"
@@ -40,10 +42,13 @@ toml = "1.1.8"
 toml_edit = "0.25.17"
 
 # Network (reqwest 0.13 defaults to rustls: no OpenSSL)
-reqwest = { version = "0.13.5", features = ["gzip", "cookies"] }
+reqwest = { version = "0.13.5", features = ["gzip"] }
 scraper = "0.27.0"
 roxmltree = "0.21.1"
 url = "2.5.8"
+
+# Sync between devices over QUIC: dial a device by its public key, hole punching, relay fallback
+iroh = "1.3.0"
 
 # Secrets in the system keyring (Secret Service, Keychain, Credential Manager)
 keyring = "4.2.0"

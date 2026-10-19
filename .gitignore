@@ -16,8 +16,6 @@
 .env.*
 !.env.example
 *.pem
-# Public CA certificates bundled into the binary (no keys)
-!crates/quire-fetch/certs/*.pem
 *.key
 *.p12
 *.pfx
@@ -41,3 +39,6 @@ __pycache__/
 .vscode/
 *.swp
 .DS_Store
+
+# mdBook output (docs/)
+/docs/book/
