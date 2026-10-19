@@ -53,7 +53,10 @@ async fn event_loop(terminal: &mut ratatui::DefaultTerminal, engine: Arc<Engine>
         let action = tokio::select! {
             event = events.next() => match event {
                 Some(Ok(Event::Key(key))) if key.kind == KeyEventKind::Press => match &state.reader {
-                    Some(reader) => keys::reader_action(key, matches!(reader.overlay, reader::Overlay::Search(_))),
+                    Some(reader) => keys::reader_action(
+                        key,
+                        matches!(reader.overlay, reader::Overlay::Search(_) | reader::Overlay::Comment(_) | reader::Overlay::Note(_)),
+                    ),
                     None => keys::action(key, state.prompt.is_some()),
                 },
                 Some(Ok(_)) => None, // resize and others: just redraw
@@ -115,13 +118,16 @@ mod tests {
         let mut state = State::new("personal".into());
         let mut paper = row("vaswani2017", "Attention Is All You Need", "Vaswani", 2017);
         update(&mut state, Action::Rows(vec![paper.clone()]));
-        assert!(update(&mut state, Action::Read).is_empty(), "no PDF: only the abstract");
+        assert!(
+            matches!(update(&mut state, Action::Read)[..], [crate::update::Effect::LoadAnnotations(_)]),
+            "no PDF: only the abstract (and the notes)"
+        );
         insta::assert_snapshot!("reader_abstract_only", screen(&mut state, 80, 10));
         assert!(update(&mut state, Action::Reader(ReaderAction::Escape)).is_empty(), "no position to save");
         paper.pdf = Some(quire_engine::PdfStatus::Available { pages: Some(15) });
         update(&mut state, Action::Rows(vec![paper]));
         let effects = update(&mut state, Action::Open);
-        assert!(matches!(effects[..], [crate::update::Effect::LoadText(_)]));
+        assert!(matches!(effects[..], [crate::update::Effect::LoadAnnotations(_), crate::update::Effect::LoadText(_)]));
         let id = state.reader.as_ref().unwrap().id;
         let markdown = "## 1 Introduction\n\nRecurrent neural networks, long short-term memory and **gated** recurrent \
             neural networks have been firmly established (Figure 1) as *state of the art* approaches.\n\n\
