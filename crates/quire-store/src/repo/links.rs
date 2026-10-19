@@ -3,9 +3,9 @@
 
 use quire_core::Result;
 use quire_model::{DeviceId, ProjectId, ReferenceId, Timestamp};
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 
-use super::codec::{id_blob, id_at};
+use super::codec::{id_at, id_blob};
 use crate::error::OrCore;
 
 pub fn link(conn: &Connection, reference: ReferenceId, project: ProjectId, device: DeviceId) -> Result<bool> {
@@ -44,7 +44,9 @@ pub fn unlink(conn: &Connection, reference: ReferenceId, project: ProjectId, dev
 }
 
 pub fn projects_of(conn: &Connection, reference: ReferenceId) -> Result<Vec<ProjectId>> {
-    let sql = "SELECT project_id FROM project_reference WHERE reference_id = ?1 AND deleted_at IS NULL";
+    let sql = "SELECT project_id FROM project_reference
+               WHERE reference_id = ?1 AND deleted_at IS NULL
+                 AND project_id IN (SELECT id FROM project WHERE deleted_at IS NULL)";
     let mut statement = conn.prepare(sql).or_core()?;
     let rows = statement.query_map([id_blob(reference)], |row| id_at(row, "project_id")).or_core()?;
     rows.collect::<rusqlite::Result<Vec<_>>>().or_core()

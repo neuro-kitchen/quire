@@ -2,7 +2,7 @@
 
 use quire_core::Result;
 use quire_model::{Project, ProjectId, Slug};
-use rusqlite::{params, Connection, OptionalExtension, Row};
+use rusqlite::{Connection, OptionalExtension, Row, params};
 
 use super::codec::{id_at, id_blob, meta_at, optional_id_at, parsed_at};
 use crate::error::OrCore;
@@ -58,7 +58,8 @@ pub fn insert(conn: &Connection, project: &Project) -> Result<()> {
 }
 
 pub fn update(conn: &Connection, project: &Project) -> Result<()> {
-    let sql = "UPDATE project SET parent_id = ?2, name = ?3, slug = ?4, updated_at = ?5, updated_by = ?6, deleted_at = ?7
+    let sql =
+        "UPDATE project SET parent_id = ?2, name = ?3, slug = ?4, updated_at = ?5, updated_by = ?6, deleted_at = ?7
                WHERE id = ?1";
     let meta = &project.meta;
     conn.execute(

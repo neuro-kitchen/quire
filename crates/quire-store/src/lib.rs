@@ -10,6 +10,6 @@ pub mod open;
 pub mod repo;
 pub mod schema;
 
-pub use error::{StoreError, Result};
+pub use error::{Result, StoreError};
 pub use open::{configure, device_id, open, open_in_memory, prepare, prepare_in_place};
 pub use repo::SqliteLibrary;

@@ -1,8 +1,8 @@
 //! Conversions between model values and SQLite columns.
 
 use quire_model::{Id, IdKind, RecordMeta, Timestamp};
-use rusqlite::types::Type;
 use rusqlite::Row;
+use rusqlite::types::Type;
 
 /// The 16 bytes stored for `id`.
 pub fn id_blob<K: IdKind>(id: Id<K>) -> [u8; 16] {
