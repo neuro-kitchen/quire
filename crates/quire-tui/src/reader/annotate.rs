@@ -31,7 +31,8 @@ pub fn sentences(block: &Block) -> Vec<Range<usize>> {
         return Vec::new();
     }
     if !matches!(block.kind, Kind::Paragraph | Kind::ListItem) {
-        return vec![0..count];
+        // The whole block, as one sentence.
+        return std::iter::once(0..count).collect();
     }
     let mut out = Vec::new();
     let mut start = 0;
@@ -197,7 +198,7 @@ mod tests {
             texts,
             ["EMG is noisy (Smith et al. 2020).", "Filters help, e.g. a notch at 60 Hz.", "See Fig. 2 for details."]
         );
-        assert_eq!(sentences(&blocks[0]), [0..2], "a heading is one sentence");
+        assert_eq!(sentences(&blocks[0]), std::iter::once(0..2).collect::<Vec<_>>(), "a heading is one sentence");
     }
 
     #[test]

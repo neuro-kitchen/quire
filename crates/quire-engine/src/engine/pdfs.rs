@@ -340,7 +340,7 @@ impl Engine {
 fn attempt_outcome(reference: &Reference, error: &quire_fetch::FetchError) -> PdfAttempt {
     let searchable =
         reference.data.identifiers.iter().any(|id| matches!(id, Identifier::Doi(_) | Identifier::Arxiv(_)));
-    if error.is_blocked() || error.is_proxy_login() {
+    if error.is_blocked() {
         PdfAttempt::Blocked
     } else if error.is_transient() {
         PdfAttempt::Error

@@ -3,6 +3,7 @@
 //! | Request | Does |
 //! |---|---|
 //! | `GET /v1/status` | app, version, library |
+//! | `GET /v1/projects` | `[{"path", "name", "references"}]`, depth first (the extension's picker) |
 //! | `POST /v1/add` `{"input", "project"?}` | `quire add <input>` |
 //! | `POST /v1/page` `{"url", "html", "project"?}` | add from the page the browser shows |
 //! | `POST /v1/pdf?reference=<key>` (PDF body) | attach the PDF to a reference |
@@ -37,6 +38,7 @@ pub fn router(engine: Arc<Engine>, token: String) -> Router {
     let state = AppState { engine, token: token.into() };
     Router::new()
         .route("/v1/status", get(status))
+        .route("/v1/projects", get(projects))
         .route("/v1/add", post(add))
         .route("/v1/page", post(page))
         .route("/v1/pdf", post(pdf))
@@ -83,6 +85,19 @@ async fn status(State(state): State<AppState>) -> Json<Value> {
     Json(
         json!({ "app": "quire", "version": env!("CARGO_PKG_VERSION"), "library": library.label(), "path": library.path }),
     )
+}
+
+async fn projects(State(state): State<AppState>) -> Response {
+    match state.engine.project_summaries().await {
+        Ok(summaries) => {
+            let list: Vec<Value> = summaries
+                .iter()
+                .map(|s| json!({ "path": s.path.to_string(), "name": s.project.name, "references": s.references }))
+                .collect();
+            Json(Value::Array(list)).into_response()
+        }
+        Err(e) => engine_error(&e),
+    }
 }
 
 #[derive(Deserialize)]

@@ -6,7 +6,6 @@
 //! 4. the publisher's landing page (`doi.org/<doi>`): its `citation_pdf_url`, or the PDF path of
 //!    its platform (Atypon, Wiley) when it tags none (works for open-access journals, and on a
 //!    campus network for subscribed ones);
-//! 5. the same through the institutional proxy, with the user's session (`proxy`).
 //!
 //! Each link must give a real PDF; a challenge page counts as blocked (the user can then fetch it
 //! in their browser). PMC's PDF links answer a proof-of-work page since 2026, so PMC copies are
@@ -67,11 +66,6 @@ impl Fetcher {
                 }
             }
             Err(error) => failures.push(("landing page".into(), error)),
-        }
-        match self.proxied_pdf(&doi).await {
-            Some(Ok(found)) => return Ok(with_failures(found, &failures)),
-            Some(Err(error)) => failures.push(("proxy".into(), error)),
-            None => {}
         }
         Err(give_up(failures, "no open-access copy and no PDF link on the publisher's page"))
     }

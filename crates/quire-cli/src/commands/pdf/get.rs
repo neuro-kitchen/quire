@@ -1,7 +1,8 @@
-//! `pdf get`: find and download PDFs (page link, arXiv, Unpaywall, publisher page). Publishers
-//! that refuse scripts are reported as blocked; with `--browser`, each reference that could not
-//! be downloaded is opened right away in your browser (through `access.proxy` if set), and the
-//! PDF you download there is attached.
+//! `pdf get`: find and download PDFs (page link, arXiv, Unpaywall, publisher page). Every
+//! reference is first downloaded directly, also with `--browser` and also when an earlier run
+//! found it blocked; only if that fails does `--browser` open its page in your browser (through
+//! `access.proxy` if set, where you log in yourself: quire never handles your login), and the PDF
+//! you download there is attached.
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -34,7 +35,8 @@ pub struct GetArgs {
     /// Every reference in the library that has no PDF
     #[arg(long, conflicts_with_all = ["queries", "project", "blocked"])]
     all: bool,
-    /// Open what cannot be downloaded in your browser, one at a time, and attach the PDF you download
+    /// Try the download first; open only what fails in your browser, one at a time, and attach the
+    /// PDF you download there
     #[arg(long)]
     browser: bool,
     /// With --browser: open publishers' pages directly, not through the proxy (for Cloudflare
@@ -64,7 +66,6 @@ pub async fn run(context: &Context, args: &GetArgs) -> anyhow::Result<ExitCode> 
     let session = if args.browser { Some(session(engine, args.wait, !args.direct)?) } else { None };
     let total = queries.len();
     let mut missing: Vec<String> = Vec::new();
-    let mut proxy_expired = false;
     for (index, query) in queries.iter().enumerate() {
         output::hint(format!("[{}/{total}] {query}", index + 1));
         match engine.get_pdf(query).await {
@@ -79,15 +80,6 @@ pub async fn run(context: &Context, args: &GetArgs) -> anyhow::Result<ExitCode> 
             Ok(PdfOutcome::Downloaded { attached, source, .. }) => {
                 report_attached(&attached, &format!("from {source}"))
             }
-            Err(error) if error.is_proxy_login() => {
-                output::note(Tone::Error, "proxy", "the proxy session has expired or is not logged in");
-                output::hint(
-                    "Log in again with `quire access login`, then run this again (references with PDFs are skipped).",
-                );
-                missing.extend(queries[index..].iter().cloned());
-                proxy_expired = true;
-                break;
-            }
             Err(error) => {
                 let (tone, label) = if error.is_blocked() { (Tone::Warn, "blocked") } else { (Tone::Error, "no PDF") };
                 output::note(tone, label, format!("{query}: {error}"));
@@ -101,7 +93,7 @@ pub async fn run(context: &Context, args: &GetArgs) -> anyhow::Result<ExitCode> 
             }
         }
     }
-    if !missing.is_empty() && session.is_none() && !proxy_expired {
+    if !missing.is_empty() && session.is_none() {
         let proxy = if engine.config().access.proxy.is_some() { " (through your proxy)" } else { "" };
         output::hint(format!(
             "{} without a PDF. Get them in your browser{proxy}: `quire pdf get {} --browser`",

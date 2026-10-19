@@ -61,12 +61,14 @@ enum Command {
     Tag(commands::tag::TagArgs),
     /// Notes on references or standalone: add, list, show, edit, rm
     Note(commands::note::NoteArgs),
+    /// Search the library: metadata, tags, notes, highlights and papers' text
+    Search(commands::search::SearchArgs),
+    /// Keep this library the same on your devices (directly, over QUIC)
+    Sync(commands::sync::SyncArgs),
     /// Passages highlighted in the reader: list (as Markdown quotes), comment, remove
     Highlight(commands::highlight::HighlightArgs),
     /// PDFs: get (download), import, list, open, path, rm
     Pdf(commands::pdf::PdfArgs),
-    /// Institutional proxy session: login, status, logout
-    Access(commands::access::AccessArgs),
     /// Work with projects: new, list, tree, rename, rm
     Project(commands::project::ProjectArgs),
     /// Import a .bib file
@@ -143,8 +145,9 @@ async fn run(context: &Context, command: &Command) -> anyhow::Result<ExitCode> {
         Command::Pdf(args) => commands::pdf::run(context, args).await,
         Command::Tag(args) => commands::tag::run(context.engine().await?, args).await.and(done),
         Command::Note(args) => commands::note::run(context.engine().await?, args).await.and(done),
+        Command::Search(args) => commands::search::run(context.engine().await?, args).await.and(done),
+        Command::Sync(args) => commands::sync::run(context, args).await.and(done),
         Command::Highlight(args) => commands::highlight::run(context.engine().await?, args).await.and(done),
-        Command::Access(args) => commands::access::run(context, args).await.and(done),
         Command::Project(args) => commands::project::run(context.engine().await?, args).await.and(done),
         Command::Import(args) => commands::import::run(context.engine().await?, args).await.and(done),
         Command::Export(args) => commands::export::run(context, args).await.and(done),

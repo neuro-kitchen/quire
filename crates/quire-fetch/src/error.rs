@@ -29,10 +29,6 @@ pub enum FetchError {
     #[error("{0} did not return a PDF")]
     NotPdf(String),
 
-    /// The institutional proxy answered with its login: no session, or it expired.
-    #[error("the proxy session has expired or is not logged in: run `quire access login`")]
-    ProxyLogin,
-
     /// No source offered a PDF (no open-access copy, no link on the publisher's page).
     #[error("no PDF found: {0}")]
     NoPdf(String),
@@ -65,15 +61,6 @@ impl FetchError {
         match self {
             Self::Blocked { .. } => true,
             Self::AllFailed(failures) => failures.iter().any(|(_, e)| e.is_blocked()),
-            _ => false,
-        }
-    }
-
-    /// Whether the institutional proxy asked for a new login (here or in any source of a chain).
-    pub fn is_proxy_login(&self) -> bool {
-        match self {
-            Self::ProxyLogin => true,
-            Self::AllFailed(failures) => failures.iter().any(|(_, e)| e.is_proxy_login()),
             _ => false,
         }
     }

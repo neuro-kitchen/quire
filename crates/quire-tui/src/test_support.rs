@@ -12,5 +12,5 @@ pub fn row(key: &str, title: &str, author: &str, year: u16) -> Row {
     data.creators.push(Creator::person(CreatorRole::Author, author, None));
     data.issued = Some(Date::year(year));
     let reference = Reference::new(CiteKey::parse(key).unwrap(), data, Origin::User, DeviceId::new());
-    Row { reference, issues: Vec::new(), pdf: None, tags: Vec::new() }
+    Row { reference, issues: Vec::new(), pdf: None, tags: Vec::new(), hit: None }
 }

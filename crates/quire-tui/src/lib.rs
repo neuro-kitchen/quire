@@ -71,11 +71,47 @@ async fn event_loop(terminal: &mut ratatui::DefaultTerminal, engine: Arc<Engine>
         };
         if let Some(action) = action {
             for effect in update::update(&mut state, action) {
-                effects::spawn(&engine, effect, &send);
+                match effect {
+                    Effect::Edit(id) => {
+                        // The editor needs the terminal and the keyboard: stop reading keys (the
+                        // stream would take the editor's), leave the screen, come back after.
+                        drop(events);
+                        ratatui::restore();
+                        let outcome = edit(&engine, id).await;
+                        *terminal = ratatui::try_init()?;
+                        events = EventStream::new();
+                        let _ = send.send(outcome);
+                    }
+                    other => effects::spawn(&engine, other, &send),
+                }
             }
         }
     }
     Ok(())
+}
+
+/// Edits the reference `id` in the user's editor (the TOML of `quire ref edit`), then applies it.
+async fn edit(engine: &Engine, id: quire_model::ReferenceId) -> Action {
+    let done = |text: String, ok: bool| Action::Done { text, ok };
+    let (id, original) = match engine.edit_document(&id.to_string()).await {
+        Ok(document) => document,
+        Err(error) => return done(format!("{error:#}"), false),
+    };
+    let text = match quire_engine::editor::edit_text(&original, ".toml") {
+        Ok(text) => text,
+        Err(error) => return done(format!("{error:#}"), false),
+    };
+    if text == original {
+        return done("nothing edited".into(), true);
+    }
+    match engine.apply_edit(id, &text, false).await {
+        Ok(updated) => {
+            let fields = updated.changes.iter().filter(|c| c.outcome == quire_engine::Outcome::Updated).count();
+            done(format!("edited {}: {fields} field(s)", updated.reference.cite_key), true)
+        }
+        // Not applied: the user can press `e` again (the CLI's `ref edit` loops until valid).
+        Err(error) => done(format!("edit not applied: {error:#}"), false),
+    }
 }
 
 #[cfg(test)]

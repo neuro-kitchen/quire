@@ -7,9 +7,9 @@ use rusqlite::{Connection, OptionalExtension, Row, params};
 use super::codec::{id_at, id_blob, meta_at, optional_id_at, parsed_at};
 use crate::error::OrCore;
 
-const TAG_COLUMNS: &str = "id, name, color, position, created_at, updated_at, updated_by, deleted_at";
+pub(crate) const TAG_COLUMNS: &str = "id, name, color, position, created_at, updated_at, updated_by, deleted_at";
 
-fn tag_from_row(row: &Row) -> rusqlite::Result<Tag> {
+pub(crate) fn tag_from_row(row: &Row) -> rusqlite::Result<Tag> {
     Ok(Tag {
         id: id_at(row, "id")?,
         name: row.get("name")?,

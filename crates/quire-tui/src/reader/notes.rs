@@ -62,7 +62,7 @@ impl Reader {
     fn notes_blocks(&self) -> Vec<Block> {
         let mut blocks = Vec::new();
         for note in &self.annotations.notes {
-            blocks.push(Block { kind: Kind::Heading(4), words: words(&format!("Note: {}", note.title())) });
+            blocks.push(Block { kind: Kind::Heading(4), words: words("Note") });
             blocks.extend(super::document::parse(&note.body, false));
         }
         for highlight in &self.annotations.highlights {

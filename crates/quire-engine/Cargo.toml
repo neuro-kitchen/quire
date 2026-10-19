@@ -13,6 +13,7 @@ quire-model.workspace = true
 quire-core.workspace = true
 quire-io.workspace = true
 quire-store.workspace = true
+quire-sync.workspace = true
 quire-fetch.workspace = true
 blake3.workspace = true
 etcetera.workspace = true
@@ -25,9 +26,9 @@ tokio.workspace = true
 tokio-rusqlite.workspace = true
 toml.workspace = true
 toml_edit.workspace = true
+tempfile.workspace = true
 tracing.workspace = true
 url.workspace = true
 
 [dev-dependencies]
-tempfile.workspace = true
 wiremock.workspace = true

@@ -1,0 +1,14 @@
+[book]
+title = "quire"
+description = "A reference manager for the terminal: library, PDFs, reader, exports that stay up to date, sync."
+authors = ["jesusdpa1"]
+language = "en"
+src = "src"
+
+[output.html]
+site-url = "/quire/"
+git-repository-url = "https://github.com/neuro-kitchen/quire/tree/main/docs"
+edit-url-template = "https://github.com/neuro-kitchen/quire/edit/main/docs/{path}"
+
+[output.html.search]
+heading-split-level = 2
