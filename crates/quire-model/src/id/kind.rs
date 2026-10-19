@@ -40,6 +40,8 @@ id_kinds! {
     Attachment => "att", "attachment";
     /// A device holding a copy of the library (for sync).
     Device => "dev", "device";
+    /// A highlighted passage of a paper's text, with an optional comment.
+    Highlight => "hl", "highlight";
 }
 
 #[cfg(test)]

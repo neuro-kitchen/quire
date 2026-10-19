@@ -30,6 +30,8 @@ name_enum! {
         Blocked => "blocked",
         /// The attached PDF prints another DOI or arXiv ID than the reference's.
         PdfMismatch => "pdf-mismatch",
+        /// Another reference looks like the same work (detail says which and why).
+        PossibleDuplicate => "possible-duplicate",
     }
 }
 
@@ -94,6 +96,7 @@ impl Issue {
             IssueCode::Fallback => "metadata from a fallback source",
             IssueCode::Blocked => "blocked by the publisher",
             IssueCode::PdfMismatch => "the PDF shows another identifier",
+            IssueCode::PossibleDuplicate => "possible duplicate",
         };
         match &self.detail {
             Some(detail) => format!("{text}: {detail}"),
