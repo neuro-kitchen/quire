@@ -1,0 +1,14 @@
+---
+source: crates/quire-tui/src/lib.rs
+expression: "screen(&mut state, 80, 10)"
+---
+" vaswani2017 Attention Is All You Need                                     100% "
+"  Abstract  │  Paper · PDF  │  Figures 1                                        "
+"    Figure 1                                                                    "
+"                                                                                "
+"    The Transformer-model architecture.                                         "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+" ← → tabs · f follow figure · j/k scroll · t contents · / search · +/- width · J"
