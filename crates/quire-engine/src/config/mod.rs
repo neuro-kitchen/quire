@@ -34,6 +34,9 @@ pub struct Config {
     /// Export profiles by name (`[export.<name>]`); `default` applies when none is named.
     #[serde(default)]
     pub export: BTreeMap<String, ExportProfile>,
+    /// Devices this one syncs with, by name (`[peers.<name>]`).
+    #[serde(default)]
+    pub peers: BTreeMap<String, Peer>,
     /// The file as read, for `get` and `list`.
     #[serde(skip)]
     raw: toml::Table,
@@ -59,15 +62,21 @@ pub struct LibraryEntry {
     pub path: PathBuf,
 }
 
+/// Another device of the user's (`quire sync peer add`).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct Peer {
+    /// Its device ID (`quire sync id` on it).
+    pub id: String,
+}
+
 /// How to reach full texts behind a login (`.knowledge/metadata-sources.md`, challenge pages).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 pub struct Access {
-    /// Prefix put before a publisher URL to go through the institution's proxy (EZproxy style).
+    /// Prefix put before a publisher URL to open it through the institution's proxy (EZproxy
+    /// style) in the user's own browser (`pdf get --browser`); quire never logs in itself.
     pub proxy: Option<String>,
     /// Where the browser saves downloads; watched by `quire pdf get --browser`.
     pub downloads: Option<PathBuf>,
-    /// Extra intermediate certificates (PEM) for a proxy that does not send its chain.
-    pub ca: Option<PathBuf>,
 }
 
 /// The TUI reader's layout (`reader.*`); unset values use the reader's defaults.

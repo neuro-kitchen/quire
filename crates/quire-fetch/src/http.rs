@@ -37,16 +37,10 @@ const MAX_RETRY_WAIT: Duration = Duration::from_secs(20);
 /// Wait before retrying a 429 that gave no `Retry-After` (arXiv sends none).
 const DEFAULT_RETRY_WAIT: Duration = Duration::from_secs(5);
 
-/// Minimum time between requests through an institutional proxy: libraries and publishers
-/// suspend proxy accounts that download in bulk.
-const PROXY_INTERVAL: Duration = Duration::from_secs(5);
-
 /// A rate-limited HTTP client.
 pub struct Http {
     client: Client,
     last_request: Mutex<HashMap<String, Instant>>,
-    /// Hosts under this domain (the proxy's) get [`PROXY_INTERVAL`].
-    slow_domain: Option<String>,
 }
 
 impl Http {
@@ -55,31 +49,7 @@ impl Http {
         let contact = email.map(|e| format!(" (mailto:{e})")).unwrap_or_default();
         let user_agent = format!("quire/{}{contact}", env!("CARGO_PKG_VERSION"));
         let client = Client::builder().user_agent(user_agent).timeout(TIMEOUT).build()?;
-        Ok(Self { client, last_request: Mutex::new(HashMap::new()), slow_domain: None })
-    }
-
-    /// A client that sends the proxy session `cookies` (`name=value; …`) to hosts under
-    /// `domain` only (e.g. `lp.hscl.ufl.edu`), with [`PROXY_INTERVAL`] between its requests.
-    /// `extra_ca` (PEM) are intermediates proxies forget to send (`certs/README.md`).
-    pub fn with_proxy_cookies(email: Option<&str>, domain: &str, cookies: &str, extra_ca: &[String]) -> Result<Self> {
-        let jar = std::sync::Arc::new(reqwest::cookie::Jar::default());
-        let origin = Url::parse(&format!("https://{domain}/")).map_err(|_| FetchError::InvalidUrl(domain.into()))?;
-        for pair in cookies.split(';').map(str::trim).filter(|p| p.contains('=')) {
-            jar.add_cookie_str(&format!("{pair}; Domain=.{domain}; Path=/; Secure"), &origin);
-        }
-        let contact = email.map(|e| format!(" (mailto:{e})")).unwrap_or_default();
-        let user_agent = format!("quire/{}{contact}", env!("CARGO_PKG_VERSION"));
-        let mut builder = Client::builder().user_agent(user_agent).timeout(TIMEOUT).cookie_provider(jar);
-        for pem in extra_ca {
-            for certificate in reqwest::Certificate::from_pem_bundle(pem.as_bytes())? {
-                builder = builder.add_root_certificate(certificate);
-            }
-        }
-        Ok(Self {
-            client: builder.build()?,
-            last_request: Mutex::new(HashMap::new()),
-            slow_domain: Some(domain.to_ascii_lowercase()),
-        })
+        Ok(Self { client, last_request: Mutex::new(HashMap::new()) })
     }
 
     /// GET `url` as a page: the body and the final URL after redirects (a proxy redirects to the
@@ -179,14 +149,9 @@ impl Http {
         let slot = {
             let mut last = self.last_request.lock().await;
             let now = Instant::now();
-            // Every host behind the proxy (www-nature-com.<domain>, …) shares one slot: the limit
-            // is on the proxy account, not on each publisher.
-            let (key, gap) = match &self.slow_domain {
-                Some(domain) if host.ends_with(domain.as_str()) => (domain.clone(), PROXY_INTERVAL),
-                _ => (host.clone(), interval(&host)),
-            };
-            let slot = last.get(&key).map_or(now, |previous| (*previous + gap).max(now));
-            last.insert(key, slot);
+            let gap = interval(&host);
+            let slot = last.get(&host).map_or(now, |previous| (*previous + gap).max(now));
+            last.insert(host, slot);
             slot
         };
         tokio::time::sleep_until(slot).await;

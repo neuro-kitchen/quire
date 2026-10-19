@@ -7,8 +7,7 @@
 //! - [`europepmc`]: abstracts by DOI or PMID.
 //! - [`fulltext`]: a paper's structured full text for reader mode (arXiv HTML, Europe PMC JATS).
 //! - [`pubmed`]: PubMed / PubMed Central via NCBI's citation exporter.
-//! - [`pdf`]: finding and downloading a PDF (page link, arXiv, Unpaywall, landing page, proxy).
-//! - [`proxy`]: the institutional proxy with the user's session.
+//! - [`pdf`]: finding and downloading a PDF (page link, arXiv, Unpaywall, landing page).
 //! - [`web`]: metadata tags and JSON-LD of a web page.
 //! - [`http`]: the rate-limited HTTP client; [`challenge`]: recognising "are you human" pages.
 //! - [`names`]: person names given as one string.
@@ -25,7 +24,6 @@ pub mod fulltext;
 pub mod http;
 pub mod names;
 pub mod pdf;
-pub mod proxy;
 pub mod pubmed;
 pub mod web;
 
@@ -33,4 +31,3 @@ pub use error::{FetchError, Result};
 pub use fetcher::{Endpoints, Fetched, Fetcher, Lookup};
 pub use fulltext::{FullText, FullTextSource};
 pub use pdf::FoundPdf;
-pub use proxy::ProxySession;
