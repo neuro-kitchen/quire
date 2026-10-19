@@ -2,7 +2,7 @@
 //! CSL says strings, arrays where it says one value), so reading accepts the common variants.
 
 use quire_model::{Creator, CreatorRole, Date, Name, PersonName};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 /// A text value: a string, a number, or the first string of an array (Crossref sends titles and
 /// ISSNs as arrays). Blank text is `None`.

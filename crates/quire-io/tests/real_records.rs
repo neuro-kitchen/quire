@@ -1,7 +1,7 @@
 //! Real CSL-JSON responses (saved from doi.org content negotiation, 2026-10-18) through to `.bib`:
 //! a Crossref journal article and an arXiv preprint (DataCite).
 
-use quire_io::{from_csl_json, to_bib, BibFormat};
+use quire_io::{BibFormat, from_csl_json, to_bib};
 use quire_model::{CiteKey, DeviceId, IdentifierKind, Origin, Reference, ReferenceData};
 
 fn load(name: &str) -> ReferenceData {

@@ -74,15 +74,30 @@ pub fn from_biblatex(name: &str) -> EntryKind {
 
 /// Journal-like types: container title is `journaltitle`, issue goes to `number`.
 pub fn is_article(kind: EntryKind) -> bool {
-    matches!(kind, EntryKind::Article | EntryKind::ArticleJournal | EntryKind::ArticleMagazine | EntryKind::ArticleNewspaper)
+    matches!(
+        kind,
+        EntryKind::Article | EntryKind::ArticleJournal | EntryKind::ArticleMagazine | EntryKind::ArticleNewspaper
+    )
 }
 
 /// BibLaTeX source types whose `number` is the series number (citation-js `collection-number` rule).
 pub fn number_is_series_number(biblatex_type: &str) -> bool {
     matches!(
         biblatex_type,
-        "book" | "mvbook" | "inbook" | "bookinbook" | "suppbook" | "collection" | "mvcollection" | "incollection"
-            | "suppcollection" | "manual" | "suppperiodical" | "proceedings" | "mvproceedings" | "reference"
+        "book"
+            | "mvbook"
+            | "inbook"
+            | "bookinbook"
+            | "suppbook"
+            | "collection"
+            | "mvcollection"
+            | "incollection"
+            | "suppcollection"
+            | "manual"
+            | "suppperiodical"
+            | "proceedings"
+            | "mvproceedings"
+            | "reference"
     )
 }
 
@@ -91,9 +106,33 @@ pub fn writes_series_number(kind: EntryKind) -> bool {
     use EntryKind::*;
     matches!(
         kind,
-        Bill | Book | Broadcast | Chapter | Dataset | Entry | EntryDictionary | EntryEncyclopedia | Figure | Graphic
-            | Interview | Legislation | LegalCase | Manuscript | Map | MotionPicture | MusicalScore | Pamphlet | Post
-            | PostWeblog | PersonalCommunication | Review | ReviewBook | Song | Speech | Thesis | Treaty | Webpage
+        Bill | Book
+            | Broadcast
+            | Chapter
+            | Dataset
+            | Entry
+            | EntryDictionary
+            | EntryEncyclopedia
+            | Figure
+            | Graphic
+            | Interview
+            | Legislation
+            | LegalCase
+            | Manuscript
+            | Map
+            | MotionPicture
+            | MusicalScore
+            | Pamphlet
+            | Post
+            | PostWeblog
+            | PersonalCommunication
+            | Review
+            | ReviewBook
+            | Song
+            | Speech
+            | Thesis
+            | Treaty
+            | Webpage
     )
 }
 
@@ -111,7 +150,8 @@ mod tests {
     #[test]
     fn common_types_round_trip() {
         use EntryKind::*;
-        for kind in [ArticleJournal, Book, Chapter, PaperConference, Report, Thesis, Webpage, Dataset, Software, Patent] {
+        for kind in [ArticleJournal, Book, Chapter, PaperConference, Report, Thesis, Webpage, Dataset, Software, Patent]
+        {
             assert_eq!(from_biblatex(to_biblatex(kind)), kind, "{kind}");
         }
         assert_eq!(from_biblatex("PhDThesis"), Thesis);

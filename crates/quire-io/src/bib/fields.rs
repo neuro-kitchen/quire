@@ -54,7 +54,9 @@ fn takes_issue_number(kind: EntryKind) -> bool {
 /// Value as written to BibLaTeX: page ranges use `--`.
 pub fn to_biblatex_value(field: TextField, value: &str) -> String {
     match field {
-        TextField::Page => value.replace('–', "--").split("--").map(|part| part.replace('-', "--")).collect::<Vec<_>>().join("--"),
+        TextField::Page => {
+            value.replace('–', "--").split("--").map(|part| part.replace('-', "--")).collect::<Vec<_>>().join("--")
+        }
         _ => value.into(),
     }
 }
@@ -103,7 +105,24 @@ pub fn from_biblatex(bib_type: &str, name: &str, value: &str, data: &mut Referen
 }
 
 /// Order in which BibLaTeX fields are read, so that preferred sources come first.
-pub const READ_ORDER: &[&str] = &["journaltitle", "journal", "booktitle", "maintitle", "publisher", "organization", "institution", "school", "location", "address", "note", "addendum", "language", "langid", "number", "issue"];
+pub const READ_ORDER: &[&str] = &[
+    "journaltitle",
+    "journal",
+    "booktitle",
+    "maintitle",
+    "publisher",
+    "organization",
+    "institution",
+    "school",
+    "location",
+    "address",
+    "note",
+    "addendum",
+    "language",
+    "langid",
+    "number",
+    "issue",
+];
 
 #[cfg(test)]
 mod tests {
