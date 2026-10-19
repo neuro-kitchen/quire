@@ -19,8 +19,8 @@ pub fn header(frame: &mut Frame, area: Rect, state: &State) {
             theme::DIM,
         ),
     ];
-    if state.jobs > 0 {
-        spans.push(Span::styled(format!("  ⟳ {} running", state.jobs), theme::WARN));
+    if !state.jobs.is_empty() {
+        spans.push(Span::styled(format!("  ⟳ {} running (J)", state.jobs.len()), theme::WARN));
     }
     frame.render_widget(Paragraph::new(Line::from(spans)), area);
 }
@@ -30,6 +30,11 @@ pub fn footer(frame: &mut Frame, area: Rect, state: &State) {
         Some(Prompt::Filter) => prompt_line("/", &state.input),
         Some(Prompt::Add) => prompt_line("add (DOI, arXiv ID, PMID, URL): ", &state.input),
         Some(Prompt::Tag) => prompt_line("tag (toggle): ", &state.input),
+        Some(Prompt::Link) => prompt_line("link to project (path, e.g. thesis/chapter-1): ", &state.input),
+        Some(Prompt::Export) => prompt_line("export to (.bib, .yml or .json): ", &state.input),
+        Some(Prompt::Search) => {
+            prompt_line("search (words, \"a phrase\", author:, title:, tag:, note:): ", &state.input)
+        }
         Some(Prompt::ConfirmTrash) => {
             let key = state.current().map(|r| r.reference.cite_key.to_string()).unwrap_or_default();
             Line::from(vec![Span::styled(format!(" move {key} to the trash? "), theme::WARN), Span::raw("y / n")])

@@ -26,6 +26,12 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &State) {
     place.extend(data.get(TextField::ContainerTitle).map(str::to_string));
     lines.push(Line::styled(place.into_iter().filter(|p| !p.is_empty()).collect::<Vec<_>>().join(" · "), theme::DIM));
     lines.push(Line::default());
+    if let Some((snippet, in_text)) = &row.hit {
+        let title = if *in_text { "Found in the paper's text" } else { "Found" };
+        lines.push(Line::styled(title, theme::TITLE));
+        lines.push(matched(snippet));
+        lines.push(Line::default());
+    }
     let field = |label: &str, value: String| {
         Line::from(vec![Span::styled(format!("{label:<9}"), theme::DIM), Span::raw(value)])
     };
@@ -88,4 +94,14 @@ fn creators(data: &quire_model::ReferenceData) -> String {
         names.push(format!("… {} more", data.creators.len() - CREATORS_SHOWN));
     }
     names.join("; ")
+}
+
+/// A search snippet with the matched words (`«…»`) in the accent color.
+fn matched(snippet: &str) -> Line<'static> {
+    let mut spans = Vec::new();
+    for (i, part) in snippet.replace('\n', " ").split(['«', '»']).enumerate() {
+        let style = if i % 2 == 1 { theme::KEY } else { ratatui::style::Style::new() };
+        spans.push(Span::styled(part.to_string(), style));
+    }
+    Line::from(spans)
 }

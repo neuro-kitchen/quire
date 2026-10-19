@@ -12,6 +12,9 @@ pub fn action(key: KeyEvent, typing: bool) -> Option<Action> {
     if ctrl && matches!(key.code, KeyCode::Char('c')) {
         return Some(Action::Quit);
     }
+    if ctrl && matches!(key.code, KeyCode::Char('f')) && !typing {
+        return Some(Action::StartPrompt(Prompt::Search));
+    }
     if typing {
         return match key.code {
             KeyCode::Esc => Some(Action::Escape),
@@ -46,6 +49,12 @@ pub fn action(key: KeyEvent, typing: bool) -> Option<Action> {
         KeyCode::Char('p') => Action::GetPdf,
         KeyCode::Char('E') => Action::ExtractText,
         KeyCode::Char('M') => Action::StartPrompt(Prompt::ConfirmMerge),
+        KeyCode::Char('e') => Action::Edit,
+        KeyCode::Char('F') => Action::Refetch,
+        KeyCode::Char('L') => Action::StartPrompt(Prompt::Link),
+        KeyCode::Char('U') => Action::Unlink,
+        KeyCode::Char('X') => Action::StartPrompt(Prompt::Export),
+        KeyCode::Char('J') => Action::ToggleJobs,
         KeyCode::Char('r') => Action::Reload,
         KeyCode::Char(c @ '1'..='9') => Action::ToggleTag(c as u8 - b'0'),
         _ => return None,
@@ -97,10 +106,10 @@ pub fn reader_action(key: KeyEvent, typing: bool) -> Option<Action> {
     Some(Action::Reader(action))
 }
 
-/// Shown at the bottom of the reader.
 /// Shown while selecting sentences to highlight.
 pub const SELECT_HELP: &str = "selecting: j/k next/previous sentence · l/h longer/shorter · m highlight · c highlight with comment · x remove highlight · Esc stop";
 
+/// Shown at the bottom of the reader.
 pub const READER_HELP: &str = "← → tabs · f follow figure · v highlight · a note · j/k scroll · t contents · / search · +/- width · J/L/T layout · R re-extract · q back";
 
 /// Shown by `?`: key, what it does.
@@ -111,6 +120,7 @@ pub const HELP: &[(&str, &str)] = &[
     ("Tab h l", "switch pane"),
     ("Enter", "read the paper / open project"),
     ("/", "filter (fuzzy, as you type)"),
+    ("Ctrl-f", "search everything, papers' text too"),
     ("Esc", "clear filter, close"),
     ("s S", "sort by next column, reverse"),
     ("a", "add by DOI, arXiv ID, PMID or URL"),
@@ -121,6 +131,10 @@ pub const HELP: &[(&str, &str)] = &[
     ("o", "open the PDF"),
     ("x", "move to the trash"),
     ("M", "merge a duplicate (≈) or mark distinct"),
+    ("e F", "edit in $EDITOR, refetch"),
+    ("L U", "link to a project, unlink from this one"),
+    ("X", "export this view (.bib .yml .json)"),
+    ("J", "jobs running"),
     ("r", "reload"),
     ("?", "this help"),
     ("q", "quit"),

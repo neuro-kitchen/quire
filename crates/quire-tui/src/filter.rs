@@ -78,6 +78,8 @@ fn compare(a: &Row, b: &Row, sort: Sort) -> std::cmp::Ordering {
         Sort::Author => author(x).cmp(&author(y)),
         Sort::Title => title(x).cmp(&title(y)),
         Sort::Added => y.meta.created_at.cmp(&x.meta.created_at),
+        // Stable sort: the order the rows came in (the search's ranking).
+        Sort::Relevance => return std::cmp::Ordering::Equal,
     }
     .then_with(|| x.cite_key.cmp(&y.cite_key))
 }
