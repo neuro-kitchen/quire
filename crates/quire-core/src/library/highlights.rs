@@ -19,6 +19,16 @@ pub fn add(
     }
     let reference = find(library, query)?;
     let highlight = Highlight::new(reference.id, quote, prefix, comment, library.device());
+    // The same passage again: one highlight, its comment updated if a new one is given.
+    let existing = library.highlights_of(reference.id)?;
+    if let Some(mut same) = existing.into_iter().find(|h| h.quote == highlight.quote && h.prefix == highlight.prefix) {
+        if highlight.comment.is_some() && highlight.comment != same.comment {
+            same.comment = highlight.comment;
+            same.meta.touch(library.device());
+            library.update_highlight(&same)?;
+        }
+        return Ok(same);
+    }
     library.insert_highlight(&highlight)?;
     Ok(highlight)
 }
@@ -67,7 +77,10 @@ mod tests {
             add_reference(&mut library, AddRequest::new(data, Origin::User)).unwrap().reference().cite_key.to_string();
         assert!(matches!(add(&mut library, &key, "  ", "", None), Err(CoreError::EmptyHighlight)));
         let h = add(&mut library, &key, "Attention is all you need.", "We show that", None).unwrap();
+        let again = add(&mut library, &key, "Attention is all you need.", "We show that", Some("again")).unwrap();
+        assert_eq!((again.id, again.comment.as_deref()), (h.id, Some("again")), "the same passage: one highlight");
         assert_eq!(comment(&mut library, h.id, "key claim").unwrap().comment.as_deref(), Some("key claim"));
+        assert_eq!(of(&library, &key).unwrap().1.len(), 1);
         assert_eq!(of(&library, &key).unwrap().1.len(), 1);
         remove(&mut library, h.id).unwrap();
         assert!(of(&library, &key).unwrap().1.is_empty());
