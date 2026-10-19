@@ -1,8 +1,15 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/quire-model",
+    "crates/quire-io",
+    "crates/quire-core",
+    "crates/quire-store",
+    "crates/quire-fetch",
+    "crates/quire-engine",
+    "crates/quire-cli",
     "quire_py",
-]   # + crates/quire-<part> (planned: core, io, fetch, cli, app)
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -12,6 +19,60 @@ authors = ["jesusdpa1 <jesuspenalozaa2@gmail.com>"]
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
-# Versions as in lumen (checked on crates.io 2026-10-14); add each to a crate with `<name>.workspace = true`.
+# Versions checked with `cargo info` (crates.io); always the latest (.knowledge/engineering.md).
+# Add each to a crate with `<name>.workspace = true`.
+
+# Our crates
+quire-model = { path = "crates/quire-model" }
+quire-io = { path = "crates/quire-io" }
+quire-core = { path = "crates/quire-core" }
+quire-store = { path = "crates/quire-store" }
+quire-fetch = { path = "crates/quire-fetch" }
+quire-engine = { path = "crates/quire-engine" }
+
+# Configuration & paths (figment skipped: last release 2024, see .knowledge/engineering.md)
+etcetera = "0.11.0"
+toml = "1.1.8"
+toml_edit = "0.25.17"
+
+# Network (reqwest 0.13 defaults to rustls: no OpenSSL)
+reqwest = { version = "0.13.5", features = ["gzip"] }
+scraper = "0.27.0"
+url = "2.5.8"
+
+# Async & logging
+tokio = { version = "1.53.3", features = ["full"] }
+tracing = "0.1.44"
+tracing-subscriber = "0.3.23"
+
+# Database (SQLite built in; `rusqlite_migration` and `tokio-rusqlite` require rusqlite 0.40)
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+rusqlite_migration = "2.6.0"
+tokio-rusqlite = "0.8.0"
+
+# Text
+deunicode = "1.6.2"
+
+# Bibliography formats
+biblatex = "0.12.0"
+
+# IDs
+uuid = { version = "1.28.0", features = ["v7"] }
+typeid_suffix = "1.3.0"
+
+# Serialization & errors
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+thiserror = "2.0.21"
+anyhow = "1.0.104"
+
+# CLI
+clap = { version = "4.6.7", features = ["derive", "env"] }
+
+# Testing
+insta = "1.49.0"
+tempfile = "3.27.0"
+wiremock = "0.6.5"
+
 # Python bindings (built by maturin, see pyproject.toml)
 pyo3 = { version = "0.29.3" }
