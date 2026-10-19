@@ -1,0 +1,30 @@
+//! Title words left out of cite keys: Better BibTeX's default `skipWords` (hidden preference,
+//! https://retorque.re/zotero-better-bibtex/preferences/hidden-preferences/, read 2026-10-18).
+
+const SKIP_WORDS: &[&str] = &[
+    "a", "ab", "aboard", "about", "above", "across", "after", "against", "al", "along", "amid", "among", "an",
+    "and", "anti", "around", "as", "at", "before", "behind", "below", "beneath", "beside", "besides", "between",
+    "beyond", "but", "by", "d", "da", "das", "de", "del", "dell", "dello", "dei", "degli", "della", "delle", "dem",
+    "den", "der", "des", "despite", "die", "do", "down", "du", "during", "ein", "eine", "einem", "einen", "einer",
+    "eines", "el", "en", "et", "except", "for", "from", "gli", "i", "il", "in", "inside", "into", "is", "l", "la",
+    "las", "le", "les", "like", "lo", "los", "near", "nor", "of", "off", "on", "onto", "or", "over", "past", "per",
+    "plus", "round", "save", "since", "so", "some", "sur", "than", "the", "through", "to", "toward", "towards",
+    "un", "una", "unas", "under", "underneath", "une", "unlike", "uno", "unos", "until", "up", "upon", "versus",
+    "via", "von", "while", "with", "within", "without", "yet", "zu", "zum",
+];
+
+/// Whether `word` (any case) is a skip word.
+pub fn is_skip_word(word: &str) -> bool {
+    SKIP_WORDS.iter().any(|skip| skip.eq_ignore_ascii_case(word))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn skips_function_words_only() {
+        assert!(is_skip_word("The") && is_skip_word("is") && is_skip_word("von"));
+        assert!(!is_skip_word("Attention") && !is_skip_word("all"));
+    }
+}
