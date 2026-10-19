@@ -5,8 +5,8 @@
 //! per use case.
 
 use quire_model::{
-    Attachment, AttachmentId, CiteKey, DeviceId, Identifier, Issue, Note, NoteId, PdfAttempt, Project, ProjectId,
-    Reference, ReferenceId, Slug, Tag, TagId, TagKind, Timestamp,
+    Attachment, AttachmentId, CiteKey, DeviceId, Highlight, HighlightId, Identifier, Issue, Note, NoteId, PdfAttempt,
+    Project, ProjectId, Reference, ReferenceId, Slug, Tag, TagId, TagKind, Timestamp,
 };
 
 use crate::error::Result;
@@ -168,4 +168,17 @@ pub trait Library {
     /// `false` if they were not related.
     fn unrelate(&mut self, a: ReferenceId, b: ReferenceId) -> Result<bool>;
     fn related(&self, reference: ReferenceId) -> Result<Vec<ReferenceId>>;
+
+    // Pairs the user said are not duplicates
+    /// Records that `a` and `b` are distinct works; `false` if already recorded.
+    fn dismiss_duplicate(&mut self, a: ReferenceId, b: ReferenceId) -> Result<bool>;
+    fn dismissed_duplicates(&self) -> Result<Vec<(ReferenceId, ReferenceId)>>;
+
+    // Highlights (passages marked in the reader)
+    /// Live highlights of `reference`, oldest first.
+    fn highlights_of(&self, reference: ReferenceId) -> Result<Vec<Highlight>>;
+    fn highlight(&self, id: HighlightId) -> Result<Option<Highlight>>;
+    fn insert_highlight(&mut self, highlight: &Highlight) -> Result<()>;
+    /// Writes a highlight's changes (comment, reference, soft delete).
+    fn update_highlight(&mut self, highlight: &Highlight) -> Result<()>;
 }
