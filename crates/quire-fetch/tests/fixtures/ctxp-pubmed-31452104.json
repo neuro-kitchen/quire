@@ -1,0 +1,41 @@
+{
+    "source": "PubMed",
+    "accessed": {
+        "date-parts": [
+            [
+                2026,
+                10,
+                18
+            ]
+        ]
+    },
+    "id": "pmid:31452104",
+    "title": "Molegro Virtual Docker for Docking",
+    "author": [
+        {
+            "family": "Bitencourt-Ferreira",
+            "given": "Gabriela"
+        },
+        {
+            "family": "de Azevedo",
+            "given": "Walter Filgueira",
+            "suffix": "Jr"
+        }
+    ],
+    "container-title-short": "Methods Mol Biol",
+    "container-title": "Methods in molecular biology (Clifton, N.J.)",
+    "publisher-place": "United States",
+    "ISSN": "1064-3745",
+    "issued": {
+        "date-parts": [
+            [
+                2019
+            ]
+        ]
+    },
+    "page": "149-167",
+    "volume": "2053",
+    "PMID": "31452104",
+    "DOI": "10.1007/978-1-4939-9752-7_10",
+    "type": "article-journal"
+}
