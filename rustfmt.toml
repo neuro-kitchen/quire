@@ -1,0 +1,5 @@
+# Formatting for the whole workspace: `cargo fmt --all` (check: `cargo fmt --all --check`).
+# Stable options only. Lines up to 120 columns, the width the code was written to.
+edition = "2024"
+max_width = 120
+use_small_heuristics = "Max"

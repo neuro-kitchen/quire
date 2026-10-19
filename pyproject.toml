@@ -7,7 +7,7 @@ name = "quire"
 version = "0.1.0"
 description = "Reference manager in Rust (library, BibTeX/CSL import and export, DOI lookup), with a Python SDK"
 readme = "README.md"
-authors = [{ name = "jesusdpa1", email = "jesuspenalozaa2@gmail.com" }]
+authors = [{ name = "jesusdpa1", email = "jpenalozaa2@gmail.com" }]
 requires-python = ">=3.10"
 dependencies = []
 
