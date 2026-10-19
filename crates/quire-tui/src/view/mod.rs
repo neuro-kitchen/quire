@@ -7,6 +7,7 @@
 
 mod details;
 mod help;
+mod jobs;
 mod reader;
 mod sidebar;
 mod status;
@@ -47,5 +48,8 @@ pub fn draw(frame: &mut Frame, state: &mut State) {
     status::footer(frame, footer, state);
     if state.help {
         help::draw(frame, frame.area());
+    }
+    if state.show_jobs {
+        jobs::draw(frame, frame.area(), state);
     }
 }

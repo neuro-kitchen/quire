@@ -1,11 +1,18 @@
 //! The pure part of the TUI: an [`Action`] (a key, or a result from the engine) changes the
 //! [`State`] and asks for [`Effect`]s (engine work, run elsewhere). No I/O here, so every
 //! behaviour is a unit test.
+//!
+//! - [`prompt`]: keys while a prompt is open; [`reader`]: the reader's keys and results;
+//!   [`jobs`]: background work shown in the jobs panel.
 
-use quire_engine::{ProjectSummary, Tag};
+mod jobs;
+mod prompt;
+mod reader;
+
+use quire_engine::{ProjectSummary, SlugPath, Tag};
 use quire_model::ReferenceId;
 
-use crate::reader::{Reader, ReaderAction, ReaderEffect, Settings, paper};
+use crate::reader::{ReaderAction, Settings};
 use crate::state::{Details, Pane, Prompt, Row, Scope, State};
 
 /// What happened.
@@ -34,6 +41,14 @@ pub enum Action {
     GetPdf,
     /// Extract the selected paper's text again.
     ExtractText,
+    /// Edit the selected reference in the user's editor.
+    Edit,
+    /// Look the selected reference up again (fields the user edited are kept).
+    Refetch,
+    /// Take the selected reference out of the open project.
+    Unlink,
+    /// Open or close the jobs panel.
+    ToggleJobs,
     Reload,
     /// Results from the engine.
     Loaded {
@@ -47,6 +62,8 @@ pub enum Action {
         text: String,
         ok: bool,
     },
+    /// A background job ended (its result came as another action).
+    JobFinished(u64),
     /// The library changed elsewhere (a job, another program).
     Changed,
     /// Open the selected reference in the reader.
@@ -117,6 +134,27 @@ pub enum Effect {
     },
     SaveReaderSettings(Settings),
     SavePositions(Vec<(ReferenceId, usize)>),
+    /// `effect`, listed in the jobs panel while it runs.
+    Job {
+        id: u64,
+        effect: Box<Effect>,
+    },
+    /// Edit in the user's editor: the event loop leaves the screen to it.
+    Edit(ReferenceId),
+    Refetch(ReferenceId),
+    Link {
+        reference: ReferenceId,
+        path: SlugPath,
+    },
+    Unlink {
+        reference: ReferenceId,
+        path: SlugPath,
+    },
+    /// Export the scope's references to `path` (format from its extension).
+    Export {
+        scope: Scope,
+        path: String,
+    },
 }
 
 /// Lines moved by page up / down.
@@ -124,23 +162,16 @@ pub const PAGE: isize = 10;
 
 pub fn update(state: &mut State, action: Action) -> Vec<Effect> {
     match action {
-        Action::Read => return open_reader(state),
+        Action::Read => return reader::open(state),
         Action::TextLoaded { id, text } => {
-            let has_pdf = state.rows.iter().any(|r| r.reference.id == id && has_pdf(r));
-            if let Some(reader) = state.reader.as_mut().filter(|r| r.id == id) {
-                match text {
-                    Ok(text) => {
-                        reader.loaded(&text.markdown, text.source.has_math());
-                        reader.source = Some(text.source.label());
-                    }
-                    // Without a PDF, "no text" is not an error: the abstract is all there is.
-                    Err(_) if !has_pdf => reader.no_text(),
-                    Err(error) => reader.failed(error),
-                }
-            }
+            reader::text_loaded(state, id, text);
             return Vec::new();
         }
-        Action::Reader(action) => return reader_action(state, action),
+        Action::Reader(action) => return reader::action(state, action),
+        Action::JobFinished(id) => {
+            jobs::finished(state, id);
+            return Vec::new();
+        }
         Action::Saved => return Vec::new(),
         Action::Annotations { id, highlights, notes } => {
             if let Some(reader) = state.reader.as_mut().filter(|r| r.id == id) {
@@ -156,12 +187,13 @@ pub fn update(state: &mut State, action: Action) -> Vec<Effect> {
             Action::Loaded { .. } | Action::Rows(_) | Action::DetailsLoaded(_) | Action::Done { .. } | Action::Changed
         )
     {
-        return prompt(state, action);
+        return prompt::handle(state, action);
     }
     match action {
         Action::Quit => state.quit = true,
         Action::Help => state.help = !state.help,
         Action::Escape if state.help => state.help = false,
+        Action::Escape if state.show_jobs => state.show_jobs = false,
         Action::Escape if !state.filter.is_empty() => {
             state.filter.clear();
             state.refresh_visible();
@@ -180,7 +212,7 @@ pub fn update(state: &mut State, action: Action) -> Vec<Effect> {
                 state.selected = 0;
                 return vec![Effect::LoadRows(state.scope.clone())];
             }
-            Pane::References => return open_reader(state),
+            Pane::References => return reader::open(state),
             Pane::Details => state.focus = Pane::References,
         },
         Action::Sort => {
@@ -193,10 +225,10 @@ pub fn update(state: &mut State, action: Action) -> Vec<Effect> {
             state.refresh_visible();
         }
         Action::StartPrompt(kind) => {
-            if matches!(kind, Prompt::Tag | Prompt::ConfirmTrash) && state.current().is_none() {
+            if prompt::needs_selection(&kind) && state.current().is_none() {
                 return Vec::new();
             }
-            if kind == Prompt::ConfirmMerge && state.current().and_then(Row::duplicate_of).is_none() {
+            if kind == Prompt::ConfirmMerge && !prompt::has_duplicate(state) {
                 state.warn("no duplicate to merge (≈ marks possible duplicates)");
                 return Vec::new();
             }
@@ -212,16 +244,18 @@ pub fn update(state: &mut State, action: Action) -> Vec<Effect> {
             return vec![Effect::ToggleTag { reference: row.reference.id, tag: tag.name.clone() }];
         }
         Action::OpenPdf => return selected(state).map(Effect::OpenPdf).into_iter().collect(),
-        Action::GetPdf => {
-            let effects: Vec<Effect> = selected(state).map(Effect::GetPdf).into_iter().collect();
-            state.jobs += effects.len();
-            return effects;
+        Action::GetPdf => return job_on_selected(state, "get the PDF of", Effect::GetPdf),
+        Action::ExtractText => return job_on_selected(state, "extract the text of", Effect::ExtractText),
+        Action::Refetch => return job_on_selected(state, "refetch", Effect::Refetch),
+        Action::Edit => return selected(state).map(Effect::Edit).into_iter().collect(),
+        Action::Unlink => {
+            let Scope::Project(path) = state.scope.clone() else {
+                state.warn("open a project first: unlink takes a reference out of the open project");
+                return Vec::new();
+            };
+            return selected(state).map(|reference| Effect::Unlink { reference, path }).into_iter().collect();
         }
-        Action::ExtractText => {
-            let effects: Vec<Effect> = selected(state).map(Effect::ExtractText).into_iter().collect();
-            state.jobs += effects.len();
-            return effects;
-        }
+        Action::ToggleJobs => state.show_jobs = !state.show_jobs,
         Action::Reload | Action::Changed => {
             return vec![Effect::LoadSidebar, Effect::LoadRows(state.scope.clone())];
         }
@@ -232,8 +266,7 @@ pub fn update(state: &mut State, action: Action) -> Vec<Effect> {
             state.scope_index = state.scope_index.min(state.scope_count() - 1);
         }
         Action::Rows(rows) => {
-            state.rows = rows;
-            state.refresh_visible();
+            state.set_rows(rows);
             return details(state);
         }
         Action::DetailsLoaded(loaded) => {
@@ -242,143 +275,34 @@ pub fn update(state: &mut State, action: Action) -> Vec<Effect> {
             }
         }
         Action::Done { text, ok } => {
-            state.jobs = state.jobs.saturating_sub(1);
-            if ok { state.tell(text) } else { state.warn(text) }
+            if ok {
+                state.tell(text)
+            } else {
+                state.warn(text)
+            }
         }
         // Prompt-only actions outside a prompt: nothing.
         Action::Type(_) | Action::Backspace | Action::Submit => {}
-        Action::Read | Action::Reader(_) | Action::TextLoaded { .. } | Action::Saved | Action::Annotations { .. } => {
+        Action::Read
+        | Action::Reader(_)
+        | Action::TextLoaded { .. }
+        | Action::Saved
+        | Action::Annotations { .. }
+        | Action::JobFinished(_) => {
             unreachable!("handled above")
         }
     }
     Vec::new()
 }
 
-fn has_pdf(row: &Row) -> bool {
-    matches!(row.pdf, Some(quire_engine::PdfStatus::Available { .. }))
-}
-
-/// Opens the selected reference in the reader, on its abstract; its text (arXiv, Europe PMC or
-/// the PDF) loads in the background.
-fn open_reader(state: &mut State) -> Vec<Effect> {
+/// A job on the selected reference, labelled `<verb> <cite key>`.
+fn job_on_selected(state: &mut State, verb: &str, effect: fn(ReferenceId) -> Effect) -> Vec<Effect> {
     let Some(row) = state.current() else { return Vec::new() };
-    let has_text = has_pdf(row) || quire_engine::online_candidate(&row.reference);
-    let reference = &row.reference;
-    let id = reference.id;
-    let title = reference.data.title().unwrap_or("(no title)").to_string();
-    let front = paper::front_matter(reference);
-    let resume = state.positions.get(&id).copied();
-    let key = reference.cite_key.to_string();
-    state.reader = Some(Reader::new(id, key, title, front, has_text, state.reader_settings, resume));
-    let mut effects = vec![Effect::LoadAnnotations(id)];
-    if has_text {
-        effects.push(Effect::LoadText(id));
-    }
-    effects
+    let (id, label) = (row.reference.id, format!("{verb} {}", row.reference.cite_key));
+    vec![jobs::start(state, label, effect(id))]
 }
 
-fn reader_action(state: &mut State, action: ReaderAction) -> Vec<Effect> {
-    let Some(reader) = state.reader.as_mut() else { return Vec::new() };
-    match reader.apply(action) {
-        ReaderEffect::None => Vec::new(),
-        ReaderEffect::Refresh => vec![Effect::RefreshText(reader.id)],
-        ReaderEffect::SaveHighlight { quote, prefix, comment } => {
-            vec![Effect::AddHighlight { reference: reader.id, quote, prefix, comment }]
-        }
-        ReaderEffect::RemoveHighlight(highlight) => vec![Effect::RemoveHighlight { reference: reader.id, highlight }],
-        ReaderEffect::AddNote(body) => vec![Effect::AddNote { reference: reader.id, body }],
-        ReaderEffect::SaveSettings => {
-            state.reader_settings = reader.settings;
-            vec![Effect::SaveReaderSettings(reader.settings)]
-        }
-        ReaderEffect::Close => {
-            let (id, block) = (reader.id, reader.paper_block());
-            state.reader = None;
-            let Some(block) = block else { return Vec::new() };
-            state.positions.insert(id, block);
-            vec![Effect::SavePositions(state.positions.iter().map(|(k, v)| (*k, *v)).collect())]
-        }
-    }
-}
-
-/// Keys while a prompt is open: typing, Enter, Esc. The filter applies as you type.
-fn prompt(state: &mut State, action: Action) -> Vec<Effect> {
-    let kind = state.prompt.clone().expect("called with a prompt");
-    match action {
-        Action::Escape => {
-            state.prompt = None;
-            if kind == Prompt::Filter {
-                state.filter.clear();
-                state.refresh_visible();
-                return details(state);
-            }
-        }
-        Action::Type(c) if kind == Prompt::ConfirmMerge => {
-            state.prompt = None;
-            let Some(row) = state.current() else { return Vec::new() };
-            let (keep, other) = (row.reference.id, row.duplicate_of().unwrap_or_default().to_string());
-            match c {
-                'y' => {
-                    state.jobs += 1;
-                    return vec![Effect::Merge { keep, other }];
-                }
-                'd' => {
-                    state.jobs += 1;
-                    return vec![Effect::Distinct { a: keep, b: other }];
-                }
-                _ => {}
-            }
-        }
-        Action::Type(c) if kind == Prompt::ConfirmTrash => {
-            state.prompt = None;
-            if c == 'y' {
-                return selected(state).map(Effect::Trash).into_iter().collect();
-            }
-        }
-        Action::Type(c) => {
-            state.input.push(c);
-            if kind == Prompt::Filter {
-                state.filter = state.input.clone();
-                state.refresh_visible();
-                return details(state);
-            }
-        }
-        Action::Backspace => {
-            state.input.pop();
-            if kind == Prompt::Filter {
-                state.filter = state.input.clone();
-                state.refresh_visible();
-                return details(state);
-            }
-        }
-        Action::Submit => {
-            state.prompt = None;
-            let input = std::mem::take(&mut state.input).trim().to_string();
-            match kind {
-                Prompt::Filter => {}
-                Prompt::Add if !input.is_empty() => {
-                    state.jobs += 1;
-                    let project = match &state.scope {
-                        Scope::Project(path) => Some(path.clone()),
-                        _ => None,
-                    };
-                    return vec![Effect::Add { input, project }];
-                }
-                Prompt::Tag if !input.is_empty() => {
-                    return selected(state)
-                        .map(|reference| Effect::ToggleTag { reference, tag: input })
-                        .into_iter()
-                        .collect();
-                }
-                _ => {}
-            }
-        }
-        _ => {}
-    }
-    Vec::new()
-}
-
-fn selected(state: &State) -> Option<ReferenceId> {
+pub(super) fn selected(state: &State) -> Option<ReferenceId> {
     state.current().map(|r| r.reference.id)
 }
 
@@ -407,7 +331,7 @@ fn move_by(state: &mut State, by: isize) -> Vec<Effect> {
 }
 
 /// Load the selected reference's details (cleared until they arrive).
-fn details(state: &mut State) -> Vec<Effect> {
+pub(super) fn details(state: &mut State) -> Vec<Effect> {
     match state.current().map(|r| r.reference.id) {
         Some(id) if state.details.id != Some(id) => {
             state.details = Details { id: Some(id), ..Details::default() };
@@ -481,10 +405,12 @@ mod tests {
             update(&mut state, Action::Type(c));
         }
         let effects = update(&mut state, Action::Submit);
-        assert_eq!(effects, [Effect::Add { input: "10.1/x".into(), project: Some("thesis".parse().unwrap()) }]);
-        assert_eq!(state.jobs, 1);
-        update(&mut state, Action::Done { text: "added".into(), ok: true });
-        assert_eq!(state.jobs, 0);
+        let [Effect::Job { id, effect }] = effects.as_slice() else { panic!("{effects:?}") };
+        assert_eq!(**effect, Effect::Add { input: "10.1/x".into(), project: Some("thesis".parse().unwrap()) });
+        assert_eq!(state.jobs.len(), 1);
+        assert_eq!(state.jobs[0].label, "add 10.1/x");
+        update(&mut state, Action::JobFinished(*id));
+        assert!(state.jobs.is_empty());
     }
 
     #[test]
@@ -512,6 +438,62 @@ mod tests {
     }
 
     #[test]
+    fn link_unlink_export_and_jobs() {
+        let mut state = loaded();
+        assert!(update(&mut state, Action::Unlink).is_empty());
+        assert!(state.message.as_ref().unwrap().error, "unlink needs an open project");
+        state.scope = Scope::Project("thesis".parse().unwrap());
+        assert!(matches!(update(&mut state, Action::Unlink).as_slice(), [Effect::Unlink { .. }]));
+
+        update(&mut state, Action::StartPrompt(Prompt::Link));
+        for c in "thesis/ch-1".chars() {
+            update(&mut state, Action::Type(c));
+        }
+        let effects = update(&mut state, Action::Submit);
+        assert!(matches!(effects.as_slice(), [Effect::Link { path, .. }] if path.to_string() == "thesis/ch-1"));
+
+        update(&mut state, Action::StartPrompt(Prompt::Export));
+        for c in "refs.bib".chars() {
+            update(&mut state, Action::Type(c));
+        }
+        let effects = update(&mut state, Action::Submit);
+        assert!(
+            matches!(effects.as_slice(), [Effect::Job { effect, .. }] if matches!(&**effect, Effect::Export { path, .. } if path == "refs.bib"))
+        );
+
+        assert!(matches!(update(&mut state, Action::Refetch).as_slice(), [Effect::Job { .. }]));
+        assert_eq!(state.jobs.len(), 2);
+        update(&mut state, Action::ToggleJobs);
+        assert!(state.show_jobs);
+        update(&mut state, Action::Escape);
+        assert!(!state.show_jobs);
+        assert!(matches!(update(&mut state, Action::Edit).as_slice(), [Effect::Edit(_)]));
+    }
+
+    #[test]
+    fn full_text_search_opens_ranked_results() {
+        let mut state = loaded();
+        update(&mut state, Action::StartPrompt(Prompt::Search));
+        for c in "ecg artifact".chars() {
+            update(&mut state, Action::Type(c));
+        }
+        let effects = update(&mut state, Action::Submit);
+        assert_eq!(effects, [Effect::LoadRows(Scope::Search("ecg artifact".into()))]);
+        assert_eq!(state.sort, crate::state::Sort::Relevance);
+        // Rows keep the ranking they arrive in.
+        let rows = vec![row("z2020", "Last key", "Z", 2020), row("a2020", "First key", "A", 2020)];
+        update(&mut state, Action::Rows(rows));
+        assert_eq!(key(&state), "z2020", "best match first, not sorted by key");
+        // A reload keeps the selected reference, wherever it moved.
+        update(&mut state, Action::Move(1));
+        // The same references (same IDs) plus a new one first.
+        let mut rows = vec![row("new2024", "New", "N", 2024)];
+        rows.extend(state.rows.iter().cloned());
+        update(&mut state, Action::Rows(rows));
+        assert_eq!(key(&state), "a2020");
+    }
+
+    #[test]
     fn merging_a_duplicate() {
         let mut state = loaded();
         update(&mut state, Action::StartPrompt(Prompt::ConfirmMerge));
@@ -524,8 +506,13 @@ mod tests {
         update(&mut state, Action::Rows(vec![row]));
         update(&mut state, Action::StartPrompt(Prompt::ConfirmMerge));
         let effects = update(&mut state, Action::Type('y'));
-        assert!(matches!(effects.as_slice(), [Effect::Merge { other, .. }] if other == "other2017"));
+        assert!(
+            matches!(effects.as_slice(), [Effect::Job { effect, .. }] if matches!(&**effect, Effect::Merge { other, .. } if other == "other2017"))
+        );
         update(&mut state, Action::StartPrompt(Prompt::ConfirmMerge));
-        assert!(matches!(update(&mut state, Action::Type('d')).as_slice(), [Effect::Distinct { .. }]));
+        let effects = update(&mut state, Action::Type('d'));
+        assert!(
+            matches!(effects.as_slice(), [Effect::Job { effect, .. }] if matches!(&**effect, Effect::Distinct { .. }))
+        );
     }
 }

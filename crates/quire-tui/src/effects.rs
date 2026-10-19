@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
-use quire_engine::{Added, Engine, IssueCode, PdfOutcome};
+use quire_engine::{Added, Engine, ExportFormat, ExportRequest, IssueCode, Outcome, PdfOutcome};
 use quire_model::ReferenceId;
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -18,10 +18,18 @@ use crate::update::{Action, Effect};
 pub fn spawn(engine: &Arc<Engine>, effect: Effect, send: &UnboundedSender<Action>) {
     let (engine, send) = (engine.clone(), send.clone());
     tokio::spawn(async move {
+        // A job: its result, then the news that it ended (the jobs panel drops it).
+        let (effect, job) = match effect {
+            Effect::Job { id, effect } => (*effect, Some(id)),
+            other => (other, None),
+        };
         let action =
             run(&engine, effect).await.unwrap_or_else(|error| Action::Done { text: format!("{error:#}"), ok: false });
         // The interface may have quit meanwhile.
         let _ = send.send(action);
+        if let Some(id) = job {
+            let _ = send.send(Action::JobFinished(id));
+        }
     });
 }
 
@@ -104,6 +112,28 @@ async fn run(engine: &Engine, effect: Effect) -> anyhow::Result<Action> {
             Action::TextLoaded { id, text: text.map_err(|e| format!("{e:#}")) }
         }
         Effect::LoadAnnotations(id) => annotations(engine, id).await?,
+        Effect::Refetch(id) => {
+            let updated = engine.refetch(&id.to_string(), false).await?;
+            let changed = updated.changes.iter().filter(|c| c.outcome == Outcome::Updated).count();
+            Action::Done {
+                text: format!("refetched {}: {changed} field(s) updated", updated.reference.cite_key),
+                ok: true,
+            }
+        }
+        Effect::Link { reference, path } => {
+            let (reference, linked) = engine.link(&reference.to_string(), &path).await?;
+            let text = if linked { "linked" } else { "already in" };
+            Action::Done { text: format!("{text} {path}: {}", reference.cite_key), ok: true }
+        }
+        Effect::Unlink { reference, path } => {
+            let (reference, unlinked) = engine.unlink(&reference.to_string(), &path).await?;
+            let text = if unlinked { "took out of" } else { "was not in" };
+            Action::Done { text: format!("{text} {path}: {}", reference.cite_key), ok: true }
+        }
+        Effect::Export { scope, path } => export(engine, &scope, &path).await?,
+        Effect::Job { .. } | Effect::Edit(_) => {
+            unreachable!("jobs are unwrapped in `spawn`, edits run in the event loop")
+        }
         Effect::AddHighlight { reference, quote, prefix, comment } => {
             engine.add_highlight(&reference.to_string(), &quote, &prefix, comment.as_deref()).await?;
             annotations(engine, reference).await?
@@ -137,6 +167,40 @@ async fn run(engine: &Engine, effect: Effect) -> anyhow::Result<Action> {
             Action::Saved
         }
     })
+}
+
+/// Writes the references of `scope` to `path` in the format its extension names.
+async fn export(engine: &Engine, scope: &Scope, path: &str) -> anyhow::Result<Action> {
+    let format = format_for(path)
+        .ok_or_else(|| anyhow::anyhow!("`{path}`: use .bib (BibLaTeX), .yml (Hayagriva) or .json (CSL-JSON)"))?;
+    let project = match scope {
+        Scope::Project(path) => Some(path.clone()),
+        _ => None,
+    };
+    let request = ExportRequest { project, recursive: true, profile: None, format: Some(format) };
+    let (text, count) = engine.export(&request).await?;
+    let target = expand_home(path);
+    std::fs::write(&target, text).map_err(|e| anyhow::anyhow!("{}: {e}", target.display()))?;
+    Ok(Action::Done { text: format!("exported {count} reference(s) to {}", target.display()), ok: true })
+}
+
+/// The export format a file name asks for.
+pub fn format_for(path: &str) -> Option<ExportFormat> {
+    let extension = Path::new(path).extension()?.to_str()?.to_lowercase();
+    match extension.as_str() {
+        "bib" => Some(ExportFormat::Biblatex),
+        "yml" | "yaml" => Some(ExportFormat::Hayagriva),
+        "json" => Some(ExportFormat::CslJson),
+        _ => None,
+    }
+}
+
+/// `~/x` → the home folder's `x`.
+fn expand_home(path: &str) -> std::path::PathBuf {
+    match (path.strip_prefix("~/"), std::env::var_os("HOME")) {
+        (Some(rest), Some(home)) => Path::new(&home).join(rest),
+        _ => path.into(),
+    }
 }
 
 /// A paper's highlights and notes, for the reader.
@@ -186,10 +250,14 @@ pub fn reader_settings(config: &quire_engine::Config) -> Settings {
 
 /// The rows of `scope`: references with issues, PDF status and tags.
 async fn rows(engine: &Engine, scope: &Scope) -> anyhow::Result<Vec<Row>> {
+    if let Scope::Search(query) = scope {
+        return search_rows(engine, query).await;
+    }
     let checked = match scope {
         Scope::All => engine.list_with_issues(None, false, false, &[]).await?,
         Scope::Project(path) => engine.list_with_issues(Some(path), false, false, &[]).await?,
         Scope::Trash => engine.list_with_issues(None, false, true, &[]).await?,
+        Scope::Search(_) => unreachable!("answered above"),
         Scope::Duplicates => {
             let all = engine.list_with_issues(None, false, false, &[]).await?;
             all.into_iter().filter(|c| c.issues.iter().any(|i| i.code == IssueCode::PossibleDuplicate)).collect()
@@ -204,9 +272,31 @@ async fn rows(engine: &Engine, scope: &Scope) -> anyhow::Result<Vec<Row>> {
             tags: tags.remove(&c.reference.id).unwrap_or_default(),
             reference: c.reference,
             issues: c.issues,
+            hit: None,
         })
         .collect())
 }
+
+/// Full-text search results as rows, best first, each with its matching words.
+async fn search_rows(engine: &Engine, query: &str) -> anyhow::Result<Vec<Row>> {
+    let hits = engine.search(query, SEARCH_ROWS).await?;
+    let pdfs = engine.pdf_statuses().await?;
+    let mut tags = engine.tags_of(hits.iter().map(|(r, _)| r.id).collect()).await?;
+    let mut rows = Vec::with_capacity(hits.len());
+    for (reference, hit) in hits {
+        rows.push(Row {
+            pdf: pdfs.get(&reference.id).copied(),
+            tags: tags.remove(&reference.id).unwrap_or_default(),
+            issues: engine.issues(&reference).await?,
+            hit: Some((hit.snippet, hit.in_text)),
+            reference,
+        });
+    }
+    Ok(rows)
+}
+
+/// Search results shown at most.
+const SEARCH_ROWS: usize = 200;
 
 /// Opens a file with the system's default application, detached and silent.
 fn open(target: &str) -> anyhow::Result<()> {

@@ -16,6 +16,9 @@ pub struct Row {
     pub issues: Vec<Issue>,
     pub pdf: Option<PdfStatus>,
     pub tags: Vec<(Tag, TagKind)>,
+    /// For a full-text search result: the matching words in context, and whether only the
+    /// paper's text matched.
+    pub hit: Option<(String, bool)>,
 }
 
 impl Row {
@@ -45,6 +48,8 @@ pub struct Details {
 pub enum Scope {
     All,
     Project(SlugPath),
+    /// Full-text search results, best first.
+    Search(String),
     /// References that look like the same work as another.
     Duplicates,
     Trash,
@@ -66,6 +71,8 @@ pub enum Sort {
     Author,
     Title,
     Added,
+    /// As the search ranked them (search results only).
+    Relevance,
 }
 
 impl Sort {
@@ -75,7 +82,7 @@ impl Sort {
             Self::Year => Self::Author,
             Self::Author => Self::Title,
             Self::Title => Self::Added,
-            Self::Added => Self::Key,
+            Self::Added | Self::Relevance => Self::Key,
         }
     }
 
@@ -86,6 +93,7 @@ impl Sort {
             Self::Author => "author",
             Self::Title => "title",
             Self::Added => "added",
+            Self::Relevance => "relevance",
         }
     }
 }
@@ -103,6 +111,20 @@ pub enum Prompt {
     ConfirmTrash,
     /// `y` to merge the selected reference's duplicate into it, `d` to mark them distinct.
     ConfirmMerge,
+    /// A project path to link the selected reference to.
+    Link,
+    /// A file to export the open scope to (format from the extension).
+    Export,
+    /// Words to search the whole library for (full text).
+    Search,
+}
+
+/// Engine work running in the background (a lookup, a download, a merge), for the jobs panel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Job {
+    pub id: u64,
+    pub label: String,
+    pub started: std::time::Instant,
 }
 
 /// A message in the status bar.
@@ -139,7 +161,11 @@ pub struct State {
     pub help: bool,
     pub message: Option<Message>,
     /// Background jobs running (lookups, downloads).
-    pub jobs: usize,
+    pub jobs: Vec<Job>,
+    /// The ID the next job gets.
+    pub next_job: u64,
+    /// The jobs panel is open (`J`).
+    pub show_jobs: bool,
     pub quit: bool,
     /// The open reader, on top of the library.
     pub reader: Option<Reader>,
@@ -170,7 +196,9 @@ impl State {
             input: String::new(),
             help: false,
             message: None,
-            jobs: 0,
+            jobs: Vec::new(),
+            next_job: 0,
+            show_jobs: false,
             quit: false,
             reader: None,
             reader_settings: Settings::default(),
@@ -199,9 +227,21 @@ impl State {
         self.visible.get(self.selected).and_then(|i| self.rows.get(*i))
     }
 
+    /// Shows new rows, keeping the selected reference selected if it is among them (taken
+    /// before the rows change: the old positions do not point into the new rows).
+    pub fn set_rows(&mut self, rows: Vec<Row>) {
+        let keep = self.current().map(|r| r.reference.id);
+        self.rows = rows;
+        self.show(keep);
+    }
+
     /// Re-applies filter and sort, keeping the selected reference selected when it is still shown.
     pub fn refresh_visible(&mut self) {
         let keep = self.current().map(|r| r.reference.id);
+        self.show(keep);
+    }
+
+    fn show(&mut self, keep: Option<ReferenceId>) {
         self.visible = filter::visible(&self.rows, &self.filter, self.sort, self.reverse);
         self.selected =
             keep.and_then(|id| self.visible.iter().position(|i| self.rows[*i].reference.id == id)).unwrap_or(0);

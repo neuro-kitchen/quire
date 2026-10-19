@@ -40,6 +40,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &State) {
     let title = match &state.scope {
         Scope::All => " All references ".to_string(),
         Scope::Project(path) => format!(" {path} "),
+        Scope::Search(query) => format!(" Search: {query} "),
         Scope::Duplicates => " Possible duplicates (M merges) ".to_string(),
         Scope::Trash => " Trash ".to_string(),
     };
