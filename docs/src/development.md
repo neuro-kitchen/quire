@@ -1,7 +1,8 @@
 # Architecture
 
 quire is a Cargo workspace. All behaviour lives in library crates; the command line, the
-terminal interface and the local server are thin front ends over one facade, `quire-engine`.
+terminal interface, the local server and the apps are thin front ends over one facade,
+`quire-engine`.
 
 | Crate | Purpose |
 |---|---|
@@ -15,17 +16,48 @@ terminal interface and the local server are thin front ends over one facade, `qu
 | `quire-server` | `quire serve`, the endpoint for the browser extension |
 | `quire-tui` | `quire tui` (ratatui) |
 | `quire-cli` | the `quire` binary |
+| `quire-ffi` | the engine for the Kotlin apps (UniFFI): flat records, `suspend` functions, PDF pages (PDFium) |
+| `uniffi-bindgen` | generates `quire-ffi`'s Kotlin API (run by the app's Gradle build) |
 | `quire_py` | Python bindings (PyO3, built with maturin) |
 
-Dependencies point one way: `model ← core ← {store, io, fetch} ← engine ← {cli, tui, server}`.
+Dependencies point one way: `model ← core ← {store, io, fetch} ← engine ← {cli, tui, server, ffi}`.
 The core defines what it needs from storage as a trait, so use cases are tested without a
 database, and the store can change without touching them.
+
+How a paper's text is read (blocks, tabs for figures, tables, equations, references) lives in
+`quire_io::reading`, shared by the terminal reader and the apps.
+
+## The apps (`app/`)
+
+A Kotlin Compose Multiplatform project: one UI for the desktop now, Android and iOS later. The
+Gradle build compiles `quire-ffi`, generates its Kotlin API with `uniffi-bindgen`, and puts the
+native library in the app (JNA loads it). PDFium, for the reader's pages, is downloaded from
+bblanchon/pdfium-binaries and checked against pinned SHA-256 sums.
+
+```
+app/
+  shared/      every screen and ViewModel (commonMain); the engine repositories (desktopMain)
+  desktopApp/  the window, menus, packaging
+  androidApp/  Android shell (not built yet)
+```
+
+Screens follow MVVM with one-way data flow: a screen draws its `State` and sends `Event`s, its
+`ViewModel` changes the state. Each screen has its own folder (`Screen`, `State`, `Event`,
+`ViewModel`, previews, and a `components/` folder for what only it uses); components shared by
+several screens have a folder each. Rules stay in Rust: ViewModels call repositories, which call
+the engine.
+
+```bash
+cd app
+./gradlew :shared:desktopTest    # unit and engine tests; screenshots in shared/build/screenshots
+./gradlew :desktopApp:run
+```
 
 ## Building and testing
 
 ```bash
 cargo build                      # target/debug/quire
-cargo test --workspace
+cargo test --workspace           # QUIRE_PDFIUM_DIR=<folder of libpdfium> also tests PDF pages
 cargo clippy --workspace --all-targets
 cargo fmt --all
 ```

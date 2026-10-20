@@ -16,8 +16,9 @@ manuscript's citations (`quire folder check`), import a Zotero library (`quire i
 follow the citation graph (OpenAlex), watch arXiv, PubMed and Crossref (`quire alert`), check for
 retractions, keep saved searches and a reading list, share projects with collaborators (each
 with a role; everything else stays private), and back up a library to one file.
-No desktop app yet. Documentation: the book in `docs/` (`mdbook serve docs`), published to GitHub
-Pages by CI. Plan and decisions: `.knowledge/roadmap.md`.
+A desktop app (`app/`, early) browses and reads the same library in Zotero-style windows, with PDF
+pages, highlights, notes and settings. Documentation: the book in `docs/` (`mdbook serve docs`),
+published to GitHub Pages by CI. Plan and decisions: `.knowledge/roadmap.md`.
 
 | Reading a paper | Tables, reflowed | Themes |
 |---|---|---|
@@ -43,6 +44,17 @@ quire library new lab --path ~/sync/lab      # more libraries; `--lib lab` or `q
 quire config keys                            # every setting, e.g. export profiles
 ```
 
+## Desktop app
+Kotlin Compose Multiplatform over the same engine (through `crates/quire-ffi`); needs a JDK 21+.
+
+```bash
+cd app && ./gradlew :desktopApp:run
+```
+
+| Library | Reader | Settings |
+|---|---|---|
+| ![The library in Zotero-style panes](assets/img/app/desktop-library.png) | ![A PDF with a highlight](assets/img/app/desktop-reader-pdf.png) | ![Settings](assets/img/app/desktop-settings.png) |
+
 Commands are grouped: `ref`, `project`, `library`, `tag`, `note`, `pdf`, `highlight`, `export`, `folder`,
 `sync`, `config`, `saved`, `alert`; `add`, `list`, `show` and `search` stand alone. `quire tui` is the terminal interface;
 `quire serve` is the local endpoint for the browser extension.
@@ -59,6 +71,9 @@ Commands are grouped: `ref`, `project`, `library`, `tag`, `note`, `pdf`, `highli
 | `crates/quire-sync` | Sync between devices: session protocol, iroh (QUIC) transport |
 | `crates/quire-server` | `quire serve`: local HTTP endpoint for a browser extension |
 | `crates/quire-tui` | `quire tui`: library browser and reader (ratatui) |
+| `crates/quire-ffi` | The engine for the Kotlin apps (UniFFI), PDF pages (PDFium) |
+| `crates/uniffi-bindgen` | Generates `quire-ffi`'s Kotlin API |
+| `app/` | Desktop app (Compose Multiplatform); Android and iOS later |
 | `extension/` | Browser extension (Manifest V3, Firefox and Chromium) |
 | `crates/quire-cli` | The `quire` command line |
 | `quire_py/` | Python SDK: PyO3 crate (`src/`, native module `quire_bindings`) + Python package `quire/`, tests |
