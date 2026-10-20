@@ -18,7 +18,7 @@ pub const LIBRARY_ENV: &str = "QUIRE_LIBRARY";
 pub const LIB_ENV: &str = "QUIRE_LIB";
 
 /// The database file inside a library directory.
-pub const DATABASE_FILE: &str = "quire.sqlite";
+pub(crate) const DATABASE_FILE: &str = "quire.sqlite";
 
 fn strategy() -> Result<impl AppStrategy> {
     let args = AppStrategyArgs { top_level_domain: "org".into(), author: "quire".into(), app_name: "quire".into() };
@@ -37,23 +37,23 @@ pub fn config_file(flag: Option<&Path>) -> Result<PathBuf> {
 }
 
 /// quire's own config folder (`~/.config/quire`), kept private.
-pub fn config_dir() -> Result<PathBuf> {
+pub(crate) fn config_dir() -> Result<PathBuf> {
     Ok(strategy()?.config_dir())
 }
 
 /// quire's own data folder (`~/.local/share/quire`), holding libraries; kept private.
-pub fn data_dir() -> Result<PathBuf> {
+pub(crate) fn data_dir() -> Result<PathBuf> {
     Ok(strategy()?.data_dir())
 }
 
 /// Folder of the `default` library when it is not registered (also where a single library lived
 /// before named libraries).
-pub fn default_library_dir() -> Result<PathBuf> {
+pub(crate) fn default_library_dir() -> Result<PathBuf> {
     Ok(strategy()?.data_dir().join("library"))
 }
 
 /// Folder for a new library called `name` when no path is given.
-pub fn new_library_dir(name: &str) -> Result<PathBuf> {
+pub(crate) fn new_library_dir(name: &str) -> Result<PathBuf> {
     Ok(strategy()?.data_dir().join("libraries").join(name))
 }
 

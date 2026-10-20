@@ -12,6 +12,7 @@ publish = false
 quire-model.workspace = true
 quire-core.workspace = true
 quire-io.workspace = true
+quire-document.workspace = true
 quire-store.workspace = true
 quire-sync.workspace = true
 quire-fetch.workspace = true
@@ -34,4 +35,5 @@ tracing.workspace = true
 url.workspace = true
 
 [dev-dependencies]
+quire-testkit.workspace = true
 wiremock.workspace = true

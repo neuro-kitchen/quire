@@ -42,7 +42,7 @@ impl Engine {
         };
         if found.is_none() && from_pdf && !self.attachments(&reference).await?.is_empty() {
             let (_, markdown, _) = self.paper_text(&reference.id.to_string()).await?;
-            found = quire_io::abstracts::from_markdown(&markdown).map(|text| ("pdf", text));
+            found = quire_document::abstracts::from_markdown(&markdown).map(|text| ("pdf", text));
         }
         let Some((source, text)) = found else { return Ok((reference, AbstractOutcome::NotFound)) };
         if dry_run {

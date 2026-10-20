@@ -83,7 +83,7 @@ pub fn spec(key: &str) -> Result<&'static KeySpec> {
 }
 
 /// `text` checked and converted for `kind`.
-pub fn to_toml(kind: ValueKind, text: &str) -> Result<toml_edit::Value> {
+pub(crate) fn to_toml(kind: ValueKind, text: &str) -> Result<toml_edit::Value> {
     let bad = |what: &str| EngineError::Config(format!("`{text}` is not {what}"));
     Ok(match kind {
         ValueKind::Email if !looks_like_email(text) => return Err(bad("an email address")),

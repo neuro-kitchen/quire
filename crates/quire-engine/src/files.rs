@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use crate::error::{EngineError, Result};
 
 /// The folder inside a library holding stored files.
-pub const FILES_DIR: &str = "files";
+pub(crate) const FILES_DIR: &str = "files";
 
 pub struct FileStore {
     root: PathBuf,

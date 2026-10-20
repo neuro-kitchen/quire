@@ -22,6 +22,9 @@ pub enum EngineError {
     #[error(transparent)]
     Format(#[from] quire_io::IoError),
 
+    #[error(transparent)]
+    Document(#[from] quire_document::DocumentError),
+
     #[error("database: {0}")]
     Database(#[from] tokio_rusqlite::Error),
 

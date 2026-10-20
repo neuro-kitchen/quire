@@ -1,8 +1,11 @@
-//! The one crate front ends use (CLI now; desktop and Python later): opens a library and
-//! offers every operation as an async method, wiring `quire-store`, `quire-fetch`, `quire-io`
-//! and `quire-core` together.
+//! The one crate front ends use (CLI, TUI, the apps through `quire-ffi`, `quire serve`): opens a
+//! library and offers every operation as an async method, wiring `quire-core`, `quire-store`,
+//! `quire-io`, `quire-document`, `quire-fetch` and `quire-sync` together.
 //!
-//! - [`engine`]: [`Engine`] and its operations.
+//! Operations:
+//! - [`engine`]: [`Engine`] and its operations, one module per concept.
+//!
+//! Infrastructure the operations use:
 //! - [`config`]: the user's `config.toml` (git-style keys).
 //! - [`editor`]: the user's text editor, for front ends.
 //! - [`libraries`]: named libraries and which one to open.
@@ -43,16 +46,16 @@ pub use libraries::{LibraryChoice, LibraryInfo};
 pub use quire_core::library::duplicates::{Merged, Reason as DuplicateReason};
 pub use quire_core::library::update::{FieldChange, Outcome, Updated};
 pub use quire_core::{Added, Checked, CoreError, FailedInput, SearchHit};
+pub use quire_document::pdf::PdfMatch;
+pub use quire_document::{paper_markdown, reading};
 pub use quire_fetch::crossref::{Update, UpdateKind};
 pub use quire_fetch::{Endpoints, FetchError};
-pub use quire_io::pdf::PdfMatch;
 pub use quire_io::{ExportFormat, ExportOptions};
-pub use quire_io::{paper_markdown, reading};
 pub use quire_model::{
     Alert, AlertSource, Attachment, Field, Highlight, HighlightId, Issue, IssueCode, Note, NoteId, PdfAttempt, PdfKind,
     Project, Reading, ReadingStatus, Reference, SavedSearch, Severity, SlugPath, Tag, TagKind,
 };
 pub use quire_model::{ProjectMember, Role as MemberRole, UserId};
 pub use quire_sync::transport::is_device_id;
-pub use quire_sync::{Report as SyncReport, Role as SyncRole};
+pub use quire_sync::{Report as SyncReport, Side as SyncSide};
 pub use secrets::Store as SecretStore;

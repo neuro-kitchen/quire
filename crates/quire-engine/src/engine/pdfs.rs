@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use quire_core::library::{attachments, references};
 use quire_core::prelude::*;
 use quire_core::{Added, check};
-use quire_io::pdf::{self, PdfMatch};
+use quire_document::pdf::{self, PdfMatch};
 use quire_model::{Attachment, Identifier, Issue, IssueCode, PdfAttempt, Reference, ReferenceId, SlugPath, TextField};
 use url::Url;
 
