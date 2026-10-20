@@ -1,11 +1,12 @@
 //! PDF pages and text layer through quire-ffi. Pure Rust (hayro): runs without any native binaries.
 
-use quire_ffi::{pdf_find, pdf_init, pdf_nearest_glyph, pdf_page_sizes, pdf_render_page, pdf_text_range, pdf_word_at};
+use quire_ffi::{
+    pdf_find, pdf_nearest_glyph, pdf_page_sizes, pdf_render_page, pdf_search, pdf_text_range, pdf_word_at,
+};
 use quire_testkit::tiny_pdf;
 
 #[tokio::test]
 async fn pages_render_and_quotes_are_found() {
-    pdf_init(None).unwrap();
     let tmp = tempfile::tempdir().unwrap();
     let path = tmp.path().join("paper.pdf");
     std::fs::write(&path, tiny_pdf("Place cells fire in one place")).unwrap();
@@ -39,6 +40,13 @@ async fn pages_render_and_quotes_are_found() {
     let range = pdf_text_range(path.clone(), 0, 0, 5).await.unwrap();
     assert_eq!(range.text, "Place");
     assert_eq!(range.rects.len(), 1);
+
+    // Find: every place, the last word as typed so far.
+    let hits = pdf_search(path.clone(), "place".into(), 10).await.unwrap();
+    assert_eq!(hits.len(), 2, "Place … place");
+    assert!(hits[0].rects[0].left < hits[1].rects[0].left);
+    assert_eq!(pdf_search(path.clone(), "in on".into(), 10).await.unwrap().len(), 1);
+    assert_eq!(pdf_search(path.clone(), "place".into(), 1).await.unwrap().len(), 1, "at most the limit");
 
     assert!(pdf_render_page(path, 3, 100).await.is_err(), "no page 3");
 }
