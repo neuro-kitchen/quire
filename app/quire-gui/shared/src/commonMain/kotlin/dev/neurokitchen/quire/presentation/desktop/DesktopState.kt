@@ -12,6 +12,7 @@ data class DesktopState(
     val selected: String? = null,
     val appTheme: AppTheme = AppTheme.Obsidian,
     val isCommandPaletteOpen: Boolean = false,
+    val isCitationGraphOpen: Boolean = false,
     val allReferences: List<Reference> = emptyList(),
 )
 
@@ -29,4 +30,5 @@ sealed interface DesktopEvent {
     data class OnCloseTab(val id: String) : DesktopEvent
     data class OnSetAppTheme(val theme: AppTheme) : DesktopEvent
     data class OnToggleCommandPalette(val open: Boolean) : DesktopEvent
+    data class OnToggleCitationGraph(val open: Boolean) : DesktopEvent
 }
