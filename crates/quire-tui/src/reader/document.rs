@@ -31,6 +31,9 @@ pub enum Kind {
     TableRow,
     /// A display equation (as the PDF's text has it), set by [`super::paper::organize`].
     Equation,
+    /// A figure's image (`![Figure](url)`): one word, the URL. [`super::paper::organize`] gives
+    /// it to the caption after it; it is never laid out as text.
+    Image,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -71,6 +74,13 @@ pub fn parse(markdown: &str, math: bool) -> Vec<Block> {
                     .map_or(text, |(_, rest)| rest);
                 blocks.push(Block { kind: Kind::ListItem, words: inline(text, math) });
             }
+            continue;
+        }
+        if let Some(url) = quire_engine::paper_markdown::image_url(chunk) {
+            blocks.push(Block {
+                kind: Kind::Image,
+                words: vec![Word { text: url.into(), emphasis: Emphasis::default() }],
+            });
             continue;
         }
         if math && chunk.starts_with("$$") {

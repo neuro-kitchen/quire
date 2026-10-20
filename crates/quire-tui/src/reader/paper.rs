@@ -63,6 +63,8 @@ pub fn split_front(markdown: &str) -> (&str, String) {
 pub struct Item {
     pub label: String,
     pub blocks: Vec<Block>,
+    /// A figure's image (`![Figure](url)` before its caption; arXiv HTML).
+    pub image: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -74,26 +76,38 @@ pub struct Paper {
     pub references: Vec<Block>,
 }
 
+/// A tab after `Paper`: its items as blocks (a heading per item) and the images they show (each
+/// from the block of its item's heading).
+pub struct ExtraTab {
+    pub tab: Tab,
+    pub count: usize,
+    pub blocks: Vec<Block>,
+    pub images: Vec<(usize, String)>,
+}
+
 impl Paper {
-    /// The tabs after `Paper` that have something, with their blocks (a heading per item).
-    pub fn extra_tabs(&self) -> Vec<(Tab, usize, Vec<Block>)> {
-        let items = |items: &[Item]| -> Vec<Block> {
-            items
-                .iter()
-                .flat_map(|item| {
-                    let heading = Block { kind: Kind::Heading(4), words: words(&item.label) };
-                    std::iter::once(heading).chain(item.blocks.iter().cloned())
-                })
-                .collect()
+    /// The tabs after `Paper` that have something.
+    pub fn extra_tabs(&self) -> Vec<ExtraTab> {
+        let items = |items: &[Item]| -> (Vec<Block>, Vec<(usize, String)>) {
+            let (mut blocks, mut images) = (Vec::new(), Vec::new());
+            for item in items {
+                if let Some(url) = &item.image {
+                    images.push((blocks.len(), url.clone()));
+                }
+                blocks.push(Block { kind: Kind::Heading(4), words: words(&item.label) });
+                blocks.extend(item.blocks.iter().cloned());
+            }
+            (blocks, images)
         };
+        let tab = |tab, count, (blocks, images)| ExtraTab { tab, count, blocks, images };
         [
-            (Tab::Figures, self.figures.len(), items(&self.figures)),
-            (Tab::Tables, self.tables.len(), items(&self.tables)),
-            (Tab::Equations, self.equations.len(), items(&self.equations)),
-            (Tab::References, self.references.len(), self.references.clone()),
+            tab(Tab::Figures, self.figures.len(), items(&self.figures)),
+            tab(Tab::Tables, self.tables.len(), items(&self.tables)),
+            tab(Tab::Equations, self.equations.len(), items(&self.equations)),
+            tab(Tab::References, self.references.len(), (self.references.clone(), Vec::new())),
         ]
         .into_iter()
-        .filter(|(_, count, _)| *count > 0)
+        .filter(|extra| extra.count > 0)
         .collect()
     }
 }
@@ -111,6 +125,8 @@ pub fn organize(blocks: Vec<Block>) -> Paper {
     let mut numbered: Option<bool> = None;
     // Rows of the display equation being read.
     let mut rows: Vec<Block> = Vec::new();
+    // A figure's image, waiting for the caption after it.
+    let mut image: Option<String> = None;
     let mut i = 0;
     while i < blocks.len() {
         let mut block = blocks[i].clone();
@@ -131,6 +147,10 @@ pub fn organize(blocks: Vec<Block>) -> Paper {
                 continue;
             }
             in_references = false;
+        }
+        if block.kind == Kind::Image {
+            image = Some(block.text());
+            continue;
         }
         if let Some((of, label, rest)) = caption(&block) {
             let mut caption = Block { kind: Kind::Paragraph, words: rest };
@@ -153,24 +173,31 @@ pub fn organize(blocks: Vec<Block>) -> Paper {
             }
             let mut shown = vec![caption];
             shown.extend(rows);
-            let item = Item { label, blocks: shown };
+            let image = if of == CaptionKind::Figure { image.take() } else { None };
+            let item = Item { label, blocks: shown, image };
             match of {
                 CaptionKind::Figure => paper.figures.push(item),
                 CaptionKind::Table => paper.tables.push(item),
             }
             continue;
         }
+        // An image belongs to the caption right after it; any other block drops it.
+        image = None;
         if block.kind == Kind::Equation {
             // A display equation's rows (from `$$…$$`); its number is on the last one.
             rows.push(block.clone());
             if let Some(number) = block.words.last().and_then(|w| equation_label(&w.text)) {
-                paper.equations.push(Item { label: format!("({number})"), blocks: std::mem::take(&mut rows) });
+                paper.equations.push(Item {
+                    label: format!("({number})"),
+                    blocks: std::mem::take(&mut rows),
+                    image: None,
+                });
             }
         } else {
             rows.clear();
             if let Some(number) = equation_number(&block) {
                 block.kind = Kind::Equation;
-                paper.equations.push(Item { label: format!("({number})"), blocks: vec![block.clone()] });
+                paper.equations.push(Item { label: format!("({number})"), blocks: vec![block.clone()], image: None });
             }
         }
         paper.body.push(block);
@@ -296,6 +323,20 @@ mod tests {
     use crate::reader::document::parse;
 
     #[test]
+    fn figure_images_go_with_their_caption() {
+        let md = "Text.\n\n![Figure](https://arxiv.org/html/x/f1.png)\n\nFigure 1: A model.\n\n\
+                  Figure 2: No image.\n\nTable 1: A table.";
+        let paper = organize(parse(md, false));
+        assert_eq!(paper.body.len(), 1, "the image line is not text");
+        assert_eq!(paper.figures[0].image.as_deref(), Some("https://arxiv.org/html/x/f1.png"));
+        assert_eq!(paper.figures[1].image, None);
+        let orphan = organize(parse("![Figure](https://x.org/a.png)\n\nText.\n\nFigure 1: Late.", false));
+        assert_eq!(orphan.figures[0].image, None, "only the caption right after the image");
+        let figures = paper.extra_tabs().into_iter().find(|e| e.tab == Tab::Figures).unwrap();
+        assert_eq!(figures.images, [(0, "https://arxiv.org/html/x/f1.png".to_string())]);
+    }
+
+    #[test]
     fn captions_tables_equations_and_references_leave_the_text() {
         let md = "#### 3 Model\n\nSee the left of Figure 1, and Table 1.\n\nFigure 1: The Transformer-model architecture.\n\n\
             Figure 2: (left) Scaled Dot-Product Attention. (right) Multi-Head Attention consists of several\n\n\
@@ -330,7 +371,7 @@ mod tests {
         let marked: Vec<&str> =
             paper.body[1].words.iter().filter(|w| w.emphasis.mention).map(|w| w.text.as_str()).collect();
         assert_eq!(marked, ["Figure", "1,", "Table", "1."]);
-        let tabs: Vec<Tab> = paper.extra_tabs().into_iter().map(|(t, ..)| t).collect();
+        let tabs: Vec<Tab> = paper.extra_tabs().into_iter().map(|extra| extra.tab).collect();
         assert_eq!(tabs, [Tab::Figures, Tab::Tables, Tab::Equations, Tab::References]);
     }
 

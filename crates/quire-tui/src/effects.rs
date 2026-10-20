@@ -39,7 +39,8 @@ async fn run(engine: &Engine, effect: Effect) -> anyhow::Result<Action> {
             let projects = engine.project_summaries().await?;
             let colored = engine.tags().await?.into_iter().map(|(t, _)| t).filter(|t| t.position.is_some()).collect();
             let duplicate_pairs = engine.duplicates().await?.iter().map(|g| g.duplicates.len()).sum();
-            Action::Loaded { projects, colored, duplicate_pairs }
+            let saved = engine.saved_searches().await?;
+            Action::Loaded { projects, colored, duplicate_pairs, saved }
         }
         Effect::LoadRows(scope) => Action::Rows(rows(engine, &scope).await?),
         Effect::LoadDetails(id) => {
@@ -112,6 +113,10 @@ async fn run(engine: &Engine, effect: Effect) -> anyhow::Result<Action> {
             Action::TextLoaded { id, text: text.map_err(|e| format!("{e:#}")) }
         }
         Effect::LoadAnnotations(id) => annotations(engine, id).await?,
+        Effect::LoadFigure(url) => {
+            let result = engine.figure(&url).await.map_err(|e| e.to_string());
+            Action::FigureLoaded { url, result }
+        }
         Effect::Refetch(id) => {
             let updated = engine.refetch(&id.to_string(), false).await?;
             let changed = updated.changes.iter().filter(|c| c.outcome == Outcome::Updated).count();
@@ -131,8 +136,22 @@ async fn run(engine: &Engine, effect: Effect) -> anyhow::Result<Action> {
             Action::Done { text: format!("{text} {path}: {}", reference.cite_key), ok: true }
         }
         Effect::Export { scope, path } => export(engine, &scope, &path).await?,
-        Effect::Job { .. } | Effect::Edit(_) => {
-            unreachable!("jobs are unwrapped in `spawn`, edits run in the event loop")
+        Effect::SetReading { reference, status } => {
+            let (reference, _, _) = engine.set_reading(&reference.to_string(), status).await?;
+            Action::Done { text: format!("{} {status}", reference.cite_key), ok: true }
+        }
+        Effect::Opened(reference) => {
+            engine.opened(reference).await?;
+            Action::Saved
+        }
+        Effect::SaveSearch { name, query } => {
+            let search = engine.save_search(&name, &query).await?;
+            Action::Done { text: format!("saved search `{}`", search.name), ok: true }
+        }
+        Effect::Job { .. } | Effect::Edit(_) | Effect::Clipboard { .. } | Effect::DetectGraphics => {
+            unreachable!(
+                "jobs are unwrapped in `spawn`; edits, the clipboard and the graphics query run in the event loop"
+            )
         }
         Effect::AddHighlight { reference, quote, prefix, comment } => {
             engine.add_highlight(&reference.to_string(), &quote, &prefix, comment.as_deref()).await?;
@@ -253,23 +272,32 @@ async fn rows(engine: &Engine, scope: &Scope) -> anyhow::Result<Vec<Row>> {
     if let Scope::Search(query) = scope {
         return search_rows(engine, query).await;
     }
+    if let Scope::Saved(name) = scope {
+        let query = engine.saved_searches().await?.into_iter().find(|s| &s.name == name).map(|s| s.query);
+        return match query {
+            Some(query) => search_rows(engine, &query).await,
+            None => Ok(Vec::new()),
+        };
+    }
     let checked = match scope {
         Scope::All => engine.list_with_issues(None, false, false, &[]).await?,
         Scope::Project(path) => engine.list_with_issues(Some(path), false, false, &[]).await?,
         Scope::Trash => engine.list_with_issues(None, false, true, &[]).await?,
-        Scope::Search(_) => unreachable!("answered above"),
+        Scope::Search(_) | Scope::Saved(_) => unreachable!("answered above"),
         Scope::Duplicates => {
             let all = engine.list_with_issues(None, false, false, &[]).await?;
             all.into_iter().filter(|c| c.issues.iter().any(|i| i.code == IssueCode::PossibleDuplicate)).collect()
         }
     };
     let pdfs = engine.pdf_statuses().await?;
+    let readings = engine.reading_statuses().await?;
     let mut tags = engine.tags_of(checked.iter().map(|c| c.reference.id).collect()).await?;
     Ok(checked
         .into_iter()
         .map(|c| Row {
             pdf: pdfs.get(&c.reference.id).copied(),
             tags: tags.remove(&c.reference.id).unwrap_or_default(),
+            reading: readings.get(&c.reference.id).map(|r| r.status),
             reference: c.reference,
             issues: c.issues,
             hit: None,
@@ -281,6 +309,7 @@ async fn rows(engine: &Engine, scope: &Scope) -> anyhow::Result<Vec<Row>> {
 async fn search_rows(engine: &Engine, query: &str) -> anyhow::Result<Vec<Row>> {
     let hits = engine.search(query, SEARCH_ROWS).await?;
     let pdfs = engine.pdf_statuses().await?;
+    let readings = engine.reading_statuses().await?;
     let mut tags = engine.tags_of(hits.iter().map(|(r, _)| r.id).collect()).await?;
     let mut rows = Vec::with_capacity(hits.len());
     for (reference, hit) in hits {
@@ -289,6 +318,7 @@ async fn search_rows(engine: &Engine, query: &str) -> anyhow::Result<Vec<Row>> {
             tags: tags.remove(&reference.id).unwrap_or_default(),
             issues: engine.issues(&reference).await?,
             hit: Some((hit.snippet, hit.in_text)),
+            reading: readings.get(&reference.id).map(|r| r.status),
             reference,
         });
     }
