@@ -11,7 +11,7 @@ use super::{Overlay, Page, Reader, ReaderAction, ReaderEffect, Tab, Text};
 
 /// Highlights and notes of the paper being read.
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct Annotations {
+pub(crate) struct Annotations {
     pub highlights: Vec<Highlight>,
     pub notes: Vec<Note>,
     /// Where each highlight is in the paper's text (highlights not found are left out).

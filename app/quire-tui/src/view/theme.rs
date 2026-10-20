@@ -3,14 +3,14 @@
 use quire_engine::{PdfAttempt, PdfStatus, Tag};
 use ratatui::style::{Color, Modifier, Style};
 
-pub const ACCENT: Color = Color::Cyan;
+pub(crate) const ACCENT: Color = Color::Cyan;
 pub const DIM: Style = Style::new().fg(Color::DarkGray);
 pub const KEY: Style = Style::new().fg(Color::Cyan);
-pub const TITLE: Style = Style::new().add_modifier(Modifier::BOLD);
+pub(crate) const TITLE: Style = Style::new().add_modifier(Modifier::BOLD);
 pub const OK: Style = Style::new().fg(Color::Green);
 pub const WARN: Style = Style::new().fg(Color::Yellow);
 pub const ERROR: Style = Style::new().fg(Color::Red);
-pub const SELECTED: Style = Style::new().bg(Color::Rgb(40, 50, 70)).add_modifier(Modifier::BOLD);
+pub(crate) const SELECTED: Style = Style::new().bg(Color::Rgb(40, 50, 70)).add_modifier(Modifier::BOLD);
 
 /// The border style of a pane: bright when it has the focus.
 pub fn border(focused: bool) -> Style {
@@ -18,7 +18,7 @@ pub fn border(focused: bool) -> Style {
 }
 
 /// A tag's color, if it has one.
-pub fn tag_color(tag: &Tag) -> Option<Color> {
+pub(crate) fn tag_color(tag: &Tag) -> Option<Color> {
     let hex = tag.color.as_deref()?.strip_prefix('#')?;
     let byte = |i: usize| u8::from_str_radix(hex.get(i..i + 2)?, 16).ok();
     Some(Color::Rgb(byte(0)?, byte(2)?, byte(4)?))

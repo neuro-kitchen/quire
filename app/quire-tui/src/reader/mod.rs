@@ -30,7 +30,7 @@ use self::layout::{Laid, MAX_WIDTH, MIN_WIDTH};
 
 /// What the reader is doing besides showing text.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Overlay {
+pub(crate) enum Overlay {
     None,
     /// The table of contents, with the selected heading.
     Contents(usize),
@@ -116,7 +116,7 @@ pub struct Reader {
 
 /// What the user did in the reader.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ReaderAction {
+pub(crate) enum ReaderAction {
     Scroll(isize),
     /// Half pages (positive: down).
     Page(isize),
@@ -155,7 +155,7 @@ pub enum ReaderAction {
 
 /// What the reader asks of its caller after an action.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ReaderEffect {
+pub(crate) enum ReaderEffect {
     None,
     /// The settings changed: save them.
     SaveSettings,

@@ -65,7 +65,7 @@ pub fn action(key: KeyEvent, typing: bool) -> Option<Action> {
 }
 
 /// The action for `key` in the reader. `typing`: the search box is open.
-pub fn reader_action(key: KeyEvent, typing: bool) -> Option<Action> {
+pub(crate) fn reader_action(key: KeyEvent, typing: bool) -> Option<Action> {
     let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
     if ctrl && matches!(key.code, KeyCode::Char('c')) {
         return Some(Action::Quit);
@@ -110,13 +110,13 @@ pub fn reader_action(key: KeyEvent, typing: bool) -> Option<Action> {
 }
 
 /// Shown while selecting sentences to highlight.
-pub const SELECT_HELP: &str = "selecting: j/k next/previous sentence · l/h longer/shorter · m highlight · c highlight with comment · x remove highlight · Esc stop";
+pub(crate) const SELECT_HELP: &str = "selecting: j/k next/previous sentence · l/h longer/shorter · m highlight · c highlight with comment · x remove highlight · Esc stop";
 
 /// Shown at the bottom of the reader.
-pub const READER_HELP: &str = "← → tabs · f follow figure · v highlight · a note · j/k scroll · t contents · / search · +/- width · J/L/T layout · R re-extract · q back";
+pub(crate) const READER_HELP: &str = "← → tabs · f follow figure · v highlight · a note · j/k scroll · t contents · / search · +/- width · J/L/T layout · R re-extract · q back";
 
 /// Shown by `?`: key, what it does.
-pub const HELP: &[(&str, &str)] = &[
+pub(crate) const HELP: &[(&str, &str)] = &[
     ("j k ↓ ↑", "move"),
     ("g G", "top, bottom"),
     ("Ctrl-d Ctrl-u", "page down, up"),
