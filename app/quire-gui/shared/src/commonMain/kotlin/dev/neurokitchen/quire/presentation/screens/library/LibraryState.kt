@@ -47,6 +47,7 @@ data class LibraryState(
     /** Why the engine refused the search as typed (a filter half typed); the last results stay. */
     val searchError: String? = null,
     val savedSearches: List<SavedSearchState> = emptyList(),
+    val isQuickLookOpen: Boolean = false,
 )
 
 /** A saved search; [isActive] when its query is the one in the search field. */

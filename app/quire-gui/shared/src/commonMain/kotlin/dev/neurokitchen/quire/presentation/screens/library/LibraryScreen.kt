@@ -68,6 +68,7 @@ import dev.neurokitchen.quire.presentation.screens.library.components.LibraryEmp
 import dev.neurokitchen.quire.presentation.screens.library.components.LibraryErrorState
 import dev.neurokitchen.quire.presentation.screens.library.components.LibrarySearchField
 import dev.neurokitchen.quire.presentation.screens.library.components.ProjectsPane
+import dev.neurokitchen.quire.presentation.screens.library.components.QuickLookModal
 import dev.neurokitchen.quire.presentation.screens.library.components.ReferenceDetailPane
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -134,13 +135,24 @@ fun LibraryScreen(
                         }
                     } else {
                         when (event.key) {
+                            Key.Spacebar -> {
+                                if (state.selected != null) {
+                                    onEvent(LibraryEvent.OnToggleQuickLook())
+                                    true
+                                } else false
+                            }
                             Key.Delete, Key.Backspace -> {
                                 onEvent(LibraryEvent.OnDeleteSelected)
                                 true
                             }
                             Key.Escape -> {
-                                onEvent(LibraryEvent.OnClearSelection)
-                                true
+                                if (state.isQuickLookOpen) {
+                                    onEvent(LibraryEvent.OnToggleQuickLook(false))
+                                    true
+                                } else {
+                                    onEvent(LibraryEvent.OnClearSelection)
+                                    true
+                                }
                             }
                             else -> false
                         }
@@ -192,6 +204,17 @@ fun LibraryScreen(
             confirm = confirm,
             onDismiss = { onEvent(LibraryEvent.OnConfirm(null)) },
             onConfirm = { onEvent(LibraryEvent.OnConfirmed) },
+        )
+    }
+
+    if (state.isQuickLookOpen && state.selected != null) {
+        QuickLookModal(
+            reference = state.selected,
+            onDismissRequest = { onEvent(LibraryEvent.OnToggleQuickLook(false)) },
+            onOpenReader = {
+                onEvent(LibraryEvent.OnToggleQuickLook(false))
+                onOpenReference(state.selected.id, state.selected.title)
+            },
         )
     }
 }
@@ -277,6 +300,7 @@ private fun ThreePanes(
                     onSelectAll = { onEvent(LibraryEvent.OnSelectAll) },
                     onClearSelection = { onEvent(LibraryEvent.OnClearSelection) },
                     onCreateCollectionFromSelected = { onEvent(LibraryEvent.OnNameDialog(NameDialog.NewProject(withIds = state.selectedIds))) },
+                    onQuickLook = { onEvent(LibraryEvent.OnToggleQuickLook(true)) },
                     drag = drag,
                     onDropOnProject = { ids, path -> onEvent(LibraryEvent.OnBatchAddToProject(ids, path)) },
                 )

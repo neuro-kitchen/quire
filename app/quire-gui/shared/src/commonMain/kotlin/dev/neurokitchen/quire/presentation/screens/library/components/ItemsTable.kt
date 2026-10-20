@@ -100,6 +100,7 @@ fun ItemsTable(
     onSelectAll: () -> Unit = {},
     onClearSelection: () -> Unit = {},
     onCreateCollectionFromSelected: () -> Unit = {},
+    onQuickLook: () -> Unit = {},
     modifier: Modifier = Modifier,
     /** Dragging rows onto a project: the shared drag, and what to do on a drop. */
     drag: ReferenceDrag? = null,
@@ -202,6 +203,7 @@ fun ItemsTable(
                     onDoubleClick = { onReferenceOpen(reference.id) },
                     onDelete = { onDeleteReference(reference.id) },
                     onCreateCollection = onCreateCollectionFromSelected,
+                    onQuickLook = onQuickLook,
                     drag = drag,
                     // A selected row drags the whole selection; another row drags itself.
                     dragIds = { if (reference.id in selectedIds) selectedIds else setOf(reference.id) },
@@ -249,6 +251,7 @@ private fun ItemRow(
     onDoubleClick: () -> Unit,
     onDelete: () -> Unit,
     onCreateCollection: () -> Unit,
+    onQuickLook: () -> Unit = {},
     drag: ReferenceDrag? = null,
     dragIds: () -> Set<String> = { emptySet() },
     onDrop: (Set<String>, String) -> Unit = { _, _ -> },
@@ -368,6 +371,22 @@ private fun ItemRow(
                 onClick = {
                     contextMenuOpen = false
                     onDoubleClick()
+                },
+            )
+
+            DropdownMenuItem(
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(painterResource(Res.drawable.ic_description), contentDescription = null, tint = colors.accent, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Quick Look Preview", style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
+                        Spacer(Modifier.weight(1f))
+                        Text("Space", style = MaterialTheme.typography.labelSmall, color = colors.fillTertiary)
+                    }
+                },
+                onClick = {
+                    contextMenuOpen = false
+                    onQuickLook()
                 },
             )
 
