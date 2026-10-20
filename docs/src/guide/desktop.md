@@ -18,15 +18,15 @@ The app is built from source for now (`app/` in the repository). You need Rust (
 and a JDK 21 or newer; Gradle and every other dependency are downloaded by the build.
 
 ```bash
-cd app
+cd app/quire-gui
 ./gradlew :desktopApp:run                                  # builds the engine, then opens the window
 ./gradlew :desktopApp:createDistributable -Pquire.release  # a self-contained app folder:
                                                            # desktopApp/build/compose/binaries/main/app/quire
 ```
 
-The first build compiles the Rust engine and downloads PDFium (the PDF engine of Chrome, used for
-the reader's pages), checking it against a pinned checksum. The app opens your default library
-(`library.default`, see [Libraries and projects](libraries.md)) with your usual config file.
+The first build compiles the Rust engine and its pure-Rust PDF engine (hayro, with no native
+binaries to download). The app opens your default library (`library.default`, see [Libraries and
+projects](libraries.md)) with your usual config file.
 
 ## The library
 
