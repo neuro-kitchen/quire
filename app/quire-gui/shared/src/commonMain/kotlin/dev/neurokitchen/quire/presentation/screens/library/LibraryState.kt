@@ -19,9 +19,15 @@ data class LibraryState(
     val sort: SortColumn = SortColumn.Title,
     val ascending: Boolean = true,
     val references: List<ReferenceCardState> = emptyList(),
-    /** The reference shown in the item pane. */
+    /** Selected reference IDs for single or multi-selection. */
+    val selectedIds: Set<String> = emptySet(),
+    /** The reference shown in the item pane (primary active item). */
     val selected: ReferenceDetailState? = null,
     val collapsedSections: Set<ItemSection> = emptySet(),
+    val isSidebarCollapsed: Boolean = false,
+    val isInspectorCollapsed: Boolean = false,
+    val showAddDialog: Boolean = false,
+    val showAddProjectDialog: Boolean = false,
     /** The engine's message when the library could not be read. */
     val error: String? = null,
 )
@@ -35,6 +41,7 @@ data class ProjectRowState(
     val hasChildren: Boolean,
     val isExpanded: Boolean,
     val isSelected: Boolean,
+    val referenceCount: Int = 0,
 )
 
 @Immutable
