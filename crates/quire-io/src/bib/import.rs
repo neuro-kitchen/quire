@@ -10,7 +10,7 @@ use super::types::from_biblatex as kind_from_biblatex;
 use crate::error::{IoError, Result};
 
 /// Prefix of `extra` keys holding unmapped BibLaTeX fields.
-pub const EXTRA_PREFIX: &str = "biblatex.";
+pub(super) const EXTRA_PREFIX: &str = "biblatex.";
 
 /// Fields read into structured parts (dates, identifiers), not text fields or `extra`.
 const STRUCTURED: &[&str] =

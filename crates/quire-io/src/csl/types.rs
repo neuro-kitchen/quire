@@ -29,7 +29,7 @@ const CROSSREF_TYPES: &[(&str, EntryKind)] = &[
 
 /// The CSL type of `item`, and whether the source name was not understood (the caller keeps it
 /// in `extra` then). Unknown or missing types become `document`.
-pub fn entry_kind(item: &Map<String, Value>) -> (EntryKind, bool) {
+pub(super) fn entry_kind(item: &Map<String, Value>) -> (EntryKind, bool) {
     let Some(name) = item.get("type").and_then(Value::as_str) else {
         return (EntryKind::Document, false);
     };

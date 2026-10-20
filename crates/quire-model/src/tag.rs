@@ -9,7 +9,7 @@ use crate::id::{DeviceId, TagId};
 use crate::record::RecordMeta;
 
 /// Longest tag name, in characters.
-pub const MAX_TAG_LEN: usize = 100;
+pub(crate) const MAX_TAG_LEN: usize = 100;
 
 /// Colored tags have positions 1 to this.
 pub const MAX_COLORED: u8 = 9;

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::{ModelError, Result};
 
 /// Longest key accepted.
-pub const MAX_LEN: usize = 100;
+pub(super) const MAX_LEN: usize = 100;
 
 /// A cite key: 1 to [`MAX_LEN`] characters, ASCII letters, digits and `_ - : .` only (no spaces,
 /// braces, commas, quotes, `#`, `%` or `\`, which break BibTeX/Biber).

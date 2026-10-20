@@ -13,7 +13,7 @@ use crate::member::UserId;
 use crate::record::RecordMeta;
 
 /// Longest slug accepted, in characters.
-pub const MAX_SLUG_LEN: usize = 64;
+pub(crate) const MAX_SLUG_LEN: usize = 64;
 
 /// A project's short name for the command line: lowercase letters (any script) and digits,
 /// separated by single `-`, e.g. `chapter-2`, `introducción`.
