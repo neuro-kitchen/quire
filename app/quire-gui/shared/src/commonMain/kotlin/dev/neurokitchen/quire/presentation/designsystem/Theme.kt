@@ -32,27 +32,38 @@ private val DesktopTypography = Typography().run {
 }
 
 /**
- * The app's theme: light or dark following the system. `desktop` switches to the dense desktop type
- * scale; phones keep Material's.
+ * The app's theme: supports 5 themes (Obsidian Dark, Nord Arctic, Solarized Dark, OLED True Black, Paper Light).
+ * `desktop` switches to the dense desktop type scale; phones keep Material's.
  */
 @Composable
 fun QuireTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    appTheme: AppTheme = AppTheme.Obsidian,
+    darkTheme: Boolean = appTheme.isDark,
     desktop: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val colors = if (darkTheme) DarkQuireColors else LightQuireColors
-    val scheme = if (darkTheme) {
+    val colors = quireColors(appTheme)
+    val scheme = if (colors.isDark) {
         darkColorScheme(
             primary = colors.accent, onPrimary = colors.onAccent,
             background = colors.background, surface = colors.background,
-            surfaceContainerLow = colors.sidepane, outline = colors.border,
+            surfaceContainerLowest = colors.surfaceContainerLowest,
+            surfaceContainerLow = colors.surfaceContainerLow,
+            surfaceContainer = colors.surfaceContainer,
+            surfaceContainerHigh = colors.surfaceContainerHigh,
+            surfaceContainerHighest = colors.surfaceContainerHighest,
+            outline = colors.border,
         )
     } else {
         lightColorScheme(
             primary = colors.accent, onPrimary = colors.onAccent,
             background = colors.background, surface = colors.background,
-            surfaceContainerLow = colors.sidepane, outline = colors.border,
+            surfaceContainerLowest = colors.surfaceContainerLowest,
+            surfaceContainerLow = colors.surfaceContainerLow,
+            surfaceContainer = colors.surfaceContainer,
+            surfaceContainerHigh = colors.surfaceContainerHigh,
+            surfaceContainerHighest = colors.surfaceContainerHighest,
+            outline = colors.border,
         )
     }
     CompositionLocalProvider(LocalQuireColors provides colors) {

@@ -17,10 +17,18 @@ object Dimens {
     val RowHeight = 28.dp
     val HeaderHeight = 28.dp
     val Icon = 16.dp
-    val RadiusSmall = 3.dp
-    val RadiusBase = 4.dp
-    val RadiusLarge = 6.dp
+    val RadiusSmall = 8.dp
+    val RadiusMedium = 10.dp
+    val RadiusBase = 12.dp
+    val RadiusLarge = 16.dp
+    val RadiusFull = 999.dp
 
+    val ElevationNone = 0.dp
+    val ElevationLow = 1.dp
+    val ElevationMedium = 3.dp
+    val ElevationHigh = 6.dp
+
+    val ActivityRailWidth = 48.dp
     val ProjectsPaneWidth = 250.dp
     val ItemPaneWidth = 360.dp
     val SideNavWidth = 37.dp
