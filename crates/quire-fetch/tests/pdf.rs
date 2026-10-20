@@ -3,13 +3,10 @@
 
 use quire_fetch::{Endpoints, FetchError, Fetcher};
 use quire_model::{EntryKind, Identifier, ReferenceData};
+use quire_testkit::fixture;
 use url::Url;
 use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
-
-fn fixture(name: &str) -> String {
-    std::fs::read_to_string(format!("{}/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"))).unwrap()
-}
 
 /// The smallest valid PDF (header is all `get_pdf` checks).
 const PDF: &[u8] = b"%PDF-1.4\n%quire test\n";

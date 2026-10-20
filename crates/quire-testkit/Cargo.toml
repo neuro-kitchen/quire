@@ -1,0 +1,13 @@
+[package]
+name = "quire-testkit"
+description = "quire test fixtures: a tiny PDF and the metadata services' recorded responses (dev-dependency only)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+# `tiny_epub`
+zip.workspace = true
