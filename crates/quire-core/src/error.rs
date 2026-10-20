@@ -47,6 +47,26 @@ pub enum CoreError {
     #[error("no highlight `{0}`")]
     HighlightNotFound(String),
 
+    /// A search filter with a value it does not take.
+    #[error("search filter {0}")]
+    InvalidFilter(String),
+
+    #[error("no saved search `{0}`")]
+    SavedSearchNotFound(String),
+
+    #[error("a saved search `{0}` already exists")]
+    SavedSearchExists(String),
+
+    #[error("no alert `{0}`")]
+    AlertNotFound(String),
+
+    #[error("no attachment `{0}`")]
+    AttachmentNotFound(String),
+
+    /// Sharing a project in a way the user's role does not allow.
+    #[error("{0}")]
+    Sharing(String),
+
     #[error("a highlight needs some text")]
     EmptyHighlight,
 

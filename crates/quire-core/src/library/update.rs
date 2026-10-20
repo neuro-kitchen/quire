@@ -11,6 +11,7 @@
 use quire_model::{CiteKey, Field, Identifier, Issue, Origin, Provenance, Reference, ReferenceData, TextField};
 
 use crate::error::{CoreError, Result};
+use crate::library::references::save;
 use crate::ports::{Library, RawRecord};
 
 /// How the new data relates to the stored data.
@@ -161,7 +162,7 @@ pub fn refresh(
     if changes.iter().any(|c| c.outcome == Outcome::Updated) {
         apply(&mut reference, &new, &changes, Mode::Refresh, &origin);
         reference.meta.touch(library.device());
-        library.update_reference(&reference)?;
+        save(library, &mut reference)?;
     }
     {
         if let Some(raw) = &raw {
@@ -206,7 +207,7 @@ pub fn edit(
         }
         apply(&mut updated.reference, &new, &updated.changes, Mode::Edit, &Origin::User);
         updated.reference.meta.touch(library.device());
-        library.update_reference(&updated.reference)?;
+        save(library, &mut updated.reference)?;
     }
     Ok(updated)
 }
@@ -231,6 +232,7 @@ mod tests {
     use super::*;
     use crate::library::references::{AddRequest, add};
     use crate::memory::MemoryLibrary;
+    use crate::prelude::*;
     use quire_model::{Creator, CreatorRole, Date, EntryKind, Issue, IssueCode};
 
     fn article(title: &str, year: u16) -> ReferenceData {

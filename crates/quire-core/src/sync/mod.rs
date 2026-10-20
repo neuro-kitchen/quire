@@ -1,15 +1,22 @@
 //! What devices exchange to stay in sync (`.knowledge/sync.md`): the current state of every
 //! record that changed, as [`Row`]s. The store keeps a change log (which rows changed, with a
 //! local sequence number) and merges incoming rows, newest `updated_at` first ([`newer`]); the
-//! transport (QUIC, `quire-sync`) only carries them.
+//! transport (QUIC, `quire-sync`) only carries them. References merge part by part
+//! ([`merge_reference`]), so edits of different fields on two devices both survive.
 //!
 //! Synced: references, projects and memberships, tags and taggings, notes, highlights,
-//! relations, attachments (their files go separately, by hash), "not duplicates" pairs. Kept on
-//! each device: fetch issues, failed inputs, PDF download attempts, raw records, automatic
+//! relations, attachments (their files go separately, by hash), "not duplicates" pairs, and the
+//! personal records: reading status and saved searches ([`Row::is_personal`]). Kept on each
+//! device: fetch issues, failed inputs, PDF download attempts, raw records, imports, automatic
 //! exports, settings.
 
+mod fields;
+
+pub use fields::{merge_reference, stamp_changes};
+
 use quire_model::{
-    Attachment, DeviceId, Highlight, Note, Project, ProjectId, Reference, ReferenceId, Tag, TagId, TagKind, Timestamp,
+    Attachment, DeviceId, Highlight, Note, Project, ProjectId, ProjectMember, Reading, Reference, ReferenceId,
+    SavedSearch, Tag, TagId, TagKind, Timestamp,
 };
 use serde::{Deserialize, Serialize};
 
@@ -27,6 +34,36 @@ pub enum Row {
     Relation(Relation),
     Attachment(Attachment),
     Distinct(Distinct),
+    Reading(Reading),
+    SavedSearch(SavedSearch),
+    /// Someone's role on a shared project.
+    Member(ProjectMember),
+}
+
+impl Row {
+    /// When this version was written and on which device (what [`newer`] compares).
+    pub fn version(&self) -> (Timestamp, DeviceId) {
+        match self {
+            Self::Reference(r) => (r.meta.updated_at, r.meta.updated_by),
+            Self::Project(p) => (p.meta.updated_at, p.meta.updated_by),
+            Self::Tag(t) => (t.meta.updated_at, t.meta.updated_by),
+            Self::Note(n) => (n.meta.updated_at, n.meta.updated_by),
+            Self::Highlight(h) => (h.meta.updated_at, h.meta.updated_by),
+            Self::Attachment(a) => (a.meta.updated_at, a.meta.updated_by),
+            Self::Reading(r) => (r.meta.updated_at, r.meta.updated_by),
+            Self::SavedSearch(s) => (s.meta.updated_at, s.meta.updated_by),
+            Self::Member(m) => (m.meta.updated_at, m.meta.updated_by),
+            Self::Membership(Membership { stamp, .. })
+            | Self::Tagging(Tagging { stamp, .. })
+            | Self::Relation(Relation { stamp, .. }) => (stamp.updated_at, stamp.updated_by),
+            Self::Distinct(d) => (d.created_at, d.by),
+        }
+    }
+
+    /// The user's own records: they go to the user's devices only, never to collaborators.
+    pub fn is_personal(&self) -> bool {
+        matches!(self, Self::Reading(_) | Self::SavedSearch(_))
+    }
 }
 
 /// A reference in a project.
@@ -85,6 +122,9 @@ pub struct Merged {
     pub applied: usize,
     /// Rows older than (or the same as) what was here.
     pub kept: usize,
+    /// Rows refused: stamped more than a day ahead of this device's clock (the sender's clock is
+    /// wrong; taking them would let them win over every later change).
+    pub refused: usize,
     /// References given another cite key (theirs was taken here by another paper).
     pub renamed: Vec<(String, String)>,
     /// Identifiers left off an incoming reference (another reference here has them): possible
