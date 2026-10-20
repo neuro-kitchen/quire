@@ -59,7 +59,7 @@ data class FindState(
 @Immutable
 data class TextMatch(val block: Int, val start: Int, val end: Int)
 
-enum class ReaderMode { Pdf, Text }
+enum class ReaderMode { Pdf, Text, Split }
 
 @Immutable
 data class PdfViewState(

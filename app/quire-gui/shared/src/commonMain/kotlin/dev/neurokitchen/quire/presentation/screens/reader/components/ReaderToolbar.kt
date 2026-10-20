@@ -150,12 +150,15 @@ fun ReaderToolbar(
         Chip(stringResource(Res.string.reader_mode_text), selected = mode == ReaderMode.Text) {
             onModeChange(ReaderMode.Text)
         }
+        Chip("Split", selected = mode == ReaderMode.Split, enabled = hasPdf) {
+            onModeChange(ReaderMode.Split)
+        }
 
         Spacer(Modifier.width(4.dp))
 
         // PDF Zoom or Text highlight
         when (mode) {
-            ReaderMode.Pdf -> {
+            ReaderMode.Pdf, ReaderMode.Split -> {
                 val zoomOut = stringResource(Res.string.reader_zoom_out)
                 val zoomIn = stringResource(Res.string.reader_zoom_in)
                 TextButton(onClick = onZoomOut, modifier = Modifier.semantics { contentDescription = "$zoomOut (Ctrl+-)" }) {
