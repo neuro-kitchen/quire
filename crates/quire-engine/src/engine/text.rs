@@ -45,8 +45,8 @@ pub struct PaperText {
 }
 
 /// Version of the stored full texts: raised when the converters change, so texts are fetched
-/// and converted again.
-const FORMAT: u32 = 2;
+/// and converted again. 3: figure images (arXiv).
+const FORMAT: u32 = 3;
 /// How long "no full text online" is believed before asking again (papers get HTML versions
 /// and open-access copies later).
 const RETRY_AFTER: Duration = Duration::from_secs(30 * 24 * 3600);
@@ -150,6 +150,30 @@ impl Engine {
 
     fn text_path(&self, reference: &Reference) -> PathBuf {
         self.library_dir().join("text").join(format!("{}.md", reference.id))
+    }
+
+    /// The file of a figure image of a full text (`![Figure](url)` in its Markdown), downloaded
+    /// once into the library folder (`text/figures/<hash of the URL>.<ext>`).
+    pub async fn figure(&self, url: &str) -> Result<PathBuf> {
+        let extension = url
+            .rsplit('/')
+            .next()
+            .and_then(|name| name.rsplit_once('.'))
+            .map(|(_, ext)| ext.to_ascii_lowercase())
+            .filter(|ext| matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "gif" | "webp"))
+            .unwrap_or_else(|| "img".into());
+        let dir = self.library_dir().join("text").join("figures");
+        let path = dir.join(format!("{}.{extension}", crate::files::FileStore::hash(url.as_bytes())));
+        if path.is_file() {
+            return Ok(path);
+        }
+        let bytes = self.fetcher.figure(url).await?;
+        std::fs::create_dir_all(&dir).map_err(EngineError::file(&dir))?;
+        private::dir(&dir)?;
+        let temporary = path.with_extension("partial");
+        std::fs::write(&temporary, bytes).map_err(EngineError::file(&temporary))?;
+        std::fs::rename(&temporary, &path).map_err(EngineError::file(&path))?;
+        Ok(path)
     }
 }
 

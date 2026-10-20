@@ -2,8 +2,8 @@
 
 use std::collections::HashMap;
 
-use quire_core::Library;
 use quire_core::library::{references, tags};
+use quire_core::prelude::*;
 use quire_model::{Note, NoteId, Reference, ReferenceId, Tag, TagKind};
 
 use super::Engine;

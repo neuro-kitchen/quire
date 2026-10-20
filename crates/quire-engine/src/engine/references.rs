@@ -3,7 +3,8 @@
 use std::path::Path;
 
 use quire_core::library::{projects, references, tags};
-use quire_core::{AddRequest, Added, Checked, FailedInput, Library, ReferenceFilter, check};
+use quire_core::prelude::*;
+use quire_core::{AddRequest, Added, Checked, FailedInput, ReferenceFilter, check};
 use quire_fetch::Lookup;
 use quire_model::{EntryKind, Issue, Origin, ProjectId, Reference, ReferenceData, SlugPath, TagKind};
 

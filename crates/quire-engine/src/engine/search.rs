@@ -2,8 +2,9 @@
 //! highlights are indexed by the store's triggers; a paper's text when the reader's text is
 //! extracted ([`Engine::reader_text`]).
 
+use quire_core::SearchHit;
 use quire_core::library::search;
-use quire_core::{Library, SearchHit};
+use quire_core::prelude::*;
 use quire_model::{Reference, ReferenceId};
 
 use super::Engine;
