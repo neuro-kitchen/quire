@@ -20,12 +20,12 @@ import kotlinx.coroutines.flow.onStart
 
 /**
  * The open library every engine repository shares. It opens on first use and again on [reopen]
- * (after the settings changed); [reloading] flows query again after each change the engine
+ * (after the settings changed) or [switchTo] (another library); [reloading] flows query again after each change the engine
  * reports (edits, sync, background jobs) and switch to the new library after a reopen.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class EngineSession(
-    private val open: suspend () -> QuireLibrary,
+    private var open: suspend () -> QuireLibrary,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
     private val current = MutableStateFlow(opening())
@@ -38,6 +38,12 @@ class EngineSession(
         val old = current.value
         current.value = opening()
         if (old.isCompleted && !old.isCancelled) runCatching { old.getCompleted().close() }
+    }
+
+    /** Opens another library through [open] from now on; open flows switch to it. */
+    suspend fun switchTo(open: suspend () -> QuireLibrary) {
+        this.open = open
+        reopen()
     }
 
     /** `load` now and after every change, the latest result winning. */

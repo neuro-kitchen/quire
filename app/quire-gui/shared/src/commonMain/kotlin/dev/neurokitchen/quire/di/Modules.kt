@@ -1,13 +1,20 @@
 package dev.neurokitchen.quire.di
 
+import dev.neurokitchen.quire.presentation.screens.tools.ToolsViewModel
 import dev.neurokitchen.quire.data.repository.SampleLibraryRepository
 import dev.neurokitchen.quire.data.repository.SamplePdfRepository
 import dev.neurokitchen.quire.data.repository.SampleReaderRepository
 import dev.neurokitchen.quire.data.repository.SampleSettingsRepository
+import dev.neurokitchen.quire.domain.repository.AttachmentRepository
+import dev.neurokitchen.quire.domain.repository.CurationRepository
+import dev.neurokitchen.quire.domain.repository.ExchangeRepository
+import dev.neurokitchen.quire.domain.repository.LibrariesRepository
 import dev.neurokitchen.quire.domain.repository.LibraryRepository
 import dev.neurokitchen.quire.domain.repository.PdfRepository
 import dev.neurokitchen.quire.domain.repository.ReaderRepository
+import dev.neurokitchen.quire.domain.repository.SearchRepository
 import dev.neurokitchen.quire.domain.repository.SettingsRepository
+import dev.neurokitchen.quire.domain.repository.SyncRepository
 import dev.neurokitchen.quire.presentation.desktop.DesktopViewModel
 import dev.neurokitchen.quire.presentation.screens.library.LibraryViewModel
 import dev.neurokitchen.quire.presentation.screens.reader.ReaderViewModel
@@ -33,12 +40,20 @@ val sampleDataModule = module {
         )
     }
     single<PdfRepository> { SamplePdfRepository() }
+    // No engine on these platforms yet: every call answers "needs the engine".
+    single<AttachmentRepository> { object : AttachmentRepository {} }
+    single<SearchRepository> { object : SearchRepository {} }
+    single<CurationRepository> { object : CurationRepository {} }
+    single<ExchangeRepository> { object : ExchangeRepository {} }
+    single<LibrariesRepository> { object : LibrariesRepository {} }
+    single<SyncRepository> { object : SyncRepository {} }
 }
 
 val viewModelModule = module {
     viewModelOf(::LibraryViewModel)
     viewModelOf(::SettingsViewModel)
     viewModelOf(::DesktopViewModel)
+    viewModelOf(::ToolsViewModel)
     // One per open paper: its reference ID and title come as parameters.
     viewModel { (id: String, title: String) -> ReaderViewModel(id, title, get(), get()) }
 }
