@@ -17,7 +17,7 @@ use ratatui_image::{Resize, StatefulImage};
 const QUERY_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(800);
 
 #[derive(Default)]
-pub(crate) struct Graphics {
+pub struct Graphics {
     picker: Option<Picker>,
     /// The image drawn last, ready to draw again (decoding is the slow part).
     shown: Option<(PathBuf, StatefulProtocol)>,

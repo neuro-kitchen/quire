@@ -41,7 +41,7 @@ impl Row {
 
 /// The selected reference's extra information, loaded on selection.
 #[derive(Debug, Clone, PartialEq, Default)]
-pub(crate) struct Details {
+pub struct Details {
     pub id: Option<ReferenceId>,
     pub projects: Vec<SlugPath>,
     pub notes: Vec<Note>,
@@ -50,7 +50,7 @@ pub(crate) struct Details {
 
 /// What the left pane lists: every reference, a project, or a special view.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Scope {
+pub enum Scope {
     All,
     Project(SlugPath),
     /// Full-text search results, best first.
@@ -64,7 +64,7 @@ pub(crate) enum Scope {
 
 /// Which pane has the keyboard.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Pane {
+pub enum Pane {
     Scopes,
     References,
     Details,
@@ -72,7 +72,7 @@ pub(crate) enum Pane {
 
 /// What the table is sorted by.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Sort {
+pub enum Sort {
     Key,
     Year,
     Author,
@@ -107,7 +107,7 @@ impl Sort {
 
 /// A one-line text prompt at the bottom (add, filter) and what it is for.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Prompt {
+pub enum Prompt {
     /// Fuzzy filter, applied as you type.
     Filter,
     /// DOI, arXiv ID, PMID, PMCID or URL to add.
