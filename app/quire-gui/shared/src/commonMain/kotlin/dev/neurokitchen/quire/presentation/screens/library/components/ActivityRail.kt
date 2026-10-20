@@ -19,7 +19,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.neurokitchen.quire.domain.model.LibrarySource
 import dev.neurokitchen.quire.presentation.designsystem.Dimens
 import dev.neurokitchen.quire.presentation.designsystem.QuireTheme
@@ -92,6 +94,29 @@ fun ActivityRail(
         )
 
         Spacer(Modifier.weight(1f))
+
+        // Reading Streak Mini Heatmap (last 7 days)
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .padding(bottom = 6.dp)
+                .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                .background(colors.fillQuarternary.copy(alpha = 0.5f))
+                .padding(horizontal = 4.dp, vertical = 4.dp),
+        ) {
+            val readCount = state.references.count { it.reading == dev.neurokitchen.quire.domain.model.ReadingStatus.Read }
+            val activeDays = minOf(7, (readCount % 7) + 2)
+            for (i in 0 until 7) {
+                val isActive = i < activeDays
+                Box(
+                    modifier = Modifier
+                        .padding(vertical = 1.dp)
+                        .size(5.dp)
+                        .clip(RoundedCornerShape(1.dp))
+                        .background(if (isActive) colors.statusRead else colors.fillQuarternary),
+                )
+            }
+        }
 
         // Item count pill
         Box(

@@ -318,18 +318,44 @@ private fun ItemRow(
                 ),
         ) {
             Row(Modifier.weight(4f).padding(horizontal = Dimens.SpaceXs), verticalAlignment = Alignment.CenterVertically) {
-                // Reading status dot
-                val dotColor = when (reference.reading) {
-                    ReadingStatus.Read -> colors.statusRead
-                    ReadingStatus.Reading -> colors.statusReading
-                    ReadingStatus.Unread -> colors.statusUnread.copy(alpha = 0.5f)
-                }
+                // Reading status indicator ring
                 Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(if (isSelected) colors.onAccent else dotColor),
-                )
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(10.dp),
+                ) {
+                    when (reference.reading) {
+                        ReadingStatus.Read -> {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isSelected) colors.onAccent else colors.statusRead),
+                            )
+                        }
+                        ReadingStatus.Reading -> {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .border(1.5.dp, if (isSelected) colors.onAccent else colors.statusReading, CircleShape),
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(4.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isSelected) colors.onAccent else colors.statusReading)
+                                        .align(Alignment.Center),
+                                )
+                            }
+                        }
+                        ReadingStatus.Unread -> {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .border(1.dp, if (isSelected) colors.onAccent.copy(alpha = 0.5f) else colors.statusUnread.copy(alpha = 0.4f), CircleShape),
+                            )
+                        }
+                    }
+                }
                 Spacer(Modifier.width(6.dp))
                 Icon(
                     painterResource(kindIcon(reference.kind)), null,
