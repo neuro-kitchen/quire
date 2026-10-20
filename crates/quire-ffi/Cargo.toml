@@ -1,0 +1,23 @@
+[package]
+name = "quire-ffi"
+description = "quire's engine for the Kotlin apps (desktop, Android), through UniFFI"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+# cdylib: the library the app loads (JNA); lib: for tests.
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+quire-model.workspace = true
+quire-engine.workspace = true
+pdfium-render.workspace = true
+tempfile.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+uniffi.workspace = true
+

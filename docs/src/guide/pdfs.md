@@ -28,14 +28,9 @@ time, in your own browser, where you log in or pass the check and download the P
 quire watches your downloads folder (`access.downloads`, default `~/Downloads`), checks the new
 file and attaches it. quire never sees your passwords or cookies.
 
-If your institution has a login proxy, set it and pages open through it:
-
-```bash
-quire config set access.proxy "https://login.proxy.example.edu/login?url="
-```
-
-`--direct` opens publishers' pages without the proxy (useful when a bot check fails on the proxy
-address); `--wait` sets how many minutes to wait for each download.
+`--wait` sets how many minutes to wait for each download. For paywalled papers, log in on the
+publisher's page with your institution (most offer "Access through your institution"), or connect
+to your institution's VPN first.
 
 ## Importing files you already have
 

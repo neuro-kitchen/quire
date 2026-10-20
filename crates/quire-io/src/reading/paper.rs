@@ -10,10 +10,8 @@
 //! - display equations as one short paragraph with the number in it: `… = softmax( √)V (1) dk`;
 //! - the reference list under a `References` heading, an appendix possibly after it.
 
-use quire_engine::Reference;
-use quire_engine::paper_markdown::{
-    CaptionKind, FRONT_END, FRONT_START, caption_label, is_label_number, is_references_title,
-};
+use crate::paper_markdown::{CaptionKind, FRONT_END, FRONT_START, caption_label, is_label_number, is_references_title};
+use quire_model::Reference;
 use quire_model::TextField;
 
 use super::document::{Block, Kind, Word, words};
@@ -110,6 +108,42 @@ impl Paper {
         .filter(|extra| extra.count > 0)
         .collect()
     }
+}
+
+/// One tab of a paper's text: what it shows, and for item tabs how many items.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TabContent {
+    pub tab: Tab,
+    /// Figures, tables, equations or references on the tab; `None` for running text.
+    pub count: Option<usize>,
+    pub blocks: Vec<Block>,
+    /// Images to show, each from the block at its index.
+    pub images: Vec<(usize, String)>,
+}
+
+/// The tabs a reader shows after the abstract, for the stored `markdown`: the running text, the
+/// front matter (when the PDF cleanup marked one), then figures, tables, equations and references
+/// that have something. `math`: the text has LaTeX ([`super::document::parse`]).
+pub fn tabs(markdown: &str, math: bool) -> Vec<TabContent> {
+    let (front, body) = split_front(markdown);
+    let paper = organize(super::document::parse(&body, math));
+    let extra = paper.extra_tabs();
+    let mut tabs = vec![TabContent { tab: Tab::Paper, count: None, blocks: paper.body, images: Vec::new() }];
+    if !front.is_empty() {
+        tabs.push(TabContent {
+            tab: Tab::Front,
+            count: None,
+            blocks: super::document::parse(front, math),
+            images: Vec::new(),
+        });
+    }
+    tabs.extend(extra.into_iter().map(|e| TabContent {
+        tab: e.tab,
+        count: Some(e.count),
+        blocks: e.blocks,
+        images: e.images,
+    }));
+    tabs
 }
 
 /// Longest paragraph taken as the second half of a cut caption.
@@ -319,8 +353,8 @@ pub fn mention_target(name: &str, number: &str) -> Option<(Tab, String)> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::document::parse;
     use super::*;
-    use crate::reader::document::parse;
 
     #[test]
     fn figure_images_go_with_their_caption() {

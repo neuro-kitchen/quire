@@ -16,6 +16,18 @@ SQLite is built in; there are no system libraries to install. Optional programs:
 | `pdftotext` (poppler) | a second try at the text of PDFs the built-in extractor reads badly |
 | a web browser | PDFs behind a login or a bot check (`quire pdf get --browser`) |
 
+## The desktop app
+
+The desktop app (`app/`) also builds from source: it needs, besides Rust, a JDK 21 or newer.
+
+```bash
+cd app
+./gradlew :desktopApp:run                                   # build and open it
+./gradlew :desktopApp:createDistributable -Pquire.release   # a self-contained app folder, with its own Java
+```
+
+See [Desktop app](guide/desktop.md).
+
 ## Shell completions
 
 ```bash

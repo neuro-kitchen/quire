@@ -69,12 +69,10 @@ pub struct Peer {
     pub id: String,
 }
 
-/// How to reach full texts behind a login (`.knowledge/metadata-sources.md`, challenge pages).
+/// Getting PDFs by hand in the user's own browser (`pdf get --browser`), where they log in with
+/// the publisher themselves; quire never handles a login.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 pub struct Access {
-    /// Prefix put before a publisher URL to open it through the institution's proxy (EZproxy
-    /// style) in the user's own browser (`pdf get --browser`); quire never logs in itself.
-    pub proxy: Option<String>,
     /// Where the browser saves downloads; watched by `quire pdf get --browser`.
     pub downloads: Option<PathBuf>,
 }

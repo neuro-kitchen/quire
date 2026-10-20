@@ -1,0 +1,4 @@
+# Read by `uniffi-bindgen generate --library` (the app's Gradle build).
+[bindings.kotlin]
+package_name = "dev.neurokitchen.quire.ffi"
+cdylib_name = "quire_ffi"

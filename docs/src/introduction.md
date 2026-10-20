@@ -12,7 +12,9 @@ quire is a reference manager for people who write in the terminal: Typst, LaTeX,
 - **PDFs**: open-access copies are downloaded and checked (is it a PDF? the right paper?). For
   paywalled ones, quire opens the page in your own browser and picks up the file you download.
 - **Read**: `quire tui` browses the library; its reader shows a paper as reflowed text with
-  tabs for figures, tables, equations and references, plus highlights and notes.
+  tabs for figures, tables, equations and references, plus highlights and notes. The
+  [desktop app](guide/desktop.md) does the same in windows laid out like Zotero, with the PDF's
+  pages too.
 - **Cite**: export BibLaTeX, BibTeX, CSL-JSON or Hayagriva (Typst). A document folder can keep its
   `.bib` updated after every change, so `typst watch` picks up new references as you add them.
 - **Write**: check a manuscript's citations against the library (`quire folder check`).
@@ -26,5 +28,7 @@ quire is a reference manager for people who write in the terminal: Typst, LaTeX,
 Everything is local: one SQLite database and a folder of PDFs per library.
 
 ![The library in the terminal](images/tui/tui_main.png)
+
+![The desktop app](images/app/desktop-library.png)
 
 quire is free software under the [GNU Affero General Public License v3.0 or later](https://www.gnu.org/licenses/agpl-3.0.html).

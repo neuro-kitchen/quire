@@ -3,8 +3,8 @@
 //! macOS, Credential Manager on Windows. Where none is available (a server over SSH, a container,
 //! or `QUIRE_NO_KEYRING=1`), a file only the user can read is used instead, and callers say so.
 //!
-//! Not secrets, so kept in `config.toml` (private, `600`): the contact email (sent to every
-//! service as their terms ask) and the proxy address (public; the login stays in the browser).
+//! Not a secret, so kept in `config.toml` (private, `600`): the contact email (sent to every
+//! service as their terms ask).
 
 use std::path::{Path, PathBuf};
 
