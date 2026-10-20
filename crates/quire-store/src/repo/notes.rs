@@ -47,11 +47,11 @@ fn from_row(row: &Row) -> rusqlite::Result<Note> {
     })
 }
 
-pub fn by_id(conn: &Connection, id: NoteId) -> Result<Option<Note>> {
+pub(super) fn by_id(conn: &Connection, id: NoteId) -> Result<Option<Note>> {
     first(conn, &format!("SELECT {COLUMNS} FROM note WHERE id = ?1"), [id_blob(id)], from_row)
 }
 
-pub fn insert(conn: &Connection, note: &Note) -> Result<()> {
+pub(super) fn insert(conn: &Connection, note: &Note) -> Result<()> {
     let sql = format!("INSERT INTO note ({COLUMNS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)");
     let m = &note.meta;
     conn.execute(
@@ -70,7 +70,7 @@ pub fn insert(conn: &Connection, note: &Note) -> Result<()> {
     Ok(())
 }
 
-pub fn update(conn: &Connection, note: &Note) -> Result<()> {
+pub(super) fn update(conn: &Connection, note: &Note) -> Result<()> {
     let sql =
         "UPDATE note SET reference_id = ?2, body = ?3, updated_at = ?4, updated_by = ?5, deleted_at = ?6 WHERE id = ?1";
     let m = &note.meta;

@@ -12,7 +12,7 @@ use crate::error::Result;
 use crate::ports::stores::*;
 use crate::ports::{AutoExport, FailedInput, RawRecord, ReferenceFilter, SearchHit};
 
-pub struct MemoryLibrary {
+pub(crate) struct MemoryLibrary {
     device: DeviceId,
     references: Vec<Reference>,
     projects: Vec<Project>,

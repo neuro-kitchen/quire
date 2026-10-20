@@ -144,7 +144,7 @@ impl Fetcher {
 /// Where a publisher's page (`html`, at `landed`) keeps the PDF of `doi`: its `citation_pdf_url`,
 /// then the paths of platforms that do not tag it. Atypon (APS physiology journals, Taylor &
 /// Francis, SAGE, ACS, …) serves `/doi/pdf/<doi>`; Wiley `/doi/pdfdirect/<doi>`.
-pub fn pdf_links(html: &str, landed: &Url, doi: &Doi) -> Vec<Url> {
+pub(crate) fn pdf_links(html: &str, landed: &Url, doi: &Doi) -> Vec<Url> {
     let mut links: Vec<Url> =
         web::read_tags(html).first(&["citation_pdf_url"]).and_then(|u| landed.join(u).ok()).into_iter().collect();
     if landed.path().contains("/doi/") {
@@ -160,7 +160,7 @@ pub fn pdf_links(html: &str, landed: &Url, doi: &Doi) -> Vec<Url> {
 }
 
 /// `url_for_pdf` of the best location, then of the others, without repeats.
-pub fn unpaywall_pdf_links(record: &Value) -> Vec<Url> {
+pub(crate) fn unpaywall_pdf_links(record: &Value) -> Vec<Url> {
     let best = record.get("best_oa_location").into_iter();
     let others = record.get("oa_locations").and_then(Value::as_array).into_iter().flatten();
     let mut links: Vec<Url> = Vec::new();

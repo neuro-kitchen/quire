@@ -70,7 +70,9 @@ impl Engine {
     /// Colors a tag (`None` removes the color), at `position` 1–9 or the first free one.
     pub async fn color_tag(&self, name: &str, color: Option<&str>, position: Option<u8>) -> Result<Tag> {
         let (name, color) = (name.to_string(), color.map(str::to_string));
-        self.run(move |lib| tags::color(lib, &name, color.as_deref(), position)).await
+        let tag = self.run(move |lib| tags::color(lib, &name, color.as_deref(), position)).await?;
+        self.mark_changed();
+        Ok(tag)
     }
 
     /// The tags of each reference in `ids` (references without tags are left out).

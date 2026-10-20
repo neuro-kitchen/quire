@@ -2,7 +2,8 @@
 //! projects, tags, notes, related items, the PDF and its highlight; importing again adds nothing.
 
 mod common;
-use common::{engine, fixture, tiny_pdf};
+use common::{engine, fixture};
+use quire_testkit::tiny_pdf;
 
 use quire_engine::SlugPath;
 

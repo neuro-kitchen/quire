@@ -34,7 +34,7 @@ struct AppState {
     token: Arc<str>,
 }
 
-pub fn router(engine: Arc<Engine>, token: String) -> Router {
+pub(crate) fn router(engine: Arc<Engine>, token: String) -> Router {
     let state = AppState { engine, token: token.into() };
     Router::new()
         .route("/v1/status", get(status))
@@ -200,7 +200,7 @@ fn engine_error(e: &EngineError) -> Response {
     let status = match e {
         EngineError::Core(CoreError::ReferenceNotFound(_) | CoreError::ProjectNotFound(_)) => StatusCode::NOT_FOUND,
         EngineError::Model(_) | EngineError::Core(CoreError::Model(_)) => StatusCode::BAD_REQUEST,
-        EngineError::Format(_) | EngineError::Pdf(_) => StatusCode::UNPROCESSABLE_ENTITY,
+        EngineError::Format(_) | EngineError::Document(_) | EngineError::Pdf(_) => StatusCode::UNPROCESSABLE_ENTITY,
         EngineError::Fetch(_) => StatusCode::BAD_GATEWAY,
         _ => StatusCode::INTERNAL_SERVER_ERROR,
     };

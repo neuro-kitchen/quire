@@ -4,49 +4,10 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use quire_ffi::{ChangeListener, Query, QuireLibrary, SortColumn, Source, open_library_at};
+use quire_ffi::{ChangeListener, Query, SortColumn, Source};
 
-const BIB: &str = r#"
-@article{hodgkin1952,
-  title = {A quantitative description of membrane current and its application to conduction and excitation in nerve},
-  author = {Hodgkin, A. L. and Huxley, A. F.},
-  journal = {The Journal of Physiology},
-  year = {1952}, volume = {117}, number = {4}, pages = {500--544},
-  doi = {10.1113/jphysiol.1952.sp004764},
-}
-@article{okeefe1971,
-  title = {The hippocampus as a spatial map},
-  author = {O'Keefe, J. and Dostrovsky, J.},
-  journal = {Brain Research},
-  year = {1971},
-  doi = {10.1016/0006-8993(71)90358-1},
-}
-@book{buzsaki2006,
-  title = {Rhythms of the Brain},
-  author = {Buzsáki, György},
-  publisher = {Oxford University Press},
-  year = {2006},
-}
-"#;
-
-struct Fixture {
-    _dir: tempfile::TempDir,
-    library: Arc<QuireLibrary>,
-}
-
-async fn fixture() -> Fixture {
-    // SAFETY: tests in this file set the same value; no other thread reads the environment yet.
-    unsafe { std::env::set_var("QUIRE_NO_KEYRING", "1") };
-    let dir = tempfile::tempdir().unwrap();
-    let config = dir.path().join("config.toml");
-    let library = open_library_at(dir.path().join("lib").display().to_string(), Some(config.display().to_string()))
-        .await
-        .unwrap();
-    let bib = dir.path().join("refs.bib");
-    std::fs::write(&bib, BIB).unwrap();
-    assert_eq!(library.import_bib(bib.display().to_string(), None).await.unwrap(), 3);
-    Fixture { _dir: dir, library }
-}
+mod common;
+use common::{BIB, fixture};
 
 fn query(source: Source) -> Query {
     Query { source, text: String::new(), tags: vec![], sort: SortColumn::Title, ascending: true }
@@ -82,7 +43,7 @@ async fn projects_unfiled_tags_and_search_narrow_the_list() {
     let path = &chapter.path;
 
     // Linking goes through the import, which takes a project.
-    let bib = f._dir.path().join("one.bib");
+    let bib = f.dir.path().join("one.bib");
     std::fs::write(&bib, BIB.split("@article{okeefe1971").next().unwrap()).unwrap();
     f.library.import_bib(bib.display().to_string(), Some(path.clone())).await.unwrap();
 

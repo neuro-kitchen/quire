@@ -162,7 +162,7 @@ mod tests {
 
     #[test]
     fn retraction_and_correction_notices() {
-        let body = include_str!("../tests/fixtures/crossref-works-wakefield-retracted.json");
+        let body = &quire_testkit::fixture("crossref-works-wakefield-retracted.json");
         let value: Value = serde_json::from_str(body).unwrap();
         let updates = updates_in(&value["message"]);
         assert_eq!(updates.len(), 2);
@@ -171,14 +171,13 @@ mod tests {
         assert_eq!(updates[1].notice.as_deref(), Some("10.1016/s0140-6736(10)60175-4"));
         assert_eq!(updates[1].date.as_deref(), Some("2010-02-06"));
         assert_eq!(updates[1].source.as_deref(), Some("retraction-watch"));
-        let plain: Value =
-            serde_json::from_str(include_str!("../tests/fixtures/crossref-works-nature12373.json")).unwrap();
+        let plain: Value = serde_json::from_str(&quire_testkit::fixture("crossref-works-nature12373.json")).unwrap();
         assert!(updates_in(&plain["message"]).is_empty());
     }
 
     #[test]
     fn search_items_are_references() {
-        let body = include_str!("../tests/fixtures/crossref-search-nanodiamond-thermometry.json");
+        let body = &quire_testkit::fixture("crossref-search-nanodiamond-thermometry.json");
         let value: Value = serde_json::from_str(body).unwrap();
         let items = value["message"]["items"].as_array().unwrap();
         let found: Vec<ReferenceData> = items.iter().filter_map(|i| quire_io::from_csl_value(i).ok()).collect();

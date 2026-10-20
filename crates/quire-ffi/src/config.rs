@@ -13,7 +13,7 @@ use crate::{QuireError, Result};
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
 pub struct ConfigKey {
     pub pattern: String,
-    /// `email`, `text`, `path`, `library`, `bool`, `list`, `choice` or `number`.
+    /// `email`, `text`, `path`, `library`, `device`, `bool`, `list`, `choice` or `number`.
     pub kind: String,
     /// The words a `choice` accepts.
     pub choices: Vec<String>,
@@ -46,6 +46,7 @@ pub fn config_keys() -> Vec<ConfigKey> {
                 ValueKind::Text => ("text", vec![], None, None),
                 ValueKind::Path => ("path", vec![], None, None),
                 ValueKind::LibraryName => ("library", vec![], None, None),
+                ValueKind::DeviceId => ("device", vec![], None, None),
                 ValueKind::Bool => ("bool", vec![], None, None),
                 ValueKind::List => ("list", vec![], None, None),
                 ValueKind::Choice(words) => ("choice", words.iter().map(|w| w.to_string()).collect(), None, None),
@@ -127,7 +128,7 @@ pub fn config_write(config_file: Option<String>, text: String) -> Result<()> {
     Ok(())
 }
 
-fn path(config_file: Option<String>) -> Result<PathBuf> {
+pub(crate) fn path(config_file: Option<String>) -> Result<PathBuf> {
     Ok(paths::config_file(config_file.as_deref().map(Path::new))?)
 }
 

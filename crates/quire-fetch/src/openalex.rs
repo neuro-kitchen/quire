@@ -150,8 +150,7 @@ mod tests {
     use super::*;
 
     fn fixture(name: &str) -> Value {
-        let path = format!("{}/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"));
-        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+        serde_json::from_str(&quire_testkit::fixture(name)).unwrap()
     }
 
     #[test]

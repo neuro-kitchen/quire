@@ -3,9 +3,10 @@
 //! file; nothing is sent twice; a later change on either side reaches the other.
 
 mod common;
-use common::{engine, tiny_pdf};
+use common::engine;
+use quire_testkit::tiny_pdf;
 
-use quire_engine::{Engine, SyncRole};
+use quire_engine::{Engine, SyncSide};
 
 const BIB: &str = "@article{rivera2025,
   title = {Diaphragm pacing restores breathing after injury},
@@ -20,8 +21,8 @@ async fn sync(a: &Engine, b: &Engine) -> (quire_engine::SyncReport, quire_engine
     let (mut left_read, mut left_write) = tokio::io::split(left);
     let (mut right_read, mut right_write) = tokio::io::split(right);
     let (client, server) = tokio::join!(
-        a.sync_session(SyncRole::Client, &mut left_read, &mut left_write),
-        b.sync_session(SyncRole::Server, &mut right_read, &mut right_write),
+        a.sync_session(SyncSide::Client, &mut left_read, &mut left_write),
+        b.sync_session(SyncSide::Server, &mut right_read, &mut right_write),
     );
     (client.unwrap(), server.unwrap())
 }
@@ -77,7 +78,7 @@ async fn try_sync(
     let (left, right) = tokio::io::duplex(64 * 1024);
     let (mut lr, mut lw) = tokio::io::split(left);
     let (mut rr, mut rw) = tokio::io::split(right);
-    tokio::join!(a.sync_session(SyncRole::Client, &mut lr, &mut lw), b.sync_session(SyncRole::Server, &mut rr, &mut rw),)
+    tokio::join!(a.sync_session(SyncSide::Client, &mut lr, &mut lw), b.sync_session(SyncSide::Server, &mut rr, &mut rw),)
 }
 
 #[tokio::test]

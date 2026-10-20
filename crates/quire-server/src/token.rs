@@ -10,7 +10,7 @@ pub use quire_engine::secrets::Store;
 pub const SECRET: &str = "serve-token";
 
 /// The fallback file for the config file `config`.
-pub fn fallback_path(config: &Path) -> PathBuf {
+pub(crate) fn fallback_path(config: &Path) -> PathBuf {
     config.with_file_name(SECRET)
 }
 

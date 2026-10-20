@@ -34,7 +34,7 @@ pub struct JsonLd {
 }
 
 /// The work described in `html`'s JSON-LD, if any block names one with a title.
-pub fn read(html: &str) -> Option<JsonLd> {
+pub(super) fn read(html: &str) -> Option<JsonLd> {
     let document = Html::parse_document(html);
     let selector = Selector::parse(r#"script[type="application/ld+json"]"#).expect("valid selector");
     let blocks: Vec<Value> = document

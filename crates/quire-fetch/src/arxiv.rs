@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn search_results() {
-        let xml = include_str!("../tests/fixtures/arxiv-api-search-nv-thermometry.xml");
+        let xml = &quire_testkit::fixture("arxiv-api-search-nv-thermometry.xml");
         let found = entries(xml).unwrap();
         assert_eq!(found.len(), 3);
         assert_eq!(found[0].identifiers[0].to_string(), "arXiv:2609.22661");

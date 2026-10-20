@@ -40,7 +40,7 @@ pub fn unset(path: &Path, key: &str) -> Result<bool> {
 }
 
 /// Renames the table `[<parent>.<old>]` to `[<parent>.<new>]` (e.g. a library), keeping its contents.
-pub fn rename_table(path: &Path, parent: &str, old: &str, new: &str) -> Result<()> {
+pub(crate) fn rename_table(path: &Path, parent: &str, old: &str, new: &str) -> Result<()> {
     edit(path, |document| {
         let table = table_at(document, &[parent])?;
         let item = table.remove(old).ok_or_else(|| EngineError::Config(format!("no `{parent}.{old}`")))?;
@@ -50,7 +50,7 @@ pub fn rename_table(path: &Path, parent: &str, old: &str, new: &str) -> Result<(
 }
 
 /// Removes the table `[<parent>.<name>]`; `false` if it did not exist.
-pub fn remove_table(path: &Path, parent: &str, name: &str) -> Result<bool> {
+pub(crate) fn remove_table(path: &Path, parent: &str, name: &str) -> Result<bool> {
     let mut removed = false;
     edit(path, |document| {
         if let Some(table) = document.get_mut(parent).and_then(Item::as_table_mut) {

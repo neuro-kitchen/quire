@@ -62,24 +62,24 @@ fn one(conn: &Connection, filter: &str, params: impl rusqlite::Params) -> Result
     first(conn, &sql, params, from_row)
 }
 
-pub fn by_id(conn: &Connection, id: ReferenceId) -> Result<Option<Reference>> {
+pub(super) fn by_id(conn: &Connection, id: ReferenceId) -> Result<Option<Reference>> {
     one(conn, "id = ?1", [id_blob(id)])
 }
 
-pub fn by_cite_key(conn: &Connection, key: &CiteKey) -> Result<Option<Reference>> {
+pub(super) fn by_cite_key(conn: &Connection, key: &CiteKey) -> Result<Option<Reference>> {
     one(conn, "cite_key = ?1", [key.as_str()])
 }
 
-pub fn by_identifier(conn: &Connection, identifier: &Identifier) -> Result<Option<Reference>> {
+pub(super) fn by_identifier(conn: &Connection, identifier: &Identifier) -> Result<Option<Reference>> {
     let filter = "id = (SELECT reference_id FROM reference_identifier WHERE kind = ?1 AND key = ?2)";
     one(conn, filter, params![identifier.kind().as_str(), identifier.key()])
 }
 
-pub fn cite_key_taken(conn: &Connection, key: &str) -> Result<bool> {
+pub(super) fn cite_key_taken(conn: &Connection, key: &str) -> Result<bool> {
     conn.query_row("SELECT EXISTS (SELECT 1 FROM reference WHERE cite_key = ?1)", [key], |row| row.get(0)).or_core()
 }
 
-pub fn insert(conn: &Connection, reference: &Reference, raw: Option<&RawRecord>) -> Result<()> {
+pub(super) fn insert(conn: &Connection, reference: &Reference, raw: Option<&RawRecord>) -> Result<()> {
     let sql = "INSERT INTO reference (id, cite_key, kind, title, year, data, provenance, created_at, updated_at, updated_by, deleted_at, clocks)
                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)";
     let meta = &reference.meta;
@@ -115,7 +115,7 @@ fn insert_raw(conn: &Connection, reference: ReferenceId, raw: &RawRecord) -> Res
     Ok(())
 }
 
-pub fn update(conn: &Connection, reference: &Reference) -> Result<()> {
+pub(super) fn update(conn: &Connection, reference: &Reference) -> Result<()> {
     let sql = "UPDATE reference SET cite_key = ?2, kind = ?3, title = ?4, year = ?5, data = ?6, provenance = ?7,
                updated_at = ?8, updated_by = ?9, deleted_at = ?10, clocks = ?11 WHERE id = ?1";
     let meta = &reference.meta;

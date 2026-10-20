@@ -8,7 +8,7 @@ use quire_model::{EntryKind, ReferenceData, TextField};
 use super::types::{is_article, number_is_series_number, writes_series_number};
 
 /// The BibLaTeX field for `field` in an entry of `kind`, or `None` if it is not written.
-pub fn to_biblatex(kind: EntryKind, field: TextField, value: &str) -> Option<&'static str> {
+pub(super) fn to_biblatex(kind: EntryKind, field: TextField, value: &str) -> Option<&'static str> {
     use TextField::*;
     Some(match field {
         Title => "title",
@@ -52,7 +52,7 @@ fn takes_issue_number(kind: EntryKind) -> bool {
 }
 
 /// Value as written to BibLaTeX: page ranges use `--`.
-pub fn to_biblatex_value(field: TextField, value: &str) -> String {
+pub(super) fn to_biblatex_value(field: TextField, value: &str) -> String {
     match field {
         TextField::Page => {
             value.replace('–', "--").split("--").map(|part| part.replace('-', "--")).collect::<Vec<_>>().join("--")
@@ -63,7 +63,7 @@ pub fn to_biblatex_value(field: TextField, value: &str) -> String {
 
 /// Reads BibLaTeX field `name` (lowercase) of an entry of BibLaTeX type `bib_type` into `data`.
 /// Returns `false` if the field is not a text field quire maps.
-pub fn from_biblatex(bib_type: &str, name: &str, value: &str, data: &mut ReferenceData) -> bool {
+pub(super) fn from_biblatex(bib_type: &str, name: &str, value: &str, data: &mut ReferenceData) -> bool {
     use TextField::*;
     let field = match name {
         "title" => Title,
@@ -105,7 +105,7 @@ pub fn from_biblatex(bib_type: &str, name: &str, value: &str, data: &mut Referen
 }
 
 /// Order in which BibLaTeX fields are read, so that preferred sources come first.
-pub const READ_ORDER: &[&str] = &[
+pub(super) const READ_ORDER: &[&str] = &[
     "journaltitle",
     "journal",
     "booktitle",

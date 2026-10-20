@@ -104,7 +104,7 @@ pub fn ordered(a: ReferenceId, b: ReferenceId) -> (ReferenceId, ReferenceId) {
 
 /// The title lowercased, without accents and punctuation, words single-spaced; `None` when
 /// too short to tell works apart.
-pub fn title_key(data: &ReferenceData) -> Option<String> {
+pub(crate) fn title_key(data: &ReferenceData) -> Option<String> {
     let title = deunicode(data.title()?).to_lowercase();
     let words: Vec<String> =
         title.split(|c: char| !c.is_alphanumeric()).filter(|w| !w.is_empty()).map(str::to_string).collect();

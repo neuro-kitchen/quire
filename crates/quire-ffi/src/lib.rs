@@ -9,14 +9,33 @@
 //! - [`records`]: the records and enums crossing the boundary.
 //! - [`config`]: the settings screen (config keys, values, the raw file).
 //! - [`reader`]: a paper's reader tabs, highlights, notes and reading status.
-//! - [`pdf`]: PDF pages rendered by PDFium, and where highlighted quotes are on them.
+//! - [`attachments`]: a reference's PDFs: download, attach, import, status, OCR, the browser.
+//! - [`discovery`]: search, saved searches, alerts, the citation graph.
+//! - [`curation`]: duplicates, checks, retractions.
+//! - [`exchange`]: Zotero import, exports, highlights as Markdown, manuscript checks.
+//! - [`libraries`]: libraries in the config, backup, copying references between libraries.
+//! - [`sync`]: syncing devices, sharing projects.
+//! - [`references`]: adding references (identifier, page, typed in) and changing them.
+//! - [`projects`]: renaming and removing projects, linking references to them.
+//! - [`tags`]: tags beyond tagging, related references, standalone notes.
+//! - [`pdf`]: PDF pages and the text layer (hayro, through `quire-document`), and where
+//!   highlighted quotes are on them.
 //! - [`query`]: answering a [`Query`] with engine calls.
 
+mod attachments;
 mod config;
+mod curation;
+mod discovery;
+mod exchange;
+mod libraries;
 mod pdf;
+mod projects;
 mod query;
 mod reader;
 mod records;
+mod references;
+mod sync;
+mod tags;
 
 use std::future::Future;
 use std::path::PathBuf;
@@ -25,13 +44,31 @@ use std::sync::{Arc, LazyLock};
 use quire_engine::{Engine, LibraryChoice, OpenOptions};
 use tokio::runtime::Runtime;
 
+pub use attachments::{AttachedRecord, ImportedPdf, PdfFetchRecord, PdfStatusRecord, VerifiedPdf};
 pub use config::{
     ConfigEntry, ConfigKey, config_check, config_entries, config_keys, config_path, config_read, config_set,
     config_unset, config_write,
 };
-pub use pdf::{PageRect, PageSize, QuoteMatch, RenderedPage, pdf_find, pdf_init, pdf_page_sizes, pdf_render_page};
+pub use curation::{
+    CheckedRecord, DuplicateGroupRecord, DuplicateRecord, MergedRecord, NoticeRecord, RetractionRecord,
+};
+pub use discovery::{AlertCheckRecord, AlertRecord, GraphWorkRecord, SavedSearchRecord, SearchHitRecord};
+pub use exchange::{
+    AnnotationsRecord, AutoExportRecord, AutoExportRun, CiteUseRecord, ExportSelection, ExportedText, ManuscriptRecord,
+    UnknownKeyRecord, ZoteroImportRecord, export_formats,
+};
+pub use libraries::{
+    BackupRecord, LibraryEntryRecord, list_libraries, register_library, rename_library, set_default_library,
+    unregister_library,
+};
+pub use pdf::{
+    PageRect, PageSize, PdfWordRecord, QuoteMatch, RenderedPage, TextMatch, TextRangeRecord, pdf_find,
+    pdf_nearest_glyph, pdf_page_sizes, pdf_page_text, pdf_render_page, pdf_search, pdf_text_range, pdf_word_at,
+};
 pub use reader::{BlockKind, BlockRecord, HighlightRecord, NoteRecord, PaperRecord, ReaderTab, WordRecord};
 pub use records::{Creator, LibraryInfo, ProjectRecord, Query, ReferenceRecord, SortColumn, Source, TagRecord};
+pub use references::{AddResult, CreatorInput, FailureRecord, FieldChangeRecord, IssueRecord, ReferenceFields};
+pub use sync::{MemberRecord, SyncReportRecord};
 
 uniffi::setup_scaffolding!();
 

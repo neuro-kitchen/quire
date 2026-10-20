@@ -1,19 +1,15 @@
 //! Every lookup path against a local mock server serving real responses saved on 2026-10-18 and
-//! 2026-10-19 (`tests/fixtures`): doi.org CSL-JSON (Crossref, DataCite/arXiv), Crossref REST, the
+//! 2026-10-19 (`quire-testkit`'s `fixtures/`): doi.org CSL-JSON (Crossref, DataCite/arXiv), Crossref REST, the
 //! arXiv API, NCBI's exporter, publisher pages, JSON-LD pages and challenge pages.
 
 use quire_fetch::{Endpoints, FetchError, Fetcher, Lookup};
 use quire_model::{EntryKind, IdentifierKind, IssueCode, TextField};
+use quire_testkit::fixture;
 use url::Url;
 use wiremock::matchers::{header, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 const CSL: &str = "application/vnd.citationstyles.csl+json";
-
-fn fixture(name: &str) -> String {
-    let path = format!("{}/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"));
-    std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"))
-}
 
 async fn serve(server: &MockServer, url_path: &str, body: String) {
     Mock::given(method("GET"))

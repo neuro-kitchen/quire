@@ -2,7 +2,8 @@
 //! highlights (kept current by triggers), the trash left out, and a paper's text once extracted.
 
 mod common;
-use common::{engine, tiny_pdf};
+use common::engine;
+use quire_testkit::tiny_pdf;
 
 use quire_engine::Engine;
 

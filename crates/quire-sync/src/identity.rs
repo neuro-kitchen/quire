@@ -11,8 +11,9 @@ use crate::error::{Result, SyncError};
 /// What a certificate signs, before the device ID (so the signature means nothing else).
 const CONTEXT: &[u8] = b"quire device certificate v1\n";
 
-/// A new user key (32 bytes, to keep secret).
-pub fn new_user_secret() -> [u8; 32] {
+/// A new user key (32 bytes), for tests: the engine creates keys as secrets (`quire_engine::secrets`).
+#[cfg(test)]
+pub(crate) fn new_user_secret() -> [u8; 32] {
     SecretKey::generate().to_bytes()
 }
 

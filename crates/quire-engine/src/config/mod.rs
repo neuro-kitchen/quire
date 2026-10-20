@@ -36,7 +36,7 @@ pub struct Config {
     pub export: BTreeMap<String, ExportProfile>,
     /// Devices this one syncs with, by name (`[peers.<name>]`).
     #[serde(default)]
-    pub peers: BTreeMap<String, Peer>,
+    pub peers: BTreeMap<String, PeerEntry>,
     /// The file as read, for `get` and `list`.
     #[serde(skip)]
     raw: toml::Table,
@@ -64,7 +64,7 @@ pub struct LibraryEntry {
 
 /// Another device of the user's (`quire sync peer add`).
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-pub struct Peer {
+pub struct PeerEntry {
     /// Its device ID (`quire sync id` on it).
     pub id: String,
 }
@@ -158,7 +158,7 @@ fn display(value: &toml::Value) -> String {
 }
 
 /// Name given to the library a pre-0.2 `library.path` pointed to.
-pub const MIGRATED_NAME: &str = "default";
+pub(crate) const MIGRATED_NAME: &str = "default";
 
 /// Moves a pre-0.2 `library.path` into `[libraries.default]` with `library.default = "default"`,
 /// after copying the file to `config.toml.bak`. Returns a message for the user, `None` if

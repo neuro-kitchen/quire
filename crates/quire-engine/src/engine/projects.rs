@@ -21,7 +21,9 @@ impl Engine {
     /// Creates a project named `name` under `parent` (top level if `None`); returns its path.
     pub async fn create_project(&self, name: &str, parent: Option<&SlugPath>) -> Result<(SlugPath, Project)> {
         let (name, parent) = (name.to_string(), parent.cloned());
-        self.run(move |lib| projects::create(lib, &name, parent.as_ref())).await
+        let created = self.run(move |lib| projects::create(lib, &name, parent.as_ref())).await?;
+        self.mark_changed();
+        Ok(created)
     }
 
     /// Every project with its path, as a depth-first tree.

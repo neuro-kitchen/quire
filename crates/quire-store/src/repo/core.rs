@@ -10,7 +10,7 @@ use super::codec::id_blob;
 use crate::error::OrCore;
 
 /// Every row `sql` returns, read with `read`.
-pub fn all<T>(
+pub(super) fn all<T>(
     conn: &Connection,
     sql: &str,
     params: impl Params,
@@ -22,7 +22,7 @@ pub fn all<T>(
 }
 
 /// The first row `sql` returns, if any.
-pub fn first<T>(
+pub(super) fn first<T>(
     conn: &Connection,
     sql: &str,
     params: impl Params,
@@ -34,7 +34,7 @@ pub fn first<T>(
 /// A table of links between two records, keyed by two ID columns, with the `created_at`,
 /// `updated_at`, `updated_by`, `deleted_at` columns. Removing a link keeps the row as a tombstone
 /// (so sync carries the removal); linking again revives it.
-pub struct LinkTable {
+pub(super) struct LinkTable {
     pub table: &'static str,
     pub keys: [&'static str; 2],
 }
@@ -42,7 +42,7 @@ pub struct LinkTable {
 impl LinkTable {
     /// Links `keys`, also writing `extra` (column, value) when the row is created or revived;
     /// `false` if the link was already there.
-    pub fn set(
+    pub(super) fn set(
         &self,
         conn: &Connection,
         keys: [[u8; 16]; 2],
@@ -86,7 +86,7 @@ impl LinkTable {
     }
 
     /// Removes the link (keeps a tombstone); `false` if there was none.
-    pub fn clear(&self, conn: &Connection, keys: [[u8; 16]; 2], device: DeviceId) -> Result<bool> {
+    pub(super) fn clear(&self, conn: &Connection, keys: [[u8; 16]; 2], device: DeviceId) -> Result<bool> {
         let [k1, k2] = self.keys;
         let sql = format!(
             "UPDATE {} SET deleted_at = ?3, updated_at = ?3, updated_by = ?4

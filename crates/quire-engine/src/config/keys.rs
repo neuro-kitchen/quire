@@ -14,6 +14,8 @@ pub enum ValueKind {
     Path,
     /// The name of a library (a slug).
     LibraryName,
+    /// Another device's sync ID (`quire sync id` prints one).
+    DeviceId,
     Bool,
     /// Comma-separated on the command line, an array in the file.
     List,
@@ -41,7 +43,7 @@ pub const KEYS: &[KeySpec] = &[
     key("user.name", ValueKind::Text, "your name"),
     key("library.default", ValueKind::LibraryName, "library used when none is chosen"),
     key("libraries.*.path", ValueKind::Path, "folder of a registered library (see `quire library new`)"),
-    key("peers.*.id", ValueKind::Text, "a device to sync with: its ID (`quire sync id` on it)"),
+    key("peers.*.id", ValueKind::DeviceId, "a device to sync with: its ID (`quire sync id` on it)"),
     key("access.downloads", ValueKind::Path, "folder your browser saves downloads to (default: ~/Downloads)"),
     key(
         "export.*.format",
@@ -83,13 +85,17 @@ pub fn spec(key: &str) -> Result<&'static KeySpec> {
 }
 
 /// `text` checked and converted for `kind`.
-pub fn to_toml(kind: ValueKind, text: &str) -> Result<toml_edit::Value> {
+pub(crate) fn to_toml(kind: ValueKind, text: &str) -> Result<toml_edit::Value> {
     let bad = |what: &str| EngineError::Config(format!("`{text}` is not {what}"));
     Ok(match kind {
         ValueKind::Email if !looks_like_email(text) => return Err(bad("an email address")),
         ValueKind::LibraryName if Slug::parse(text).is_err() => {
             return Err(bad("a library name (lowercase letters, digits and `-`)"));
         }
+        ValueKind::DeviceId if !quire_sync::transport::is_device_id(text) => {
+            return Err(bad("a device ID (`quire sync id` on that device prints it)"));
+        }
+        ValueKind::DeviceId => text.trim().into(),
         ValueKind::Bool => match text {
             "true" | "yes" | "on" => true.into(),
             "false" | "no" | "off" => false.into(),
@@ -132,5 +138,6 @@ mod tests {
         let list = to_toml(ValueKind::List, "abstract, file,").unwrap();
         assert_eq!(list.as_array().unwrap().len(), 2);
         assert!(to_toml(ValueKind::Choice(&["a", "b"]), "c").is_err());
+        assert!(to_toml(ValueKind::DeviceId, "not a device").is_err());
     }
 }

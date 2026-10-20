@@ -14,7 +14,7 @@ use crate::error::{EngineError, Result};
 use crate::paths;
 
 /// Name of the library used when nothing else is chosen or configured.
-pub const DEFAULT_NAME: &str = "default";
+pub(crate) const DEFAULT_NAME: &str = "default";
 
 /// Which library to open.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -53,7 +53,7 @@ impl LibraryInfo {
 }
 
 /// The name of the default library.
-pub fn default_name(config: &Config) -> &str {
+pub(crate) fn default_name(config: &Config) -> &str {
     config.library.default.as_deref().unwrap_or(DEFAULT_NAME)
 }
 

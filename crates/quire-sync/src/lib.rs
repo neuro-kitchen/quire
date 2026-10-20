@@ -18,4 +18,4 @@ pub mod transport;
 
 pub use error::{Result, SyncError};
 pub use identity::Certificate;
-pub use session::{Peer, Replica, Report, Role};
+pub use session::{Peer, Replica, Report, Side};

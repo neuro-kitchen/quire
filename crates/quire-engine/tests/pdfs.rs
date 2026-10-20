@@ -2,7 +2,8 @@
 //! showing another DOI, importing a PDF as a new reference, and a blocked page recorded as an issue.
 
 mod common;
-use common::{engine, fixture, tiny_pdf};
+use common::{engine, fixture};
+use quire_testkit::tiny_pdf;
 
 use quire_engine::{IssueCode, PdfOutcome};
 use wiremock::matchers::{method, path};

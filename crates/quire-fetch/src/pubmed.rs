@@ -151,7 +151,7 @@ mod tests {
 
     #[test]
     fn summaries_are_references() {
-        let body = include_str!("../tests/fixtures/pubmed-esummary-nanodiamond-thermometry.json");
+        let body = &quire_testkit::fixture("pubmed-esummary-nanodiamond-thermometry.json");
         let found = summaries(&serde_json::from_str(body).unwrap());
         assert_eq!(found.len(), 3);
         let first = &found[0];

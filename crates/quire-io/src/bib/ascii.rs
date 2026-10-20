@@ -59,7 +59,7 @@ fn special(c: char) -> Option<&'static str> {
 }
 
 /// `text` with every non-ASCII character LaTeX can write replaced by its command.
-pub fn to_latex(text: &str) -> String {
+pub(super) fn to_latex(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for c in text.chars() {
         if c.is_ascii() {

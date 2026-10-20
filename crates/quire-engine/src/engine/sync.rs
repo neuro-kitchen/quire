@@ -10,7 +10,7 @@ use quire_core::library::sharing;
 use quire_model::{ProjectMember, Role as MemberRole, SlugPath, UserId};
 use quire_sync::identity::{self, Certificate};
 use quire_sync::transport::{self, Device};
-use quire_sync::{Peer, Replica, Report, Role, SyncError};
+use quire_sync::{Peer, Replica, Report, Side, SyncError};
 
 use super::Engine;
 use crate::error::{EngineError, Result};
@@ -142,12 +142,12 @@ impl Engine {
 
 impl Engine {
     /// One sync session over `reader`/`writer` (any stream: QUIC in use, a pipe in tests).
-    pub async fn sync_session<Rd, Wr>(&self, role: Role, reader: &mut Rd, writer: &mut Wr) -> Result<Report>
+    pub async fn sync_session<Rd, Wr>(&self, side: Side, reader: &mut Rd, writer: &mut Wr) -> Result<Report>
     where
         Rd: tokio::io::AsyncRead + Unpin,
         Wr: tokio::io::AsyncWrite + Unpin,
     {
-        let report = quire_sync::session::run(&LibraryReplica(self), role, None, reader, writer).await;
+        let report = quire_sync::session::run(&LibraryReplica(self), side, None, reader, writer).await;
         self.mark_changed();
         Ok(report?)
     }
@@ -217,7 +217,7 @@ impl Replica for LibraryReplica<'_> {
         &self,
         rows: Vec<quire_core::sync::Row>,
         from: &Peer,
-    ) -> quire_sync::Result<quire_core::sync::Merged> {
+    ) -> quire_sync::Result<quire_core::sync::MergeSummary> {
         let (device, user) = (from.device.clone(), collaborator(from)?);
         replica(
             self.0

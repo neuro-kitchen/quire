@@ -6,7 +6,7 @@ use super::{Field, Reference, TextField};
 
 /// The parts that are not fields.
 pub const CITE_KEY: &str = "cite-key";
-pub const EXTRA: &str = "extra";
+pub(crate) const EXTRA: &str = "extra";
 pub const TRASH: &str = "trash";
 
 /// Every part's name.

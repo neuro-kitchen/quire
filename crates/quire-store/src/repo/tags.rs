@@ -67,15 +67,15 @@ fn tag_from_row(row: &Row) -> rusqlite::Result<Tag> {
 }
 
 /// By ID, including a tag in the trash.
-pub fn by_id(conn: &Connection, id: TagId) -> Result<Option<Tag>> {
+pub(super) fn by_id(conn: &Connection, id: TagId) -> Result<Option<Tag>> {
     first(conn, &format!("SELECT {TAG_COLUMNS} FROM tag WHERE id = ?1"), [id_blob(id)], tag_from_row)
 }
 
-pub fn by_key(conn: &Connection, key: &str) -> Result<Option<Tag>> {
+pub(super) fn by_key(conn: &Connection, key: &str) -> Result<Option<Tag>> {
     first(conn, &format!("SELECT {TAG_COLUMNS} FROM tag WHERE key = ?1 AND deleted_at IS NULL"), [key], tag_from_row)
 }
 
-pub fn insert(conn: &Connection, tag: &Tag) -> Result<()> {
+pub(super) fn insert(conn: &Connection, tag: &Tag) -> Result<()> {
     let sql = "INSERT INTO tag (id, name, key, color, position, created_at, updated_at, updated_by, deleted_at)
                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)";
     let m = &tag.meta;
@@ -97,7 +97,7 @@ pub fn insert(conn: &Connection, tag: &Tag) -> Result<()> {
     Ok(())
 }
 
-pub fn update(conn: &Connection, tag: &Tag) -> Result<()> {
+pub(super) fn update(conn: &Connection, tag: &Tag) -> Result<()> {
     let sql = "UPDATE tag SET name = ?2, key = ?3, color = ?4, position = ?5, updated_at = ?6, updated_by = ?7, deleted_at = ?8
                WHERE id = ?1";
     let m = &tag.meta;

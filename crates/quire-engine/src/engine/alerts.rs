@@ -10,9 +10,9 @@ use super::Engine;
 use crate::error::Result;
 
 /// How far back an alert's first check looks.
-pub const FIRST_CHECK_DAYS: i64 = 30;
+pub(super) const FIRST_CHECK_DAYS: i64 = 30;
 /// Works asked for per alert and check.
-pub const PER_CHECK: usize = 50;
+pub(super) const PER_CHECK: usize = 50;
 
 /// One alert's check: the new works, or why the source could not be asked.
 #[derive(Debug, Clone)]
