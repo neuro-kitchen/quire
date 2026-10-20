@@ -3,7 +3,8 @@
 //! other goes to the trash), or recorded as distinct.
 
 mod common;
-use common::{engine, fixture, tiny_pdf};
+use common::{engine, fixture};
+use quire_testkit::tiny_pdf;
 
 use quire_engine::{Engine, IssueCode};
 use wiremock::matchers::{method, path};
