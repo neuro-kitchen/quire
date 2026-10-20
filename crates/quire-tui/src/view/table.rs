@@ -1,7 +1,7 @@
-//! The references table: cite key, year, first author, title, colored-tag dots, PDF status,
-//! issue mark.
+//! The references table: cite key, year, first author, reading status, title, colored-tag dots,
+//! PDF status, issue mark.
 
-use quire_engine::Severity;
+use quire_engine::{ReadingStatus, Severity};
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Rect};
 use ratatui::style::Style;
@@ -17,8 +17,14 @@ const KEY_WIDTH: usize = 24;
 pub fn draw(frame: &mut Frame, area: Rect, state: &State) {
     // The dots column only when some reference has a colored tag.
     let dots = state.visible.iter().any(|i| state.rows[*i].tags.iter().any(|(t, _)| t.color.is_some()));
-    let header = TableRow::new(["key", "year", "author", "title", "", "pdf", ""]).style(theme::TITLE);
-    let rows = state.visible.iter().map(|i| row(&state.rows[*i]));
+    // The reading column only when some paper is being read or was read.
+    let reading = state.visible.iter().any(|i| state.rows[*i].reading.is_some_and(|r| r != ReadingStatus::Unread));
+    let mut names = vec!["key", "year", "author", "title", "", "pdf", ""];
+    if reading {
+        names.insert(STATUS_COLUMN, "");
+    }
+    let header = TableRow::new(names).style(theme::TITLE);
+    let rows = state.visible.iter().map(|i| row(&state.rows[*i], reading));
     // Fixed columns sized to their content; the title takes the rest (at least 12).
     let key_width = state
         .visible
@@ -27,7 +33,7 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &State) {
         .max()
         .unwrap_or(3)
         .clamp(3, KEY_WIDTH) as u16;
-    let widths = [
+    let mut widths = vec![
         Constraint::Length(key_width),
         Constraint::Length(4),
         Constraint::Length(12),
@@ -36,11 +42,15 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &State) {
         Constraint::Length(9),
         Constraint::Length(1),
     ];
+    if reading {
+        widths.insert(STATUS_COLUMN, Constraint::Length(1));
+    }
     let focused = state.focus == Pane::References;
     let title = match &state.scope {
         Scope::All => " All references ".to_string(),
         Scope::Project(path) => format!(" {path} "),
-        Scope::Search(query) => format!(" Search: {query} "),
+        Scope::Search(query) => format!(" Search: {query} (w saves) "),
+        Scope::Saved(name) => format!(" Saved search: {name} "),
         Scope::Duplicates => " Possible duplicates (M merges) ".to_string(),
         Scope::Trash => " Trash ".to_string(),
     };
@@ -63,7 +73,10 @@ pub fn draw(frame: &mut Frame, area: Rect, state: &State) {
     frame.render_stateful_widget(table, area, &mut table_state);
 }
 
-fn row(row: &Row) -> TableRow<'static> {
+/// Where the reading-status column goes (before the title), when shown.
+const STATUS_COLUMN: usize = 3;
+
+fn row(row: &Row, reading: bool) -> TableRow<'static> {
     let data = &row.reference.data;
     let author = match data.creators.as_slice() {
         [] => String::new(),
@@ -86,7 +99,7 @@ fn row(row: &Row) -> TableRow<'static> {
         None => Span::raw(""),
     };
     let trashed = row.reference.meta.is_deleted();
-    TableRow::new(vec![
+    let mut cells = vec![
         Cell::from(Span::styled(row.reference.cite_key.to_string(), if trashed { theme::DIM } else { theme::KEY })),
         Cell::from(Span::styled(data.issued.map(|d| d.get_year().to_string()).unwrap_or_default(), theme::DIM)),
         Cell::from(author),
@@ -94,5 +107,16 @@ fn row(row: &Row) -> TableRow<'static> {
         Cell::from(Line::from(dots)),
         Cell::from(Span::styled(pdf, pdf_style)),
         Cell::from(mark),
-    ])
+    ];
+    if reading {
+        cells.insert(
+            STATUS_COLUMN,
+            Cell::from(match row.reading {
+                Some(ReadingStatus::Reading) => Span::styled("◐", theme::KEY),
+                Some(ReadingStatus::Read) => Span::styled("✓", theme::DIM),
+                _ => Span::raw(""),
+            }),
+        );
+    }
+    TableRow::new(cells)
 }

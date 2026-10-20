@@ -2,6 +2,8 @@
 //! length in front; a file follows its [`Message::File`] header as raw bytes.
 
 use quire_core::sync::Row;
+
+use crate::identity::Certificate;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
@@ -15,8 +17,9 @@ pub const MAX_FILE: u64 = 2 * 1024 * 1024 * 1024;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Message {
-    /// Who is talking, about which library; `new`: this copy has nothing yet and may join.
-    Hello { protocol: u32, library: String, device: String, new: bool },
+    /// Who is talking, about which library; `new`: this copy has nothing yet and may join;
+    /// `certificate`: the person this device belongs to.
+    Hello { protocol: u32, library: String, device: String, new: bool, certificate: Certificate },
     /// The highest change number of the other side's already merged here.
     Start { received: i64 },
     /// Changed rows, up to the sender's change number `last`; `more`: another batch follows.
@@ -69,7 +72,8 @@ mod tests {
     #[tokio::test]
     async fn frames_round_trip() {
         let (mut a, mut b) = tokio::io::duplex(1024);
-        let hello = Message::Hello { protocol: 1, library: "lib".into(), device: "dev".into(), new: true };
+        let certificate = Certificate { user: "u".into(), device: "d".into(), signature: "s".into() };
+        let hello = Message::Hello { protocol: 1, library: "lib".into(), device: "dev".into(), new: true, certificate };
         send(&mut a, &hello).await.unwrap();
         send_file(&mut a, "abc", b"PDF bytes").await.unwrap();
         assert_eq!(receive(&mut b).await.unwrap(), hello);

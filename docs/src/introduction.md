@@ -15,8 +15,16 @@ quire is a reference manager for people who write in the terminal: Typst, LaTeX,
   tabs for figures, tables, equations and references, plus highlights and notes.
 - **Cite**: export BibLaTeX, BibTeX, CSL-JSON or Hayagriva (Typst). A document folder can keep its
   `.bib` updated after every change, so `typst watch` picks up new references as you add them.
+- **Write**: check a manuscript's citations against the library (`quire folder check`).
+- **Move from Zotero**: items, collections, tags, notes, PDFs and highlights (`quire import ~/Zotero`).
+- **Discover**: what a paper cites and who cites it (OpenAlex), alerts on arXiv, PubMed and Crossref,
+  retraction checks; saved searches and a reading list.
 - **Search** metadata, notes, highlights and the papers' full text.
 - **Sync** a library between your devices, directly and end-to-end encrypted, with no server
   holding your data.
 
 Everything is local: one SQLite database and a folder of PDFs per library.
+
+![The library in the terminal](images/tui/tui_main.png)
+
+quire is free software under the [GNU Affero General Public License v3.0 or later](https://www.gnu.org/licenses/agpl-3.0.html).

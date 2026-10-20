@@ -33,12 +33,17 @@ use crate::update::{Action, Effect};
 /// Runs the TUI on `engine` until the user quits; the terminal is restored even on a panic.
 pub async fn run(engine: Arc<Engine>) -> anyhow::Result<()> {
     let mut terminal = ratatui::try_init()?;
-    let result = event_loop(&mut terminal, engine).await;
+    let mut graphics = view::Graphics::default();
+    let result = event_loop(&mut terminal, engine, &mut graphics).await;
     ratatui::restore();
     result
 }
 
-async fn event_loop(terminal: &mut ratatui::DefaultTerminal, engine: Arc<Engine>) -> anyhow::Result<()> {
+async fn event_loop(
+    terminal: &mut ratatui::DefaultTerminal,
+    engine: Arc<Engine>,
+    graphics: &mut view::Graphics,
+) -> anyhow::Result<()> {
     let (send, mut results) = tokio::sync::mpsc::unbounded_channel();
     let mut changes = engine.subscribe();
     let mut events = EventStream::new();
@@ -49,7 +54,7 @@ async fn event_loop(terminal: &mut ratatui::DefaultTerminal, engine: Arc<Engine>
         effects::spawn(&engine, effect, &send);
     }
     while !state.quit {
-        terminal.draw(|frame| view::draw(frame, &mut state))?;
+        terminal.draw(|frame| view::draw(frame, &mut state, graphics))?;
         let action = tokio::select! {
             event = events.next() => match event {
                 Some(Ok(Event::Key(key))) if key.kind == KeyEventKind::Press => match &state.reader {
@@ -81,6 +86,23 @@ async fn event_loop(terminal: &mut ratatui::DefaultTerminal, engine: Arc<Engine>
                         *terminal = ratatui::try_init()?;
                         events = EventStream::new();
                         let _ = send.send(outcome);
+                    }
+                    Effect::DetectGraphics => {
+                        // The terminal answers on stdin: stop reading keys while it does.
+                        drop(events);
+                        *graphics = view::Graphics::detect();
+                        events = EventStream::new();
+                        let _ = send.send(Action::GraphicsDetected(graphics.available()));
+                    }
+                    Effect::Clipboard { text, what } => {
+                        let copied = crossterm::execute!(
+                            std::io::stdout(),
+                            crossterm::clipboard::CopyToClipboard::to_clipboard_from(text.as_bytes())
+                        );
+                        let _ = send.send(match copied {
+                            Ok(()) => Action::Done { text: format!("copied {what}"), ok: true },
+                            Err(error) => Action::Done { text: format!("could not copy: {error}"), ok: false },
+                        });
                     }
                     other => effects::spawn(&engine, other, &send),
                 }
@@ -125,7 +147,7 @@ mod tests {
 
     fn screen(state: &mut State, width: u16, height: u16) -> String {
         let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
-        terminal.draw(|frame| crate::view::draw(frame, state)).unwrap();
+        terminal.draw(|frame| crate::view::draw(frame, state, &mut crate::view::Graphics::default())).unwrap();
         terminal.backend().to_string()
     }
 
@@ -149,13 +171,42 @@ mod tests {
     }
 
     #[test]
+    fn figure_images_ask_the_terminal_once() {
+        use crate::reader::ReaderAction;
+        use crate::update::Effect;
+        let mut state = State::new("personal".into());
+        let mut paper = row("vaswani2017", "Attention Is All You Need", "Vaswani", 2017);
+        paper.pdf = Some(quire_engine::PdfStatus::Available { pages: Some(15) });
+        update(&mut state, Action::Rows(vec![paper]));
+        update(&mut state, Action::Open);
+        let id = state.reader.as_ref().unwrap().id;
+        let url = "https://arxiv.org/html/1706.03762v7/Figures/ModalNet-21.png";
+        let markdown = format!("Text.\n\n![Figure]({url})\n\nFigure 1: The Transformer.");
+        let text = quire_engine::PaperText { markdown, source: quire_engine::TextSource::ArxivHtml };
+        assert!(update(&mut state, Action::TextLoaded { id, text: Ok(text) }).is_empty(), "not on the Figures tab");
+        // Abstract → Paper → Figures.
+        update(&mut state, Action::Reader(ReaderAction::Tab(1)));
+        let effects = update(&mut state, Action::Reader(ReaderAction::Tab(1)));
+        assert_eq!(effects, [Effect::DetectGraphics]);
+        assert_eq!(update(&mut state, Action::GraphicsDetected(true)), [Effect::LoadFigure(url.into())]);
+        assert!(update(&mut state, Action::Reader(ReaderAction::Scroll(1))).is_empty(), "asked once");
+        let path = std::path::PathBuf::from("/tmp/f.png");
+        update(&mut state, Action::FigureLoaded { url: url.into(), result: Ok(path.clone()) });
+        let reader = state.reader.as_ref().unwrap();
+        assert_eq!(reader.figures[url], crate::reader::figures::Figure::Ready(path));
+    }
+
+    #[test]
     fn reader_screens() {
         use crate::reader::ReaderAction;
         let mut state = State::new("personal".into());
         let mut paper = row("vaswani2017", "Attention Is All You Need", "Vaswani", 2017);
         update(&mut state, Action::Rows(vec![paper.clone()]));
         assert!(
-            matches!(update(&mut state, Action::Read)[..], [crate::update::Effect::LoadAnnotations(_)]),
+            matches!(
+                update(&mut state, Action::Read)[..],
+                [crate::update::Effect::LoadAnnotations(_), crate::update::Effect::Opened(_)]
+            ),
             "no PDF: only the abstract (and the notes)"
         );
         insta::assert_snapshot!("reader_abstract_only", screen(&mut state, 80, 10));
@@ -163,7 +214,14 @@ mod tests {
         paper.pdf = Some(quire_engine::PdfStatus::Available { pages: Some(15) });
         update(&mut state, Action::Rows(vec![paper]));
         let effects = update(&mut state, Action::Open);
-        assert!(matches!(effects[..], [crate::update::Effect::LoadAnnotations(_), crate::update::Effect::LoadText(_)]));
+        assert!(matches!(
+            effects[..],
+            [
+                crate::update::Effect::LoadAnnotations(_),
+                crate::update::Effect::Opened(_),
+                crate::update::Effect::LoadText(_)
+            ]
+        ));
         let id = state.reader.as_ref().unwrap().id;
         let markdown = "## 1 Introduction\n\nRecurrent neural networks, long short-term memory and **gated** recurrent \
             neural networks have been firmly established (Figure 1) as *state of the art* approaches.\n\n\

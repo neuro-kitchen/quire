@@ -7,10 +7,25 @@
 //!   equations as their own `$$LaTeX$$ (1)` paragraph (full texts only; a literal dollar is `\$`);
 //! - captions as their own paragraph starting with a label: `Figure 1: …`, `Fig. 2. …`,
 //!   `Table 1 | …` ([`caption_label`]); a table's rows after its caption as `|a|b|` lines;
+//! - a figure's image as its own `![Figure](https://…)` paragraph just before its caption
+//!   ([`image_url`]; arXiv HTML only: PMC serves images behind a bot check);
 //! - `- item` lists;
 //! - a `## References` section ([`is_references_title`]) of `[1] citation` paragraphs;
 //! - the front matter (journal header, authors, affiliations, history, copyright) between
 //!   [`FRONT_START`] and [`FRONT_END`] (PDF text only).
+
+/// The URL of an image paragraph (`![Figure](https://…)`), if `paragraph` is one.
+pub fn image_url(paragraph: &str) -> Option<&str> {
+    let rest = paragraph.trim().strip_prefix("![")?;
+    let (_, rest) = rest.split_once("](")?;
+    let url = rest.strip_suffix(')')?;
+    (url.starts_with("https://") || url.starts_with("http://")).then_some(url)
+}
+
+/// An image paragraph for `url`.
+pub fn image_paragraph(url: &str) -> String {
+    format!("![Figure]({url})")
+}
 
 /// Marks the front matter section (Markdown comments: invisible to other renderers).
 pub const FRONT_START: &str = "<!-- front -->";
@@ -166,6 +181,14 @@ pub fn is_references_title(text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn image_paragraphs() {
+        let paragraph = image_paragraph("https://arxiv.org/html/1706.03762v7/Figures/ModalNet-21.png");
+        assert_eq!(image_url(&paragraph), Some("https://arxiv.org/html/1706.03762v7/Figures/ModalNet-21.png"));
+        assert_eq!(image_url("![x](relative.png)"), None);
+        assert_eq!(image_url("Figure 1: not an image"), None);
+    }
 
     fn label(text: &str) -> Option<(String, usize)> {
         caption_label(text).map(|l| (l.name(), l.len))

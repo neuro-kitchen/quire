@@ -179,6 +179,7 @@ mod tests {
     use crate::library::references::{AddRequest, add as add_reference};
     use crate::memory::MemoryLibrary;
     use crate::ports::ReferenceFilter;
+    use crate::prelude::*;
     use quire_model::{EntryKind, Identifier, Origin, ReferenceData};
 
     fn reference(lib: &mut MemoryLibrary, doi: &str) -> Reference {

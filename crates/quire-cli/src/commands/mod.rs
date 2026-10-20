@@ -2,11 +2,12 @@
 //!
 //! - [`reference`]: `ref add|list|show|link|unlink|rm|restore|copy` (and the `add`, `list`,
 //!   `show` shortcuts).
-//! - [`project`], [`library`], [`config`], [`folder`], [`pdf`], [`tag`], [`note`], [`highlight`]: their
+//! - [`project`], [`library`], [`config`], [`folder`], [`pdf`], [`tag`], [`note`], [`highlight`], [`saved`], [`alert`], [`user`]: their
 //!   groups.
 //! - [`editor`]: the user's editor, shared.
-//! - [`import`], [`export`], [`init`], [`serve`], [`completions`]: single commands.
+//! - [`import`], [`export`], [`search`], [`init`], [`serve`], [`completions`]: single commands.
 
+pub mod alert;
 pub mod completions;
 pub mod config;
 pub mod editor;
@@ -20,7 +21,9 @@ pub mod note;
 pub mod pdf;
 pub mod project;
 pub mod reference;
+pub mod saved;
 pub mod search;
 pub mod serve;
 pub mod sync;
 pub mod tag;
+pub mod user;

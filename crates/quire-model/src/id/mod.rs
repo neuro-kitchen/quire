@@ -14,3 +14,5 @@ pub type NoteId = Id<kind::Note>;
 pub type AttachmentId = Id<kind::Attachment>;
 pub type DeviceId = Id<kind::Device>;
 pub type HighlightId = Id<kind::Highlight>;
+pub type SavedSearchId = Id<kind::SavedSearch>;
+pub type AlertId = Id<kind::Alert>;

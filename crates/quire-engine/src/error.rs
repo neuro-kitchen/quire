@@ -50,6 +50,10 @@ pub enum EngineError {
     #[error("`{0}` has no DOI, arXiv ID, PubMed ID or URL to look it up by")]
     Unrefetchable(String),
 
+    /// A Zotero data folder that cannot be read.
+    #[error("Zotero: {0}")]
+    Zotero(String),
+
     /// An unknown, duplicate or invalid library name.
     #[error("{0}")]
     Library(String),

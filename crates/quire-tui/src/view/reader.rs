@@ -8,11 +8,16 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, List, ListItem, ListState, Paragraph};
 
+use super::Graphics;
 use crate::keys::{READER_HELP, SELECT_HELP};
 use crate::reader::annotate::Marked;
 use crate::reader::document::Kind;
+use crate::reader::figures::Figure;
 use crate::reader::layout::{self, Piece};
 use crate::reader::{Overlay, Reader, Tab, Text, Theme};
+
+/// Columns an image needs beside the text column; narrower screens show it above the text.
+const MIN_IMAGE_WIDTH: u16 = 40;
 
 /// Text and background of a theme; `None`: the terminal's own.
 struct Colors {
@@ -63,7 +68,7 @@ fn colors(theme: Theme) -> Colors {
     }
 }
 
-pub fn draw(frame: &mut Frame, reader: &mut Reader) {
+pub fn draw(frame: &mut Frame, reader: &mut Reader, graphics: &mut Graphics) {
     let c = colors(reader.settings.theme);
     let mut base = Style::new();
     if let Some(fg) = c.fg {
@@ -76,10 +81,31 @@ pub fn draw(frame: &mut Frame, reader: &mut Reader) {
     frame.render_widget(Block::new().style(base), area);
     let [header, body, footer] =
         Layout::vertical([Constraint::Length(2), Constraint::Fill(1), Constraint::Length(1)]).areas(area);
-    reader.height = body.height as usize;
     let width = (reader.settings.width + 4).min(body.width);
-    let [column] = Layout::horizontal([Constraint::Length(width)]).flex(Flex::Center).areas(body);
+    // The Figures tab with an image to show: beside the text when there is room, else above it.
+    let figure = reader.shown_figure().and_then(|url| reader.figures.get(url)).cloned();
+    let (text_area, image_area) = match &figure {
+        Some(_) if graphics.available() && body.width >= width + MIN_IMAGE_WIDTH => {
+            let [text, image] = Layout::horizontal([Constraint::Length(width), Constraint::Fill(1)]).areas(body);
+            (text, Some(image))
+        }
+        Some(_) if graphics.available() => {
+            let [image, text] = Layout::vertical([Constraint::Percentage(55), Constraint::Fill(1)]).areas(body);
+            (text, Some(image))
+        }
+        _ => (body, None),
+    };
+    reader.height = text_area.height as usize;
+    let [column] = Layout::horizontal([Constraint::Length(width)]).flex(Flex::Center).areas(text_area);
     let column = Rect { x: column.x + 2, width: column.width.saturating_sub(4), ..column };
+    let figure_note = match (&figure, image_area) {
+        (Some(Figure::Ready(path)), Some(area)) => {
+            (!graphics.draw(frame, area, path)).then_some(" (this figure's image cannot be shown)")
+        }
+        (Some(Figure::Loading), Some(_)) => Some(" (getting the figure…)"),
+        (Some(Figure::Failed(_)), Some(_)) => Some(" (the figure's image could not be downloaded)"),
+        _ => None,
+    };
 
     let page = reader.page();
     let total = page.laid.lines.len();
@@ -129,6 +155,7 @@ pub fn draw(frame: &mut Frame, reader: &mut Reader) {
         }
         _ => format!(" {READER_HELP}"),
     };
+    let status = format!("{status}{}", figure_note.unwrap_or_default());
     frame.render_widget(Paragraph::new(Span::styled(status, dim)), footer);
 
     match &reader.overlay {

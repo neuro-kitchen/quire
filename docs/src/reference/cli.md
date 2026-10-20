@@ -21,11 +21,14 @@ Commands:
   tag          Tags on references: add, rm, list, rename, delete, color
   note         Notes on references or standalone: add, list, show, edit, rm
   search       Search the library: metadata, tags, notes, highlights and papers' text
+  saved        Saved searches: list, run, rm, rename
+  alert        New papers from arXiv, PubMed or Crossref searches: add, list, check, rm
+  user         Who you are to collaborators: your user ID, your key for your other devices
   sync         Keep this library the same on your devices (directly, over QUIC)
   highlight    Passages highlighted in the reader: list (as Markdown quotes), comment, remove
   pdf          PDFs: get (download), import, list, open, path, rm
   project      Work with projects: new, list, tree, rename, rm
-  import       Import a .bib file
+  import       Import a .bib file or a Zotero library (its data folder)
   export       Write references as BibLaTeX, BibTeX, CSL-JSON or Hayagriva; keep files updated
   folder       Link this folder to a project: quire.toml (new, show)
   library      Work with libraries: new, list, use, rename, rm
@@ -175,6 +178,7 @@ Commands:
   unlink      Take references out of a project (they stay in the library)
   rm          Move references to the trash
   restore     Take references out of the trash
+  mark        Set the reading status: unread, reading or read
   relate      Mark two references as related (both ways)
   unrelate    Remove the relation between two references
   copy        Copy references to another library (same ID there)
@@ -185,6 +189,9 @@ Commands:
   duplicates  List references that look like the same work (preprint and journal version, …)
   merge       Merge duplicates into one reference (the others go to the trash)
   distinct    Record that two references are not duplicates
+  cites       The works a reference cites (OpenAlex); --add adds them
+  cited-by    Works citing a reference, most cited first (OpenAlex)
+  similar     Works related to a reference (OpenAlex)
   help        Print this message or the help of the given subcommand(s)
 
 Options:
@@ -370,6 +377,25 @@ Options:
   -h, --help            Print help
 ```
 
+### quire ref mark
+
+```text
+Set the reading status: unread, reading or read
+
+Usage: quire ref mark [OPTIONS] <STATUS> <QUERIES>...
+
+Arguments:
+  <STATUS>      unread, reading or read
+  <QUERIES>...  Cite keys, DOIs / arXiv IDs / PMIDs, or reference IDs
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
 ### quire ref relate
 
 ```text
@@ -467,6 +493,7 @@ Options:
       --config <FILE>      Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
       --errors             Only errors, not warnings
   -v, --verbose            Show debug logs (requests, database)
+      --retractions        First ask Crossref (with Retraction Watch's data) about retractions and expressions of concern
       --json               Print JSON
   -h, --help               Print help
 ```
@@ -564,6 +591,72 @@ Options:
       --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
   -v, --verbose         Show debug logs (requests, database)
   -h, --help            Print help
+```
+
+### quire ref cites
+
+```text
+The works a reference cites (OpenAlex); --add adds them
+
+Usage: quire ref cites [OPTIONS] <QUERY>
+
+Arguments:
+  <QUERY>  Cite key, DOI / arXiv ID / PMID, or reference ID
+
+Options:
+      --add                Add the works not in the library yet (by DOI)
+      --lib <NAME>         Use this registered library [env: QUIRE_LIB]
+      --library <PATH>     Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+  -p, --project <PROJECT>  With --add: put them into this project
+      --config <FILE>      Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+      --limit <LIMIT>      Most works listed (citing works: the most cited first) [default: 25]
+      --json               Print JSON
+  -v, --verbose            Show debug logs (requests, database)
+  -h, --help               Print help
+```
+
+### quire ref cited-by
+
+```text
+Works citing a reference, most cited first (OpenAlex)
+
+Usage: quire ref cited-by [OPTIONS] <QUERY>
+
+Arguments:
+  <QUERY>  Cite key, DOI / arXiv ID / PMID, or reference ID
+
+Options:
+      --add                Add the works not in the library yet (by DOI)
+      --lib <NAME>         Use this registered library [env: QUIRE_LIB]
+      --library <PATH>     Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+  -p, --project <PROJECT>  With --add: put them into this project
+      --config <FILE>      Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+      --limit <LIMIT>      Most works listed (citing works: the most cited first) [default: 25]
+      --json               Print JSON
+  -v, --verbose            Show debug logs (requests, database)
+  -h, --help               Print help
+```
+
+### quire ref similar
+
+```text
+Works related to a reference (OpenAlex)
+
+Usage: quire ref similar [OPTIONS] <QUERY>
+
+Arguments:
+  <QUERY>  Cite key, DOI / arXiv ID / PMID, or reference ID
+
+Options:
+      --add                Add the works not in the library yet (by DOI)
+      --lib <NAME>         Use this registered library [env: QUIRE_LIB]
+      --library <PATH>     Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+  -p, --project <PROJECT>  With --add: put them into this project
+      --config <FILE>      Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+      --limit <LIMIT>      Most works listed (citing works: the most cited first) [default: 25]
+      --json               Print JSON
+  -v, --verbose            Show debug logs (requests, database)
+  -h, --help               Print help
 ```
 
 ## quire tag
@@ -823,13 +916,291 @@ Search the library: metadata, tags, notes, highlights and papers' text
 Usage: quire search [OPTIONS] [QUERY]...
 
 Arguments:
-  [QUERY]...  Words (all must match, as word prefixes); "a phrase"; field:word for title, author, abstract, journal, tag, note, key or doi
+  [QUERY]...  Words (all must match, as word prefixes); "a phrase"; field:word for title, author, abstract, journal, tag, note, key or doi; filters status:unread|reading|read, year:2019 or year:2019..2021, pdf:yes|no, type:<CSL type>, in:<project>
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --save <NAME>     Also keep this search under a name (run it again with `quire saved run`)
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+  -n, --limit <LIMIT>   Results shown at most [default: 50]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+      --reindex         First index the paper texts already stored (those extracted before search existed)
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+## quire saved
+
+```text
+Saved searches: list, run, rm, rename
+
+Usage: quire saved [OPTIONS] <COMMAND>
+
+Commands:
+  list    The saved searches and their queries
+  run     Run a saved search
+  rm      Forget a saved search
+  rename  Rename a saved search
+  help    Print this message or the help of the given subcommand(s)
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+### quire saved list
+
+```text
+The saved searches and their queries
+
+Usage: quire saved list [OPTIONS]
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+### quire saved run
+
+```text
+Run a saved search
+
+Usage: quire saved run [OPTIONS] <NAME>
+
+Arguments:
+  <NAME>  
 
 Options:
       --lib <NAME>      Use this registered library [env: QUIRE_LIB]
   -n, --limit <LIMIT>   Results shown at most [default: 50]
       --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
-      --reindex         First index the paper texts already stored (those extracted before search existed)
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+### quire saved rm
+
+```text
+Forget a saved search
+
+Usage: quire saved rm [OPTIONS] <NAME>
+
+Arguments:
+  <NAME>  
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+### quire saved rename
+
+```text
+Rename a saved search
+
+Usage: quire saved rename [OPTIONS] <NAME> <NEW>
+
+Arguments:
+  <NAME>  
+  <NEW>   
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+## quire alert
+
+```text
+New papers from arXiv, PubMed or Crossref searches: add, list, check, rm
+
+Usage: quire alert [OPTIONS] <COMMAND>
+
+Commands:
+  add    Add an alert (or change the one with this name)
+  list   The alerts and when each was last checked
+  check  Look for new papers (every alert, or the one named)
+  rm     Remove an alert
+  help   Print this message or the help of the given subcommand(s)
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+### quire alert add
+
+```text
+Add an alert (or change the one with this name)
+
+Usage: quire alert add [OPTIONS] <NAME> <SOURCE> <QUERY>...
+
+Arguments:
+  <NAME>      
+  <SOURCE>    arxiv, pubmed or crossref
+  <QUERY>...  The search: plain words, or the source's syntax (arXiv au: ti: cat:, PubMed [au] [ti], Crossref author:)
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+### quire alert list
+
+```text
+The alerts and when each was last checked
+
+Usage: quire alert list [OPTIONS]
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+### quire alert check
+
+```text
+Look for new papers (every alert, or the one named)
+
+Usage: quire alert check [OPTIONS] [NAME]
+
+Arguments:
+  [NAME]  
+
+Options:
+      --add                Add the new papers to the library
+      --lib <NAME>         Use this registered library [env: QUIRE_LIB]
+      --library <PATH>     Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+  -p, --project <PROJECT>  With --add: put them into this project
+      --config <FILE>      Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+      --days <DAYS>        Look this many days back instead of since the last check
+  -v, --verbose            Show debug logs (requests, database)
+  -h, --help               Print help
+```
+
+### quire alert rm
+
+```text
+Remove an alert
+
+Usage: quire alert rm [OPTIONS] <NAME>
+
+Arguments:
+  <NAME>  
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+## quire user
+
+```text
+Who you are to collaborators: your user ID, your key for your other devices
+
+Usage: quire user [OPTIONS] <COMMAND>
+
+Commands:
+  id    Your user ID: what others share projects with
+  key   Your user key, to give your other devices (keep it secret)
+  help  Print this message or the help of the given subcommand(s)
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+### quire user id
+
+```text
+Your user ID: what others share projects with
+
+Usage: quire user id [OPTIONS]
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+### quire user key
+
+```text
+Your user key, to give your other devices (keep it secret)
+
+Usage: quire user key [OPTIONS] <COMMAND>
+
+Commands:
+  export  Print the key (run `quire user key import <key>` on your other device)
+  import  Use this key here (from `quire user key export` on your other device)
+  help    Print this message or the help of the given subcommand(s)
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+#### quire user key export
+
+```text
+Print the key (run `quire user key import <key>` on your other device)
+
+Usage: quire user key export [OPTIONS]
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+#### quire user key import
+
+```text
+Use this key here (from `quire user key export` on your other device)
+
+Usage: quire user key import [OPTIONS] <KEY>
+
+Arguments:
+  <KEY>  
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
       --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
   -v, --verbose         Show debug logs (requests, database)
   -h, --help            Print help
@@ -989,6 +1360,7 @@ Commands:
   list     Print a paper's highlights as Markdown quotes, with their comments
   comment  Set a highlight's comment (empty text removes it)
   rm       Remove a highlight
+  export   Write each paper's highlights and notes as Markdown (one file per paper, named by cite key)
   help     Print this message or the help of the given subcommand(s)
 
 Options:
@@ -1054,6 +1426,24 @@ Options:
   -h, --help            Print help
 ```
 
+### quire highlight export
+
+```text
+Write each paper's highlights and notes as Markdown (one file per paper, named by cite key)
+
+Usage: quire highlight export [OPTIONS]
+
+Options:
+      --lib <NAME>         Use this registered library [env: QUIRE_LIB]
+  -p, --project <PROJECT>  Only this project
+      --library <PATH>     Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+  -r, --recursive          With --project: include its subprojects
+      --config <FILE>      Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -o, --output <OUTPUT>    Folder to write to (e.g. your Obsidian vault's literature folder); without it, print
+  -v, --verbose            Show debug logs (requests, database)
+  -h, --help               Print help
+```
+
 ## quire pdf
 
 ```text
@@ -1070,6 +1460,7 @@ Commands:
   text     Print the paper's text as reader mode shows it (arXiv / Europe PMC full text, else the PDF's)
   extract  Extract papers' text again (after a quire update, or to retry online sources)
   verify   Re-check attached PDFs against their references (DOI or title); changes nothing
+  ocr      OCR of scanned PDFs (OCRmyPDF, or Tesseract with poppler, when installed)
   rm       Remove a reference's PDFs (the files stay in the store)
   help     Print this message or the help of the given subcommand(s)
 
@@ -1237,6 +1628,24 @@ Options:
   -h, --help               Print help
 ```
 
+### quire pdf ocr
+
+```text
+OCR of scanned PDFs (OCRmyPDF, or Tesseract with poppler, when installed)
+
+Usage: quire pdf ocr [OPTIONS] <QUERIES>...
+
+Arguments:
+  <QUERIES>...  Cite keys, DOIs / arXiv IDs / PMIDs, or reference IDs
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
 ### quire pdf rm
 
 ```text
@@ -1263,12 +1672,15 @@ Work with projects: new, list, tree, rename, rm
 Usage: quire project [OPTIONS] <COMMAND>
 
 Commands:
-  new     Create a project; its slug is made from the name ("Chapter 2" → chapter-2)
-  list    List project paths, one per line, with their number of references
-  tree    Draw projects as a tree
-  rename  Rename a project (its slug follows the new name)
-  rm      Move a project to the trash; its references stay in the library
-  help    Print this message or the help of the given subcommand(s)
+  new      Create a project; its slug is made from the name ("Chapter 2" → chapter-2)
+  list     List project paths, one per line, with their number of references
+  tree     Draw projects as a tree
+  rename   Rename a project (its slug follows the new name)
+  rm       Move a project to the trash; its references stay in the library
+  share    Share a project with someone (their `quire user id`); they sync with one of your devices
+  members  Who a project is shared with
+  unshare  Stop sharing a project with someone
+  help     Print this message or the help of the given subcommand(s)
 
 Options:
       --lib <NAME>      Use this registered library [env: QUIRE_LIB]
@@ -1366,19 +1778,78 @@ Options:
   -h, --help            Print help
 ```
 
+### quire project share
+
+```text
+Share a project with someone (their `quire user id`); they sync with one of your devices
+
+Usage: quire project share [OPTIONS] --name <NAME> <PATH> <USER>
+
+Arguments:
+  <PATH>  
+  <USER>  
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --name <NAME>     What to call them in lists
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --role <ROLE>     reader, editor or owner [default: editor]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+### quire project members
+
+```text
+Who a project is shared with
+
+Usage: quire project members [OPTIONS] <PATH>
+
+Arguments:
+  <PATH>  
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+### quire project unshare
+
+```text
+Stop sharing a project with someone
+
+Usage: quire project unshare [OPTIONS] <PATH> <USER>
+
+Arguments:
+  <PATH>  
+  <USER>  
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
 ## quire import
 
 ```text
-Import a .bib file
+Import a .bib file or a Zotero library (its data folder)
 
 Usage: quire import [OPTIONS] <FILE>
 
 Arguments:
-  <FILE>  BibTeX or BibLaTeX file
+  <FILE>  BibTeX or BibLaTeX file, or a Zotero data folder (with zotero.sqlite)
 
 Options:
       --lib <NAME>         Use this registered library [env: QUIRE_LIB]
-  -p, --project <PROJECT>  Put the references into this project
+  -p, --project <PROJECT>  Put the references into this project (Zotero: its collections go under it)
+      --base <BASE>        Zotero: the folder linked attachments are relative to ("Linked Attachment Base Directory")
       --library <PATH>     Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
       --config <FILE>      Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
   -v, --verbose            Show debug logs (requests, database)
@@ -1486,9 +1957,10 @@ Link this folder to a project: quire.toml (new, show)
 Usage: quire folder [OPTIONS] <COMMAND>
 
 Commands:
-  new   Write quire.toml in the current folder
-  show  Show the quire.toml that applies here
-  help  Print this message or the help of the given subcommand(s)
+  new    Write quire.toml in the current folder
+  show   Show the quire.toml that applies here
+  check  Check the manuscript's citations: keys not in the library, not in the project (so not in its bibliography file), and the project's references never cited. Fails if a key is missing
+  help   Print this message or the help of the given subcommand(s)
 
 Options:
       --lib <NAME>      Use this registered library [env: QUIRE_LIB]
@@ -1534,6 +2006,28 @@ Options:
   -h, --help            Print help
 ```
 
+### quire folder check
+
+```text
+Check the manuscript's citations: keys not in the library, not in the project (so not in its bibliography file), and the project's references never cited. Fails if a key is missing
+
+Usage: quire folder check [OPTIONS] [FILES]...
+
+Arguments:
+  [FILES]...  .typ, .tex or .md files, or folders to search (default: the folder of quire.toml, else the current one)
+
+Options:
+      --lib <NAME>         Use this registered library [env: QUIRE_LIB]
+  -p, --project <PROJECT>  The project to check against (default: quire.toml's)
+      --library <PATH>     Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+  -r, --recursive          With --project: include its subprojects
+      --config <FILE>      Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+      --link               Put cited references that are outside the project into it (the bibliography file follows)
+      --uncited            Also list the project's references that are never cited
+  -v, --verbose            Show debug logs (requests, database)
+  -h, --help               Print help
+```
+
 ## quire library
 
 ```text
@@ -1542,12 +2036,14 @@ Work with libraries: new, list, use, rename, rm
 Usage: quire library [OPTIONS] <COMMAND>
 
 Commands:
-  new     Create and register a library
-  list    List libraries (* = default)
-  use     Make a library the default
-  rename  Rename a library (its folder stays)
-  rm      Forget a library; its folder and files are kept
-  help    Print this message or the help of the given subcommand(s)
+  new      Create and register a library
+  list     List libraries (* = default)
+  use      Make a library the default
+  rename   Rename a library (its folder stays)
+  rm       Forget a library; its folder and files are kept
+  backup   Write the library (database, PDFs, texts) to one .tar.gz
+  restore  Make a new library from a backup and register it as `name`
+  help     Print this message or the help of the given subcommand(s)
 
 Options:
       --lib <NAME>      Use this registered library [env: QUIRE_LIB]
@@ -1642,6 +2138,42 @@ Arguments:
 
 Options:
       --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+### quire library backup
+
+```text
+Write the library (database, PDFs, texts) to one .tar.gz
+
+Usage: quire library backup [OPTIONS]
+
+Options:
+      --lib <NAME>       Use this registered library [env: QUIRE_LIB]
+  -o, --output <OUTPUT>  The archive (default: quire-<library>-<date>.tar.gz here)
+      --library <PATH>   Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>    Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose          Show debug logs (requests, database)
+  -h, --help             Print help
+```
+
+### quire library restore
+
+```text
+Make a new library from a backup and register it as `name`
+
+Usage: quire library restore [OPTIONS] <ARCHIVE> <NAME>
+
+Arguments:
+  <ARCHIVE>  
+  <NAME>     
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --path <PATH>     Folder (default: ~/.local/share/quire/libraries/<name>)
       --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
       --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
   -v, --verbose         Show debug logs (requests, database)

@@ -78,8 +78,14 @@ impl Fetcher {
             Err(FetchError::NotFound(_)) => return Ok(None),
             Err(error) => return Err(error),
         };
-        let markdown = arxiv::to_markdown(&html);
+        let markdown = arxiv::to_markdown(&html, &url);
         Ok((markdown.len() >= MIN_LENGTH).then_some(markdown))
+    }
+
+    /// A figure image of a full text (its URL as the converter wrote it).
+    pub async fn figure(&self, url: &str) -> Result<Vec<u8>> {
+        let url = Url::parse(url).map_err(|_| FetchError::InvalidUrl(url.into()))?;
+        self.http.get_image(&url).await
     }
 
     /// The PMCID of the work, if it is in Europe PMC's open-access subset (whose full text it serves).
@@ -116,6 +122,8 @@ fn invalid() -> FetchError {
 #[derive(Debug, Default)]
 pub(crate) struct Writer {
     blocks: Vec<String>,
+    /// The page's URL, for resolving image links.
+    pub base: Option<url::Url>,
 }
 
 impl Writer {

@@ -3,8 +3,8 @@
 
 use std::collections::HashSet;
 
-use quire_core::Library;
 use quire_core::library::duplicates::{self, Merged, Reason};
+use quire_core::prelude::*;
 use quire_model::{Reference, ReferenceId};
 
 use super::Engine;

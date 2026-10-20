@@ -1,11 +1,12 @@
 //! Drawing the [`State`]: a header, the scopes pane (all references, projects, trash), the
 //! references table and the details of the selected one, a status line; help on top. An open
-//! reader takes the whole screen.
+//! reader takes the whole screen (with figure images on graphics terminals, [`graphics`]).
 //!
 //! Wide terminals (≥ 140 columns) show all three panes; narrower ones show the details in place of
 //! the table when the details pane has the focus.
 
 mod details;
+pub mod graphics;
 mod help;
 mod jobs;
 mod reader;
@@ -17,14 +18,16 @@ pub mod theme;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout};
 
+pub use graphics::Graphics;
+
 use crate::state::{Pane, State};
 
 /// Columns from which all three panes fit side by side.
 const WIDE: u16 = 140;
 
-pub fn draw(frame: &mut Frame, state: &mut State) {
+pub fn draw(frame: &mut Frame, state: &mut State, graphics: &mut Graphics) {
     if let Some(open) = state.reader.as_mut() {
-        return reader::draw(frame, open);
+        return reader::draw(frame, open, graphics);
     }
     let [header, body, footer] =
         Layout::vertical([Constraint::Length(1), Constraint::Fill(1), Constraint::Length(1)]).areas(frame.area());

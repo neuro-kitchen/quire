@@ -2,22 +2,28 @@
 
 use quire_core::Result;
 use quire_core::sync::{Distinct, Membership, Relation, Row, Stamp, Tagging};
-use quire_model::{Id, IdKind, TagId, Timestamp};
+use quire_model::{Id, IdKind, Timestamp};
 use rusqlite::{Connection, OptionalExtension, Row as SqlRow};
 
 use crate::error::OrCore;
 use crate::repo::codec::{id_at, parsed_at};
-use crate::repo::{attachments, highlights, projects, references, tags};
+use crate::repo::{attachments, highlights, members, notes, projects, reading, references, tags};
 
 /// The row `table` holds at (`k1`, `k2`), if it still exists.
 pub fn load(conn: &Connection, table: &str, k1: &[u8], k2: &[u8]) -> Result<Option<Row>> {
     Ok(match table {
         "reference" => references::by_id(conn, id(k1)?)?.map(Row::Reference),
         "project" => projects::by_id(conn, id(k1)?)?.map(Row::Project),
-        "tag" => tag(conn, id(k1)?)?.map(Row::Tag),
-        "note" => tags::note(conn, id(k1)?)?.map(Row::Note),
+        "tag" => tags::by_id(conn, id(k1)?)?.map(Row::Tag),
+        "note" => notes::by_id(conn, id(k1)?)?.map(Row::Note),
         "highlight" => highlights::by_id(conn, id(k1)?)?.map(Row::Highlight),
         "attachment" => attachments::by_id(conn, id(k1)?)?.map(Row::Attachment),
+        "reading" => reading::reading_by_id(conn, id(k1)?)?.map(Row::Reading),
+        "saved_search" => reading::search_by_id(conn, id(k1)?)?.map(Row::SavedSearch),
+        "project_member" => {
+            let user = std::str::from_utf8(k2).map_err(|_| quire_core::CoreError::Storage("a member key is not text".into()))?;
+            members::get(conn, id(k1)?, user)?.map(Row::Member)
+        }
         "project_reference" => conn
             .query_row(
                 "SELECT project_id, reference_id, created_at, updated_at, updated_by, deleted_at
@@ -79,11 +85,6 @@ fn id<K: IdKind>(bytes: &[u8]) -> Result<Id<K>> {
     let bytes: [u8; 16] =
         bytes.try_into().map_err(|_| quire_core::CoreError::Storage("a change log key is not an ID".into()))?;
     Ok(Id::from_bytes(bytes)?)
-}
-
-pub(super) fn tag(conn: &Connection, id: TagId) -> Result<Option<quire_model::Tag>> {
-    let sql = format!("SELECT {} FROM tag WHERE id = ?1", tags::TAG_COLUMNS);
-    conn.query_row(&sql, [crate::repo::codec::id_blob(id)], tags::tag_from_row).optional().or_core()
 }
 
 /// The `created_at`, `updated_at`, `updated_by`, `deleted_at` columns of a link row.

@@ -14,7 +14,7 @@ use deunicode::deunicode;
 use quire_model::{Field, Reference, ReferenceData, ReferenceId, TextField};
 
 use crate::error::{CoreError, Result};
-use crate::library::references::find;
+use crate::library::references::{find, save};
 use crate::ports::{Library, ReferenceFilter};
 
 /// Why two references look like one work.
@@ -158,11 +158,11 @@ pub fn merge(library: &mut impl Library, keep: &str, other: &str) -> Result<Merg
     // Identifiers are unique in the store: take them off the other one first.
     let moved_ids: Vec<_> = std::mem::take(&mut removed.data.identifiers);
     removed.meta.delete(device);
-    library.update_reference(&removed)?;
+    save(library, &mut removed)?;
 
     let fields = fill_missing(&mut kept, &removed, moved_ids);
     kept.meta.touch(device);
-    library.update_reference(&kept)?;
+    save(library, &mut kept)?;
 
     let mut merged =
         Merged { kept, removed, fields, projects: 0, tags: 0, notes: 0, attachments: 0, highlights: 0, relations: 0 };
@@ -252,6 +252,7 @@ mod tests {
     use super::*;
     use crate::library::references::{AddRequest, add};
     use crate::memory::MemoryLibrary;
+    use crate::prelude::*;
     use quire_model::{Creator, CreatorRole, Date, EntryKind, Identifier, Origin};
 
     fn data(title: &str, family: &str, year: u16, id: Option<&str>) -> ReferenceData {

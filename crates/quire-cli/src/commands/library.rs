@@ -1,6 +1,7 @@
-//! `library new|list|use|rename|rm`: named libraries (`.knowledge/library-model.md`). Each is its
-//! own folder; the config file only records where. `rm` forgets a library, it does not delete
-//! its folder.
+//! `library new|list|use|rename|rm|backup|restore`: named libraries (`.knowledge/library-model.md`).
+//! Each is its own folder; the config file only records where. `rm` forgets a library, it does not
+//! delete its folder. `backup` writes the open library to one `.tar.gz`; `restore` makes a new
+//! library from one.
 
 use std::path::PathBuf;
 
@@ -42,6 +43,20 @@ enum Action {
     Rename { old: String, new: String },
     /// Forget a library; its folder and files are kept
     Rm { name: String },
+    /// Write the library (database, PDFs, texts) to one .tar.gz
+    Backup {
+        /// The archive (default: quire-<library>-<date>.tar.gz here)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
+    /// Make a new library from a backup and register it as `name`
+    Restore {
+        archive: PathBuf,
+        name: String,
+        /// Folder (default: ~/.local/share/quire/libraries/<name>)
+        #[arg(long)]
+        path: Option<PathBuf>,
+    },
 }
 
 pub async fn run(context: &Context, args: &LibraryArgs) -> anyhow::Result<()> {
@@ -93,6 +108,29 @@ pub async fn run(context: &Context, args: &LibraryArgs) -> anyhow::Result<()> {
         Action::Rename { old, new } => {
             let info = libraries::rename(&file, old, new)?;
             output::report(Tone::Ok, "renamed", format!("{} → {}", style::paint(style::KEY, old), describe(&info)));
+        }
+        Action::Backup { output } => {
+            let engine = context.engine().await?;
+            let label = engine.library().label().replace(['/', ' '], "-");
+            let date = quire_model::Timestamp::now().date();
+            let output = output.clone().unwrap_or_else(|| PathBuf::from(format!("quire-{label}-{date}.tar.gz")));
+            let report = engine.backup(&output).await?;
+            output::report(
+                Tone::Ok,
+                "backed up",
+                format!("{} ({} files, {:.1} MB)", report.path.display(), report.files, report.bytes as f64 / 1e6),
+            );
+            output::hint("It holds your library unencrypted (notes, PDFs): keep it somewhere private.");
+        }
+        Action::Restore { archive, name, path } => {
+            let info = libraries::register(&file, name, path.as_deref())?;
+            if let Err(error) = quire_engine::engine::backup::restore(archive, &info.path) {
+                libraries::unregister(&file, name)?;
+                return Err(error.into());
+            }
+            context.open(LibraryChoice::Named(name.clone())).await?;
+            output::report(Tone::Ok, "restored", describe(&info));
+            output::hint(format!("Use it with `--lib {name}`; it syncs as a new device of its library."));
         }
         Action::Rm { name } => {
             let info = libraries::unregister(&file, name)?;

@@ -4,6 +4,7 @@
 //! - [`math`]: LaTeX → Unicode for equations from arXiv and Europe PMC.
 //! - [`paper`]: blocks → the running text, and figures, tables, equations, references apart.
 //! - [`layout`]: blocks → lines for a width and [`Settings`].
+//! - [`figures`]: figure images on the Figures tab (graphics terminals).
 //! - [`annotate`] and `notes`: highlights (sentences selected with `v`) and notes, the Notes tab.
 //!
 //! The reader opens on the abstract (from the library, so it works without a PDF); `←`/`→` move
@@ -13,10 +14,13 @@
 
 pub mod annotate;
 pub mod document;
+pub mod figures;
 pub mod layout;
 pub mod math;
 mod notes;
 pub mod paper;
+
+use std::collections::HashMap;
 
 use quire_model::ReferenceId;
 
@@ -50,12 +54,14 @@ pub struct Page {
     pub laid: Laid,
     /// First line shown.
     pub top: usize,
+    /// Images of the items it lists (Figures tab): from which block, and the URL.
+    pub images: Vec<(usize, String)>,
 }
 
 impl Page {
     fn new(tab: Tab, count: Option<usize>, blocks: Vec<Block>, settings: &Settings) -> Self {
         let laid = layout::lay_out(&blocks, settings);
-        Self { tab, count, blocks, laid, top: 0 }
+        Self { tab, count, blocks, laid, top: 0, images: Vec::new() }
     }
 
     /// The block at the top of the screen.
@@ -106,6 +112,8 @@ pub struct Reader {
     pub selection: Option<annotate::Selection>,
     /// The user's highlights and notes on this paper.
     pub annotations: notes::Annotations,
+    /// Figure images asked for, by URL.
+    pub figures: HashMap<String, figures::Figure>,
 }
 
 /// What the user did in the reader.
@@ -205,6 +213,7 @@ impl Reader {
             resume,
             selection: None,
             annotations: notes::Annotations::default(),
+            figures: HashMap::new(),
         }
     }
 
@@ -222,8 +231,10 @@ impl Reader {
         if !front.is_empty() {
             self.pages.push(Page::new(Tab::Front, None, document::parse(front, math), &self.settings));
         }
-        for (tab, count, blocks) in extra {
-            self.pages.push(Page::new(tab, Some(count), blocks, &self.settings));
+        for extra in extra {
+            let mut page = Page::new(extra.tab, Some(extra.count), extra.blocks, &self.settings);
+            page.images = extra.images;
+            self.pages.push(page);
         }
         self.tab = self.tab.min(self.pages.len() - 1);
         self.text = Text::Loaded;

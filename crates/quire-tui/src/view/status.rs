@@ -32,6 +32,7 @@ pub fn footer(frame: &mut Frame, area: Rect, state: &State) {
         Some(Prompt::Tag) => prompt_line("tag (toggle): ", &state.input),
         Some(Prompt::Link) => prompt_line("link to project (path, e.g. thesis/chapter-1): ", &state.input),
         Some(Prompt::Export) => prompt_line("export to (.bib, .yml or .json): ", &state.input),
+        Some(Prompt::SaveSearch) => prompt_line("save this search as: ", &state.input),
         Some(Prompt::Search) => {
             prompt_line("search (words, \"a phrase\", author:, title:, tag:, note:): ", &state.input)
         }

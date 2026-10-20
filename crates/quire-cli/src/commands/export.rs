@@ -116,7 +116,7 @@ pub async fn run(context: &Context, args: &ExportArgs) -> anyhow::Result<()> {
         }
         Some(path) => {
             let (text, count) = engine.export(&request).await?;
-            let wrote = quire_engine::engine::write_if_changed(&path, &text)?;
+            let wrote = quire_engine::write_if_changed(&path, &text)?;
             let label = if wrote { "written" } else { "unchanged" };
             output::note(Tone::Ok, label, format!("{count} references to {}", path.display()));
         }

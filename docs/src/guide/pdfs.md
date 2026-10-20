@@ -61,6 +61,18 @@ version or the Europe PMC full text (both keep equations and figure captions int
 PDF itself. PDFs whose text layer is hidden (some scans) are revealed; badly encoded ones are
 retried with `pdftotext` when it is installed.
 
+Scans with no text at all need OCR, which quire leaves to programs you install:
+
+```bash
+quire pdf ocr smith1987                 # the scan of smith1987
+quire config set reader.ocr_language eng+deu
+```
+
+With [OCRmyPDF](https://ocrmypdf.readthedocs.io) the PDF itself gets a text layer (it replaces
+the scan: same pages, now searchable in any viewer). Without it, [Tesseract](https://tesseract-ocr.github.io)
+and poppler's `pdftoppm` read the pages into the paper's text for the reader and search; this
+also happens by itself when the reader opens a scan.
+
 ```bash
 quire pdf text smith2020            # the text as the reader shows it (Markdown)
 quire pdf text smith2020 --refresh  # extract again

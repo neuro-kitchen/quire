@@ -3,16 +3,19 @@
 //! - [`fetcher`]: [`Fetcher`], the entry point: what the user typed → [`Fetched`], with fallbacks.
 //! - [`doi`]: DOI content negotiation (Crossref, DataCite incl. arXiv, mEDRA).
 //! - [`crossref`]: Crossref's REST API (fallback for DOIs).
-//! - [`arxiv`]: the arXiv API (fallback for arXiv IDs).
+//! - [`arxiv`]: the arXiv API (fallback for arXiv IDs; searches).
+//! - [`alerts`]: new papers for an alert (arXiv, PubMed, Crossref).
 //! - [`europepmc`]: abstracts by DOI or PMID.
 //! - [`fulltext`]: a paper's structured full text for reader mode (arXiv HTML, Europe PMC JATS).
 //! - [`pubmed`]: PubMed / PubMed Central via NCBI's citation exporter.
+//! - [`openalex`]: the citation graph (references, citing and related works).
 //! - [`pdf`]: finding and downloading a PDF (page link, arXiv, Unpaywall, landing page).
 //! - [`web`]: metadata tags and JSON-LD of a web page.
 //! - [`http`]: the rate-limited HTTP client; [`challenge`]: recognising "are you human" pages.
 //! - [`names`]: person names given as one string.
 //! - [`error`]: the error type, [`FetchError`].
 
+pub mod alerts;
 pub mod arxiv;
 pub mod challenge;
 pub mod crossref;
@@ -23,6 +26,7 @@ pub mod fetcher;
 pub mod fulltext;
 pub mod http;
 pub mod names;
+pub mod openalex;
 pub mod pdf;
 pub mod pubmed;
 pub mod web;

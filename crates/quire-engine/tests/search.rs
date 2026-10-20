@@ -1,7 +1,10 @@
 //! Full-text search on SQLite: metadata and abstracts, authors without accents, tags, notes and
 //! highlights (kept current by triggers), the trash left out, and a paper's text once extracted.
 
-use quire_engine::{Engine, LibraryChoice, OpenOptions};
+mod common;
+use common::{engine, tiny_pdf};
+
+use quire_engine::Engine;
 
 const BIB: &str = "@article{muller2020,
   title = {Spinal cord stimulation restores breathing},
@@ -17,40 +20,6 @@ const BIB: &str = "@article{muller2020,
   year = {2021},
 }";
 
-/// A one-page PDF showing `text`.
-fn tiny_pdf(text: &str) -> Vec<u8> {
-    let stream = format!("BT /F1 12 Tf 72 720 Td ({text}) Tj ET");
-    let objects = [
-        "<< /Type /Catalog /Pages 2 0 R >>".to_string(),
-        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_string(),
-        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>".to_string(),
-        format!("<< /Length {} >>\nstream\n{stream}\nendstream", stream.len()),
-        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_string(),
-    ];
-    let mut pdf = String::from("%PDF-1.4\n");
-    let mut offsets = Vec::new();
-    for (i, body) in objects.iter().enumerate() {
-        offsets.push(pdf.len());
-        pdf.push_str(&format!("{} 0 obj\n{body}\nendobj\n", i + 1));
-    }
-    let xref = pdf.len();
-    pdf.push_str(&format!("xref\n0 {}\n0000000000 65535 f \n", objects.len() + 1));
-    for offset in offsets {
-        pdf.push_str(&format!("{offset:010} 00000 n \n"));
-    }
-    pdf.push_str(&format!("trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n", objects.len() + 1));
-    pdf.into_bytes()
-}
-
-async fn engine(dir: &tempfile::TempDir) -> Engine {
-    let options = OpenOptions {
-        library: LibraryChoice::Path(dir.path().join("library")),
-        config_file: Some(dir.path().join("config.toml")),
-        endpoints: None,
-    };
-    Engine::open(options).await.unwrap()
-}
-
 async fn keys(engine: &Engine, query: &str) -> Vec<String> {
     engine.search(query, 10).await.unwrap().into_iter().map(|(r, _)| r.cite_key.to_string()).collect()
 }
@@ -58,7 +27,7 @@ async fn keys(engine: &Engine, query: &str) -> Vec<String> {
 #[tokio::test]
 async fn metadata_tags_notes_trash_and_text() {
     let dir = tempfile::tempdir().unwrap();
-    let engine = engine(&dir).await;
+    let engine = engine(dir.path(), None).await;
     let bib = dir.path().join("refs.bib");
     std::fs::write(&bib, BIB).unwrap();
     let added = engine.import_bib(&bib, None).await.unwrap();

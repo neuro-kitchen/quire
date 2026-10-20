@@ -21,7 +21,7 @@ pub(super) fn open(state: &mut State) -> Vec<Effect> {
     let resume = state.positions.get(&id).copied();
     let key = reference.cite_key.to_string();
     state.reader = Some(Reader::new(id, key, title, front, has_text, state.reader_settings, resume));
-    let mut effects = vec![Effect::LoadAnnotations(id)];
+    let mut effects = vec![Effect::LoadAnnotations(id), Effect::Opened(id)];
     if has_text {
         effects.push(Effect::LoadText(id));
     }
@@ -44,6 +44,21 @@ pub(super) fn text_loaded(
         // Without a PDF, "no text" is not an error: the abstract is all there is.
         Err(_) if !has_pdf => reader.no_text(),
         Err(error) => reader.failed(error),
+    }
+}
+
+/// The figure image to download for what the reader shows now, on a graphics terminal; the first
+/// time a figure is shown, the terminal is asked whether it is one.
+pub(super) fn figure(state: &mut State) -> Option<Effect> {
+    let reader = state.reader.as_mut()?;
+    reader.shown_figure()?;
+    match state.graphics {
+        None => {
+            state.graphics = Some(false); // asked once; the answer sets it
+            Some(Effect::DetectGraphics)
+        }
+        Some(true) => reader.wanted_figure().map(Effect::LoadFigure),
+        Some(false) => None,
     }
 }
 

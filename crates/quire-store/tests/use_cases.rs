@@ -1,7 +1,8 @@
 //! The `quire-core` use cases on a real (in-memory) SQLite library.
 
 use quire_core::library::{projects, references};
-use quire_core::{AddRequest, Added, Library, RawRecord, ReferenceFilter};
+use quire_core::prelude::*;
+use quire_core::{AddRequest, Added, RawRecord, ReferenceFilter};
 use quire_model::{
     Creator, CreatorRole, Date, EntryKind, Identifier, Origin, ReferenceData, SlugPath, TextField, Timestamp,
 };

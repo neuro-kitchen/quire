@@ -103,9 +103,14 @@ pub fn export(references: &[Reference], options: &ExportOptions) -> Result<Strin
 }
 
 /// Hayagriva YAML, converted from our BibLaTeX entries by Typst's own `hayagriva` crate, so the
-/// result reads exactly as Typst reads a `.bib` file. Preprints use the `@article` form, which
-/// Typst renders as a preprint.
+/// result reads exactly as Typst reads a `.bib` file.
 fn to_hayagriva(references: &[Reference], omit: &[String]) -> Result<String> {
+    hayagriva::io::to_yaml_str(&hayagriva_library(references, omit)?).map_err(|e| IoError::Hayagriva(e.to_string()))
+}
+
+/// `references` as `hayagriva` entries (keyed by cite key), converted from our BibLaTeX entries.
+/// Preprints use the `@article` form, which `hayagriva` renders as a preprint.
+fn hayagriva_library(references: &[Reference], omit: &[String]) -> Result<hayagriva::Library> {
     let mut bibliography = Bibliography::new();
     for mut entry in bib::entries(references, omit, PreprintForm::Article)? {
         // `hayagriva` turns numeric `54--58` into a range but keeps `D480--D489` as written, which
@@ -115,9 +120,8 @@ fn to_hayagriva(references: &[Reference], omit: &[String]) -> Result<String> {
         }
         bibliography.insert(entry);
     }
-    let library = hayagriva::io::from_biblatex(&bibliography)
-        .map_err(|errors| IoError::Hayagriva(errors.iter().map(ToString::to_string).collect::<Vec<_>>().join("; ")))?;
-    hayagriva::io::to_yaml_str(&library).map_err(|e| IoError::Hayagriva(e.to_string()))
+    hayagriva::io::from_biblatex(&bibliography)
+        .map_err(|errors| IoError::Hayagriva(errors.iter().map(ToString::to_string).collect::<Vec<_>>().join("; ")))
 }
 
 #[cfg(test)]

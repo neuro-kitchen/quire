@@ -9,6 +9,7 @@ pub mod browser;
 pub mod files;
 pub mod get;
 pub mod import;
+pub mod ocr;
 
 use std::process::ExitCode;
 
@@ -40,6 +41,8 @@ enum Action {
     Extract(files::ExtractArgs),
     /// Re-check attached PDFs against their references (DOI or title); changes nothing
     Verify(files::ListArgs),
+    /// OCR of scanned PDFs (OCRmyPDF, or Tesseract with poppler, when installed)
+    Ocr(ocr::OcrArgs),
     /// Remove a reference's PDFs (the files stay in the store)
     Rm(files::QueryArgs),
 }
@@ -56,6 +59,7 @@ pub async fn run(context: &Context, args: &PdfArgs) -> anyhow::Result<ExitCode> 
         Action::Text(args) => files::text(engine, args).await.and(done),
         Action::Extract(args) => files::extract(context, args).await.and(done),
         Action::Verify(args) => files::verify(context, args).await.and(done),
+        Action::Ocr(args) => ocr::run(engine, args).await,
         Action::Rm(args) => files::remove(engine, args).await.and(done),
     }
 }

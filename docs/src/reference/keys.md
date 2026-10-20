@@ -26,6 +26,9 @@ The keys of `quire tui`. `?` shows the first table inside the program.
 | `e` `F` | edit in `$EDITOR`, refetch |
 | `L` `U` | link to a project, unlink from this one |
 | `X` | export this view (`.bib`, `.yml`, `.json` by the file name) |
+| `Y` | copy the cite key |
+| `m` | reading status: unread → reading → read |
+| `w` | save the open search (shown in the left pane) |
 | `J` | jobs running |
 | `r` | reload |
 | `?` | help |

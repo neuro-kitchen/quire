@@ -1,7 +1,8 @@
 //! Project operations of [`Engine`].
 
+use quire_core::ReferenceFilter;
 use quire_core::library::projects;
-use quire_core::{Library, ReferenceFilter};
+use quire_core::prelude::*;
 use quire_model::{Project, Reference, SlugPath};
 
 use super::Engine;

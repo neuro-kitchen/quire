@@ -55,9 +55,13 @@ keyring = "4.2.0"
 
 # TUI (`quire tui`): ratatui on crossterm 0.29 (the same crossterm for both)
 ratatui = { version = "0.30.2", features = ["crossterm_0_29"] }
-crossterm = { version = "0.29.0", features = ["event-stream"] }
+crossterm = { version = "0.29.0", features = ["event-stream", "osc52"] }   # osc52: copy to the clipboard
 futures-util = "0.3.34"
 nucleo-matcher = "0.3.1"
+# Figure images in the reader on graphics terminals (kitty, sixel, iTerm2): 11.1 is the latest stable
+# (12 is a release candidate); no libchafa (default features off); decoders for figure formats only.
+ratatui-image = { version = "11.1.0", default-features = false, features = ["crossterm"] }
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 
 # Local server (`quire serve`)
 axum = "0.8.9"
@@ -83,6 +87,9 @@ hayagriva = { version = "0.10.1", default-features = false, features = ["biblate
 
 # Files (content-addressed attachments; PDF checks)
 blake3 = "1.8.7"
+# Library backups (`quire library backup`): one .tar.gz
+tar = "0.4.46"
+flate2 = "1.1.10"
 pdf-inspector = "1.25.2"
 # PDF objects (the parser pdf-inspector uses): revealing invisible OCR text layers
 lopdf = "0.45.0"

@@ -3,12 +3,25 @@
 //! rowid. Ranking is FTS5's BM25 with the title and authors weighted above the rest, and the
 //! paper's text below the metadata.
 
+use quire_core::ports::SearchStore;
 use quire_core::{Result, SearchHit};
 use quire_model::ReferenceId;
 use rusqlite::{Connection, params};
 
+use super::SqliteLibrary;
 use super::codec::{id_at, id_blob};
+use super::core::all;
 use crate::error::OrCore;
+
+impl SearchStore for SqliteLibrary<'_> {
+    fn search(&self, query: &str, in_text: bool, limit: usize) -> Result<Vec<SearchHit>> {
+        search(self.conn, query, in_text, limit)
+    }
+
+    fn index_paper_text(&mut self, reference: ReferenceId, text: Option<&str>) -> Result<()> {
+        index_paper_text(self.conn, reference, text)
+    }
+}
 
 /// BM25 weights of `search_index`'s columns: cite key, title, authors, abstract, venue,
 /// identifiers, tags, notes.
@@ -16,7 +29,7 @@ const WEIGHTS: &str = "2.0, 10.0, 6.0, 3.0, 2.0, 4.0, 4.0, 3.0";
 /// A match only in the paper's text counts this much of a metadata match.
 const TEXT_WEIGHT: f64 = 0.4;
 
-pub fn search(conn: &Connection, query: &str, in_text: bool, limit: usize) -> Result<Vec<SearchHit>> {
+fn search(conn: &Connection, query: &str, in_text: bool, limit: usize) -> Result<Vec<SearchHit>> {
     let mut hits: Vec<SearchHit> = Vec::new();
     let sql = format!(
         "SELECT r.id AS id, bm25(search_index, {WEIGHTS}) AS rank,
@@ -25,36 +38,29 @@ pub fn search(conn: &Connection, query: &str, in_text: bool, limit: usize) -> Re
          WHERE search_index MATCH ?1 AND r.deleted_at IS NULL
          ORDER BY rank LIMIT ?2"
     );
-    let mut statement = conn.prepare(&sql).or_core()?;
-    let rows = statement
-        .query_map(params![query, limit as i64], |row| {
-            Ok(SearchHit {
-                reference: id_at(row, "id")?,
-                score: -row.get::<_, f64>("rank")?,
-                snippet: row.get("snippet")?,
-                in_text: false,
-            })
+    hits.extend(all(conn, &sql, params![query, limit as i64], |row| {
+        Ok(SearchHit {
+            reference: id_at(row, "id")?,
+            score: -row.get::<_, f64>("rank")?,
+            snippet: row.get("snippet")?,
+            in_text: false,
         })
-        .or_core()?;
-    hits.extend(rows.collect::<rusqlite::Result<Vec<_>>>().or_core()?);
+    })?);
     if in_text {
         let sql = "SELECT r.id AS id, bm25(paper_text_index) AS rank,
                           snippet(paper_text_index, 0, '«', '»', '…', 12) AS snippet
                    FROM paper_text_index JOIN reference r ON r.rowid = paper_text_index.rowid
                    WHERE paper_text_index MATCH ?1 AND r.deleted_at IS NULL
                    ORDER BY rank LIMIT ?2";
-        let mut statement = conn.prepare(sql).or_core()?;
-        let rows = statement
-            .query_map(params![query, limit as i64], |row| {
-                Ok(SearchHit {
-                    reference: id_at(row, "id")?,
-                    score: -row.get::<_, f64>("rank")? * TEXT_WEIGHT,
-                    snippet: row.get("snippet")?,
-                    in_text: true,
-                })
+        let text_hits = all(conn, sql, params![query, limit as i64], |row| {
+            Ok(SearchHit {
+                reference: id_at(row, "id")?,
+                score: -row.get::<_, f64>("rank")? * TEXT_WEIGHT,
+                snippet: row.get("snippet")?,
+                in_text: true,
             })
-            .or_core()?;
-        for hit in rows.collect::<rusqlite::Result<Vec<_>>>().or_core()? {
+        })?;
+        for hit in text_hits {
             // A reference found in both: one hit, the scores added, the metadata snippet kept.
             match hits.iter_mut().find(|h| h.reference == hit.reference) {
                 Some(known) => known.score += hit.score,
@@ -68,7 +74,7 @@ pub fn search(conn: &Connection, query: &str, in_text: bool, limit: usize) -> Re
 }
 
 /// Replaces the indexed text of `reference` (`None`: removes it).
-pub fn index_paper_text(conn: &Connection, reference: ReferenceId, text: Option<&str>) -> Result<()> {
+fn index_paper_text(conn: &Connection, reference: ReferenceId, text: Option<&str>) -> Result<()> {
     let rowid: i64 = conn
         .query_row("SELECT rowid FROM reference WHERE id = ?1", [id_blob(reference)], |row| row.get(0))
         .or_core()?;

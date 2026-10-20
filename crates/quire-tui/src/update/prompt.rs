@@ -96,6 +96,10 @@ fn submit(state: &mut State, kind: Prompt, input: String) -> Vec<Effect> {
             state.selected = 0;
             vec![Effect::LoadRows(state.scope.clone())]
         }
+        Prompt::SaveSearch => match &state.scope {
+            Scope::Search(query) => vec![Effect::SaveSearch { name: input, query: query.clone() }],
+            _ => Vec::new(),
+        },
         Prompt::Export => {
             let scope = state.scope.clone();
             vec![jobs::start(state, format!("export to {input}"), Effect::Export { scope, path: input })]

@@ -63,6 +63,12 @@ enum Command {
     Note(commands::note::NoteArgs),
     /// Search the library: metadata, tags, notes, highlights and papers' text
     Search(commands::search::SearchArgs),
+    /// Saved searches: list, run, rm, rename
+    Saved(commands::saved::SavedArgs),
+    /// New papers from arXiv, PubMed or Crossref searches: add, list, check, rm
+    Alert(commands::alert::AlertArgs),
+    /// Who you are to collaborators: your user ID, your key for your other devices
+    User(commands::user::UserArgs),
     /// Keep this library the same on your devices (directly, over QUIC)
     Sync(commands::sync::SyncArgs),
     /// Passages highlighted in the reader: list (as Markdown quotes), comment, remove
@@ -71,7 +77,7 @@ enum Command {
     Pdf(commands::pdf::PdfArgs),
     /// Work with projects: new, list, tree, rename, rm
     Project(commands::project::ProjectArgs),
-    /// Import a .bib file
+    /// Import a .bib file or a Zotero library (its data folder)
     Import(commands::import::ImportArgs),
     /// Write references as BibLaTeX, BibTeX, CSL-JSON or Hayagriva; keep files updated
     Export(commands::export::ExportArgs),
@@ -146,6 +152,9 @@ async fn run(context: &Context, command: &Command) -> anyhow::Result<ExitCode> {
         Command::Tag(args) => commands::tag::run(context.engine().await?, args).await.and(done),
         Command::Note(args) => commands::note::run(context.engine().await?, args).await.and(done),
         Command::Search(args) => commands::search::run(context.engine().await?, args).await.and(done),
+        Command::Saved(args) => commands::saved::run(context.engine().await?, args).await.and(done),
+        Command::Alert(args) => commands::alert::run(context.engine().await?, args).await,
+        Command::User(args) => commands::user::run(context.engine().await?, args).and(done),
         Command::Sync(args) => commands::sync::run(context, args).await.and(done),
         Command::Highlight(args) => commands::highlight::run(context.engine().await?, args).await.and(done),
         Command::Project(args) => commands::project::run(context.engine().await?, args).await.and(done),

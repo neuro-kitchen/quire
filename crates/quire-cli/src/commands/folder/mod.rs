@@ -1,5 +1,6 @@
-//! `folder new|show`: `quire.toml` links a document's folder to a library and project, so inside
-//! it `quire add <doi>` and `quire export` need no flags (`.knowledge/cli-tui.md`).
+//! `folder new|show|check`: `quire.toml` links a document's folder to a library and project, so
+//! inside it `quire add <doi>` and `quire export` need no flags (`.knowledge/cli-tui.md`);
+//! `check` compares the cite keys of the folder's manuscripts with the library and project.
 
 use std::path::PathBuf;
 
@@ -7,6 +8,8 @@ use clap::{Args, Subcommand};
 use quire_engine::{ExportRequest, FolderFile, SlugPath};
 
 use crate::context::Context;
+
+mod check;
 use crate::output::{self, Tone, style};
 
 #[derive(Args, Debug)]
@@ -40,6 +43,28 @@ enum Action {
     },
     /// Show the quire.toml that applies here
     Show,
+    /// Check the manuscript's citations: keys not in the library, not in the project (so not in its
+    /// bibliography file), and the project's references never cited. Fails if a key is missing
+    Check(CheckArgs),
+}
+
+#[derive(Args, Debug)]
+struct CheckArgs {
+    /// .typ, .tex or .md files, or folders to search (default: the folder of quire.toml, else
+    /// the current one)
+    files: Vec<PathBuf>,
+    /// The project to check against (default: quire.toml's)
+    #[arg(short, long)]
+    project: Option<SlugPath>,
+    /// With --project: include its subprojects
+    #[arg(short, long)]
+    recursive: bool,
+    /// Put cited references that are outside the project into it (the bibliography file follows)
+    #[arg(long)]
+    link: bool,
+    /// Also list the project's references that are never cited
+    #[arg(long)]
+    uncited: bool,
 }
 
 pub async fn run(context: &Context, args: &FolderArgs) -> anyhow::Result<()> {
@@ -77,6 +102,7 @@ pub async fn run(context: &Context, args: &FolderArgs) -> anyhow::Result<()> {
                 );
             }
         }
+        Action::Check(args) => return check::run(context, args).await,
         Action::Show => match &context.folder {
             Some(folder) => {
                 anstream::println!(

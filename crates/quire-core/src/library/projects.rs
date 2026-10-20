@@ -22,6 +22,16 @@ pub fn create(library: &mut impl Library, name: &str, parent: Option<&SlugPath>)
     Ok((path, project))
 }
 
+/// The project named `name` under `parent` (top level if `None`), created if there is none.
+pub fn ensure(library: &mut impl Library, name: &str, parent: Option<ProjectId>) -> Result<Project> {
+    let project = Project::new(name, parent, library.device())?;
+    if let Some(existing) = library.child_project(parent, &project.slug)? {
+        return Ok(existing);
+    }
+    library.insert_project(&project)?;
+    Ok(project)
+}
+
 /// Renames the project at `path`; its slug follows the new name. Returns the new path.
 pub fn rename(library: &mut impl Library, path: &SlugPath, name: &str) -> Result<(SlugPath, Project)> {
     let mut project = resolve(library, path)?;

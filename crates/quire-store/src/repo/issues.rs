@@ -1,28 +1,49 @@
 //! Queries on `reference_issue` and `failed_input`.
 
+use quire_core::ports::IssueStore;
 use quire_core::{FailedInput, Result};
 use quire_model::{Issue, ProjectId, ReferenceId, Timestamp};
 use rusqlite::{Connection, params};
 
+use super::SqliteLibrary;
 use super::codec::{id_blob, optional_id_at, parsed_at};
+use super::core::all;
 use crate::error::OrCore;
 
-pub fn recorded(conn: &Connection, reference: ReferenceId) -> Result<Vec<Issue>> {
-    let sql = "SELECT code, detail, recorded_at FROM reference_issue WHERE reference_id = ?1 ORDER BY code";
-    let mut statement = conn.prepare(sql).or_core()?;
-    let rows = statement
-        .query_map([id_blob(reference)], |row| {
-            Ok(Issue {
-                code: parsed_at(row, "code")?,
-                detail: row.get("detail")?,
-                at: Some(Timestamp::from_millis(row.get("recorded_at")?)),
-            })
-        })
-        .or_core()?;
-    rows.collect::<rusqlite::Result<Vec<_>>>().or_core()
+impl IssueStore for SqliteLibrary<'_> {
+    fn recorded_issues(&self, reference: ReferenceId) -> Result<Vec<Issue>> {
+        recorded(self.conn, reference)
+    }
+
+    fn set_recorded_issues(&mut self, reference: ReferenceId, issues: &[Issue]) -> Result<()> {
+        set_recorded(self.conn, reference, issues)
+    }
+
+    fn record_failure(&mut self, input: &str, project: Option<ProjectId>, error: &str) -> Result<()> {
+        record_failure(self.conn, input, project, error)
+    }
+
+    fn clear_failure(&mut self, input: &str) -> Result<bool> {
+        clear_failure(self.conn, input)
+    }
+
+    fn failures(&self) -> Result<Vec<FailedInput>> {
+        failures(self.conn)
+    }
 }
 
-pub fn set_recorded(conn: &Connection, reference: ReferenceId, issues: &[Issue]) -> Result<()> {
+fn recorded(conn: &Connection, reference: ReferenceId) -> Result<Vec<Issue>> {
+    let sql = "SELECT code, detail, recorded_at FROM reference_issue WHERE reference_id = ?1 ORDER BY code";
+    all(conn, sql, [id_blob(reference)], |row| {
+        Ok(Issue {
+            code: parsed_at(row, "code")?,
+            detail: row.get("detail")?,
+            at: Some(Timestamp::from_millis(row.get("recorded_at")?)),
+        })
+    })
+}
+
+fn set_recorded(conn: &Connection, reference: ReferenceId, issues: &[Issue]) -> Result<()> {
     conn.execute("DELETE FROM reference_issue WHERE reference_id = ?1", [id_blob(reference)]).or_core()?;
     let sql =
         "INSERT OR REPLACE INTO reference_issue (reference_id, code, detail, recorded_at) VALUES (?1, ?2, ?3, ?4)";
@@ -33,7 +54,7 @@ pub fn set_recorded(conn: &Connection, reference: ReferenceId, issues: &[Issue])
     Ok(())
 }
 
-pub fn record_failure(conn: &Connection, input: &str, project: Option<ProjectId>, error: &str) -> Result<()> {
+fn record_failure(conn: &Connection, input: &str, project: Option<ProjectId>, error: &str) -> Result<()> {
     let now = Timestamp::now().as_millis();
     let sql = "INSERT INTO failed_input (input, project_id, error, attempts, first_at, last_at) VALUES (?1, ?2, ?3, 1, ?4, ?4)
                ON CONFLICT (input) DO UPDATE SET project_id = ?2, error = ?3, attempts = attempts + 1, last_at = ?4";
@@ -41,24 +62,20 @@ pub fn record_failure(conn: &Connection, input: &str, project: Option<ProjectId>
     Ok(())
 }
 
-pub fn clear_failure(conn: &Connection, input: &str) -> Result<bool> {
+fn clear_failure(conn: &Connection, input: &str) -> Result<bool> {
     Ok(conn.execute("DELETE FROM failed_input WHERE input = ?1", [input]).or_core()? > 0)
 }
 
-pub fn failures(conn: &Connection) -> Result<Vec<FailedInput>> {
+fn failures(conn: &Connection) -> Result<Vec<FailedInput>> {
     let sql = "SELECT input, project_id, error, attempts, first_at, last_at FROM failed_input ORDER BY first_at, input";
-    let mut statement = conn.prepare(sql).or_core()?;
-    let rows = statement
-        .query_map([], |row| {
-            Ok(FailedInput {
-                input: row.get("input")?,
-                project: optional_id_at(row, "project_id")?,
-                error: row.get("error")?,
-                attempts: row.get("attempts")?,
-                first_at: Timestamp::from_millis(row.get("first_at")?),
-                last_at: Timestamp::from_millis(row.get("last_at")?),
-            })
+    all(conn, sql, [], |row| {
+        Ok(FailedInput {
+            input: row.get("input")?,
+            project: optional_id_at(row, "project_id")?,
+            error: row.get("error")?,
+            attempts: row.get("attempts")?,
+            first_at: Timestamp::from_millis(row.get("first_at")?),
+            last_at: Timestamp::from_millis(row.get("last_at")?),
         })
-        .or_core()?;
-    rows.collect::<rusqlite::Result<Vec<_>>>().or_core()
+    })
 }

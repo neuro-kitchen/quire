@@ -16,6 +16,8 @@ crossterm.workspace = true
 futures-util.workspace = true
 nucleo-matcher.workspace = true
 ratatui.workspace = true
+ratatui-image.workspace = true
+image.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 
