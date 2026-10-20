@@ -1,5 +1,5 @@
 //! The reader: a paper's tabs as styled blocks (the same reading model as the terminal reader,
-//! `quire_io::reading`), its highlights and notes, and its reading status.
+//! `quire_document::reading`), its highlights and notes, and its reading status.
 
 use quire_engine::reading::document::{Block, Kind};
 use quire_engine::reading::paper::{self, Tab};
