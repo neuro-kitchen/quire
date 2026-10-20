@@ -4,7 +4,8 @@
 //!   PDF at all (a site may send an HTML page named `.pdf`), whether it has a text layer or is
 //!   scanned, and which DOIs or arXiv IDs its first pages print, to confirm it is the expected
 //!   paper (arXiv PDFs print `arXiv:1706.03762v7` in the margin, not their DOI).
-//! - [`to_markdown`]: the paper as reader Markdown ([`tidy`], [`plain`] for poppler's text).
+//! - [`to_markdown`]: the paper as reader Markdown: pdf-inspector's, or the hayro layer's when that
+//!   reads too little (`structure`); then [`tidy`] ([`plain`] for poppler's text).
 //! - [`pages`]: the reader's pages with hayro (pure Rust): rendering ([`render`]), the text layer
 //!   ([`layer`], ordered by [`layout`]), hit-testing and quotes ([`find`]), over a document cache
 //!   ([`cache`]).
@@ -18,13 +19,14 @@ pub mod pages;
 pub mod plain;
 pub mod render;
 mod schedule;
+mod structure;
 pub mod tidy;
 pub mod types;
 
 pub use cache::{DocumentCache, global_cache};
 pub use ocr_layer::is_sparse;
-pub use pages::{locate, nearest_glyph, page_sizes, page_text, render_page_at, text_range, word_at};
-pub use types::{Glyph, GlyphBox, Line, PageRect, PageSize, PageText, QuoteMatch, RenderedPage, WordBox};
+pub use pages::{locate, nearest_glyph, page_sizes, page_text, render_page_at, search, text_range, word_at};
+pub use types::{Glyph, GlyphBox, Line, PageRect, PageSize, PageText, QuoteMatch, RenderedPage, TextMatch, WordBox};
 
 use quire_model::{Doi, Identifier, PdfKind};
 
@@ -32,7 +34,13 @@ use crate::error::{DocumentError, Result};
 
 /// The converter behind [`to_markdown`], written into cached reader text so a newer one rebuilds it.
 /// Change it together with the `pdf-inspector` version, and when quire's own processing changes.
-pub const READER_CONVERTER: &str = "pdf-inspector 1.25.2 + quire 4";
+pub const READER_CONVERTER: &str = "pdf-inspector 1.25.2 + quire 6 (hayro layer fallback)";
+
+/// Word agreement between pdf-inspector's text and the layer's under which pdf-inspector's is taken
+/// as partial. Measured on the owner's library (`.knowledge/pdf-engine.md`, T04 step 3): below 0.7 the
+/// layer was better in every paper (pdf-inspector's word F1 0.14–0.74, the layer's 0.87–0.98); at 0.8
+/// one paper got worse.
+const PARTIAL: f64 = 0.7;
 
 /// The whole paper as Markdown in reading order (two-column pages become one column; headings,
 /// lists and tables kept), for reader mode.
@@ -40,19 +48,63 @@ pub fn to_markdown(bytes: &[u8]) -> Result<String> {
     if !looks_like_pdf(bytes) {
         return Err(DocumentError::NotPdf("the file does not start with %PDF-".into()));
     }
-    let (markdown, pages) = convert(bytes)?;
-    // Only stamps read: a scan whose OCR layer is invisible ([`ocr_layer`]).
+    let converted = convert(bytes);
+    let (mut markdown, pages) = match &converted {
+        Ok((markdown, pages)) => (markdown.clone(), *pages),
+        Err(_) => (None, 0),
+    };
+    let words = |text: Option<&str>| text.map_or(0, |t| t.split_whitespace().count());
+    // Only stamps read: a scan whose OCR layer is invisible ([`ocr_layer`]). What the reveal step
+    // reads still goes through the layer check below (it can be partial too).
     if markdown.as_deref().is_none_or(|m| ocr_layer::is_sparse(m, pages))
         && let Some(revealed) = ocr_layer::reveal(bytes)
         && let Ok((Some(fuller), _)) = convert(&revealed)
-        && fuller.split_whitespace().count() > markdown.as_deref().map_or(0, |m| m.split_whitespace().count())
+        && words(Some(&fuller)) > words(markdown.as_deref())
     {
-        return Ok(tidy::tidy(&fuller));
+        markdown = Some(fuller);
     }
-    match markdown {
-        Some(markdown) if !markdown.trim().is_empty() => Ok(tidy::tidy(&markdown)),
-        _ => Err(DocumentError::NotPdf("no text layer (a scanned PDF needs OCR)".into())),
+    match choose(markdown, pages, layer_markdown(bytes)) {
+        Some(markdown) => Ok(tidy::tidy(&markdown)),
+        None => converted.and(Err(DocumentError::NotPdf("no text layer (a scanned PDF needs OCR)".into()))),
     }
+}
+
+/// pdf-inspector's text (`markdown`, of a `pages`-page PDF), or the hayro layer's (`layer`, with its
+/// page count) when the layer reads more words and pdf-inspector read too little or only part of
+/// the paper (the two share less than [`PARTIAL`] of their words). `None` if neither has text.
+fn choose(markdown: Option<String>, pages: u32, layer: Option<(String, u32)>) -> Option<String> {
+    let words = |text: &str| text.split_whitespace().count();
+    let markdown = markdown.filter(|m| !m.trim().is_empty());
+    if let Some((layer, layer_pages)) = layer
+        && !ocr_layer::is_sparse(&layer, pages.max(layer_pages))
+        && words(&layer) > markdown.as_deref().map_or(0, words)
+        && markdown
+            .as_deref()
+            .is_none_or(|m| ocr_layer::is_sparse(m, pages) || find::word_agreement(m, &layer) < PARTIAL)
+    {
+        return Some(layer);
+    }
+    markdown
+}
+
+/// The paper as reader Markdown from the hayro text layer alone (structured, then tidied): what
+/// [`to_markdown`] falls back to.
+pub fn layer_to_markdown(bytes: &[u8]) -> Result<String> {
+    let (markdown, _) = layer_markdown(bytes).ok_or_else(|| DocumentError::NotPdf("hayro cannot read it".into()))?;
+    Ok(tidy::tidy(&markdown))
+}
+
+/// Every page's hayro text layer as reader Markdown (untidied), and the page count; `None` if hayro
+/// cannot read the file (or panics on it).
+fn layer_markdown(bytes: &[u8]) -> Option<(String, u32)> {
+    std::panic::catch_unwind(|| {
+        let pdf = hayro_syntax::Pdf::new(bytes.to_vec()).ok()?;
+        let pages: Vec<PageText> =
+            pdf.pages().iter().filter_map(|page| layer::TextCollector::extract(page).ok()).collect();
+        Some((structure::markdown(&pages), pages.len() as u32))
+    })
+    .ok()
+    .flatten()
 }
 
 /// `pdf-inspector`'s Markdown (if any text) and page count.
@@ -202,14 +254,26 @@ pub fn inspect(bytes: &[u8]) -> Result<PdfInfo> {
 pub(crate) fn find_identifiers(text: &str) -> Vec<Identifier> {
     let mut found: Vec<Identifier> = Vec::new();
     // The extracted text is Markdown: identifiers also sit inside `[text](url)` and `<url>`.
-    let words = text.split(|c: char| c.is_whitespace() || matches!(c, '[' | ']' | '(' | ')' | '<' | '>' | '"' | '|'));
+    // Parentheses do not split words: old DOIs have them (`10.1016/0006-8993(71)90358-1`).
+    let words = text.split(|c: char| c.is_whitespace() || matches!(c, '[' | ']' | '<' | '>' | '"' | '|'));
     for word in words.filter(|w| !w.is_empty()) {
-        let candidate = match (word.find("10."), word.to_ascii_lowercase().find("arxiv:")) {
+        let mut candidate = match (word.find("10."), word.to_ascii_lowercase().find("arxiv:")) {
             (_, Some(start)) => &word[start..],
             (Some(start), None) => &word[start..],
             (None, None) => continue,
         };
-        let candidate = candidate.trim_end_matches(['.', ',', ';', ':', ')', ']', '}', '>', '"', '\'', '*', '_']);
+        // Trailing punctuation, and a `)` only while unbalanced (the end of `(doi:…)` or of a link).
+        loop {
+            let trimmed = candidate.trim_end_matches(['.', ',', ';', ':', ']', '}', '>', '"', '\'', '*', '_']);
+            let trimmed = match trimmed.strip_suffix(')') {
+                Some(rest) if trimmed.matches('(').count() < trimmed.matches(')').count() => rest,
+                _ => trimmed,
+            };
+            if trimmed.len() == candidate.len() {
+                break;
+            }
+            candidate = trimmed;
+        }
         let parsed = match Doi::parse(candidate) {
             Ok(doi) => Some(doi.arxiv_id().map_or(Identifier::Doi(doi), Identifier::Arxiv)),
             Err(_) => Identifier::parse(candidate).ok().filter(|id| matches!(id, Identifier::Arxiv(_))),
@@ -236,11 +300,94 @@ mod tests {
 
     use super::*;
 
+    /// A scan's invisible OCR text on a page with an inline image (`BI … ID … EI`, how scanners
+    /// store strips): pdf-inspector skips invisible text, and still reads too little from the copy
+    /// the reveal step writes, so only the hayro layer reads it (3 papers of the owner's library came
+    /// out empty before).
+    #[test]
+    fn the_hayro_layer_reads_what_pdf_inspector_skips() {
+        let line = "Place cells fire when the animal is in one place and grid cells fire across the room";
+        let text: String =
+            (0..30).map(|i| format!("BT 3 Tr /F1 10 Tf 72 {} Td ({line}) Tj ET ", 740 - i * 14)).collect();
+        let content = format!("q 100 0 0 10 72 60 cm BI /W 4 /H 1 /BPC 8 /CS /G ID \u{1}\u{2}\u{3}\u{4} EI Q {text}");
+        let bytes = quire_testkit::pdf_page(&content, "");
+        let (inspected, _) = convert(&bytes).unwrap();
+        assert!(inspected.is_none_or(|m| m.split_whitespace().count() < 10), "pdf-inspector reads it after all");
+        let revealed = ocr_layer::reveal(&bytes).map(|copy| convert(&copy).map(|(m, _)| m));
+        let revealed_words = revealed.and_then(Result::ok).flatten().map_or(0, |m| m.split_whitespace().count());
+        assert!(revealed_words < 10, "the reveal step gets it after all ({revealed_words} words)");
+        let markdown = to_markdown(&bytes).unwrap();
+        assert!(markdown.contains("Place cells fire when the animal is in one place"), "{markdown}");
+    }
+
     #[test]
     fn inspects_a_text_pdf() {
         let info = inspect(&tiny_pdf("Nature 500, 54 (2013) doi:10.1038/nature12373.")).unwrap();
         assert_eq!((info.kind, info.pages), (PdfKind::Text, 1));
         assert_eq!(info.identifiers.iter().map(|d| d.key()).collect::<Vec<_>>(), ["10.1038/NATURE12373"]);
+    }
+
+    /// A page pdf-inspector reads only in part (a visible header over a scan's invisible text, with
+    /// an inline image), though not too little to be sparse: the layer's text, which has it all.
+    #[test]
+    fn a_partly_read_paper_takes_the_layers_text() {
+        let visible: String = (0..5)
+            .map(|i| {
+                format!(
+                    "BT /F1 10 Tf 72 {} Td (Journal of Physiology volume twelve issue three pages one to ten) Tj ET ",
+                    770 - i * 12
+                )
+            })
+            .collect();
+        let line = "Place cells fire when the animal is in one place and grid cells fire across the room";
+        let hidden: String =
+            (0..20).map(|i| format!("BT 3 Tr /F1 10 Tf 72 {} Td ({line}) Tj ET ", 680 - i * 14)).collect();
+        let content =
+            format!("q 100 0 0 10 72 60 cm BI /W 4 /H 1 /BPC 8 /CS /G ID \u{1}\u{2}\u{3}\u{4} EI Q {visible}{hidden}");
+        let bytes = quire_testkit::pdf_page(&content, "");
+        let (inspected, pages) = convert(&bytes).unwrap();
+        let inspected = inspected.unwrap_or_default();
+        assert!(!ocr_layer::is_sparse(&inspected, pages), "pdf-inspector's text should not be sparse here");
+        assert!(!inspected.contains("Place cells"), "pdf-inspector reads the hidden text after all");
+        let markdown = to_markdown(&bytes).unwrap();
+        assert!(markdown.contains("Place cells fire when the animal is in one place"), "{markdown}");
+    }
+
+    /// Two scanned pages (invisible OCR text), one with an inline image: pdf-inspector reads
+    /// neither, nor the revealed copy; both pages come through the layer.
+    #[test]
+    fn two_scanned_pages_both_come_through_the_layer() {
+        let lines = |words: &str| -> String {
+            (0..25).map(|i| format!("BT 3 Tr /F1 10 Tf 72 {} Td ({words}) Tj ET ", 740 - i * 14)).collect()
+        };
+        let first = lines("Grid cells fire on a lattice across the whole room as the animal runs");
+        let second = format!(
+            "q 100 0 0 10 72 60 cm BI /W 4 /H 1 /BPC 8 /CS /G ID \u{1}\u{2}\u{3}\u{4} EI Q {}",
+            lines("Place cells fire when the animal is in one place of the arena")
+        );
+        let bytes = quire_testkit::pdf_pages(&[&first, &second]);
+        let markdown = to_markdown(&bytes).unwrap();
+        assert!(markdown.contains("Grid cells fire on a lattice"), "{markdown}");
+        assert!(markdown.contains("Place cells fire when the animal"), "the second page is missing");
+    }
+
+    /// The choice between pdf-inspector's text (whatever produced it: directly, or the reveal step)
+    /// and the layer's.
+    #[test]
+    fn choosing_between_pdf_inspector_and_the_layer() {
+        let paper = "Place cells fire when the animal is in one place and grid cells fire across the room. ".repeat(20);
+        let partial = format!("{} {}", "Journal of Physiology volume twelve issue three.".repeat(10), &paper[..200]);
+        let layer = Some((paper.clone(), 1));
+        // Partial (most words not the layer's): the layer.
+        assert_eq!(choose(Some(partial.clone()), 1, layer.clone()), Some(paper.clone()));
+        // Nothing read: the layer.
+        assert_eq!(choose(None, 1, layer.clone()), Some(paper.clone()));
+        // Nearly the same words, a few fewer than the layer's: pdf-inspector's stays.
+        let close = paper.replacen("grid ", "", 3);
+        assert_eq!(choose(Some(close.clone()), 1, layer.clone()), Some(close));
+        // A sparse layer is never chosen.
+        assert_eq!(choose(Some(partial.clone()), 30, layer), Some(partial));
+        assert_eq!(choose(None, 1, None), None);
     }
 
     #[test]
@@ -311,6 +458,24 @@ mod tests {
                 "doi:10.1000/xyz",
                 "arXiv:1706.03762v7",
                 "doi:10.1038/s41467-019-11731-7"
+            ]
+        );
+    }
+
+    /// Old DOIs keep their parentheses, even at the end; an enclosing one is not part of them.
+    #[test]
+    fn dois_with_parentheses_are_whole() {
+        let found = find_identifiers(
+            "Brain Res. doi:10.1016/0006-8993(71)90358-1. Also (see 10.1002/(SICI)1097-4636(199601)) and \
+             [link](https://doi.org/10.1016/S0006-8993(97)00002-1)",
+        );
+        let keys: Vec<String> = found.iter().map(ToString::to_string).collect();
+        assert_eq!(
+            keys,
+            [
+                "doi:10.1016/0006-8993(71)90358-1",
+                "doi:10.1002/(SICI)1097-4636(199601)",
+                "doi:10.1016/S0006-8993(97)00002-1"
             ]
         );
     }

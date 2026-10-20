@@ -3,7 +3,7 @@
 use quire_core::library::references;
 use quire_core::library::update::{self, Updated};
 use quire_fetch::Lookup;
-use quire_model::{Identifier, Origin, Reference, ReferenceId, TextField};
+use quire_model::{CiteKey, Identifier, Origin, Reference, ReferenceData, ReferenceId, TextField};
 use url::Url;
 
 use super::Engine;
@@ -39,13 +39,26 @@ impl Engine {
     /// Applies an edited document to the reference `id`: changed fields become the user's. With
     /// `dry_run`, only reports what would change.
     pub async fn apply_edit(&self, id: ReferenceId, text: &str, dry_run: bool) -> Result<Updated> {
-        let (cite_key, mut data) = quire_io::from_edit_toml(text)?;
+        let (cite_key, data) = quire_io::from_edit_toml(text)?;
+        self.edit_fields(&id.to_string(), data, Some(cite_key), dry_run).await
+    }
+
+    /// Replaces the fields of the reference `query` names with `data` (and its cite key with
+    /// `cite_key`, if given): changed fields become the user's. Its `extra` fields are kept. With
+    /// `dry_run`, only reports what would change.
+    pub async fn edit_fields(
+        &self,
+        query: &str,
+        mut data: ReferenceData,
+        cite_key: Option<CiteKey>,
+        dry_run: bool,
+    ) -> Result<Updated> {
+        let query = query.to_string();
         let updated = self
             .run(move |lib| {
-                let reference = references::find(lib, &id.to_string())?;
-                // `extra` is not in the document; keep it.
+                let reference = references::find(lib, &query)?;
                 data.extra = reference.data.extra.clone();
-                update::edit(lib, reference, data, Some(cite_key), dry_run)
+                update::edit(lib, reference, data, cite_key, dry_run)
             })
             .await?;
         if updated.changed() && !dry_run {

@@ -300,4 +300,12 @@ async fn subscribers_hear_about_changes() {
     assert!(changes.try_recv().is_ok(), "an import is a change");
     engine.list(None, false, false).await.unwrap();
     assert!(changes.try_recv().is_err(), "reading is not");
+
+    // Writes that change what a view shows without touching a reference's fields.
+    engine.create_project("Thesis", None).await.unwrap();
+    assert!(changes.try_recv().is_ok(), "a new project is a change");
+    engine.tag("knuth1984", &["typesetting".into()]).await.unwrap();
+    changes.try_recv().unwrap();
+    engine.color_tag("typesetting", Some("#5FB236"), None).await.unwrap();
+    assert!(changes.try_recv().is_ok(), "a tag's colour is a change");
 }

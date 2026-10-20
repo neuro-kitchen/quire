@@ -47,6 +47,25 @@ impl Engine {
         self.store(input, request).await
     }
 
+    /// What `input` names (DOI, arXiv ID, PMID, PMCID, or a URL), looked up but not stored: a
+    /// preview before [`Engine::add`].
+    pub async fn lookup(&self, input: &str) -> Result<ReferenceData> {
+        let lookup = Lookup::parse(input)?;
+        Ok(self.fetcher.fetch(&lookup).await?.data)
+    }
+
+    /// Adds a reference the user typed in, linked to `project`. As for any added reference, one
+    /// with an identifier already here is only linked; look-alikes without one are left to
+    /// [`Engine::duplicates`].
+    pub async fn add_manual(&self, data: ReferenceData, project: Option<&SlugPath>) -> Result<Added> {
+        let project = self.project_id(project).await?;
+        let added = self
+            .run(move |lib| references::add(lib, AddRequest { project, ..AddRequest::new(data, Origin::User) }))
+            .await?;
+        self.mark_changed();
+        Ok(added)
+    }
+
     /// Adds the work the page at `url` describes, from the page's `html` as the user's browser
     /// loaded it (no request to the page itself, so "are you human" checks do not apply). An
     /// identifier on the page is looked up as usual.
@@ -125,9 +144,16 @@ impl Engine {
     /// are linked, not duplicated.
     pub async fn import_bib(&self, path: &Path, project: Option<&SlugPath>) -> Result<Vec<Added>> {
         let text = std::fs::read_to_string(path).map_err(EngineError::file(path))?;
-        let records = quire_io::from_bib(&text)?;
-        let project = self.project_id(project).await?;
         let file = path.file_name().map_or_else(|| path.display().to_string(), |n| n.to_string_lossy().into_owned());
+        self.import_bib_text(&text, &file, project).await
+    }
+
+    /// [`Engine::import_bib`] for `.bib` text (pasted, say); `source` names where it came from in the
+    /// references' provenance.
+    pub async fn import_bib_text(&self, text: &str, source: &str, project: Option<&SlugPath>) -> Result<Vec<Added>> {
+        let records = quire_io::from_bib(text)?;
+        let project = self.project_id(project).await?;
+        let file = source.to_string();
         let added = self
             .run(move |lib| {
                 let mut added = Vec::with_capacity(records.len());

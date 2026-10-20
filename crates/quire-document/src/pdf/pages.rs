@@ -10,7 +10,7 @@ use super::cache::global_cache;
 use super::find;
 use super::render;
 use super::schedule;
-use super::types::{PageRect, PageSize, PageText, QuoteMatch, RenderedPage, WordBox};
+use super::types::{PageRect, PageSize, PageText, QuoteMatch, RenderedPage, TextMatch, WordBox};
 use crate::error::DocumentError;
 
 /// Returns the dimensions (width and height in points) for all pages in `path`.
@@ -47,6 +47,13 @@ pub fn page_text(path: impl AsRef<Path>, page_index: u32) -> Result<Arc<PageText
 /// Locates highlights on the pages where their quotes appear.
 pub fn locate(path: impl AsRef<Path>, quotes: &[String]) -> Result<Vec<QuoteMatch>, DocumentError> {
     find::locate_quotes(global_cache(), path.as_ref(), quotes)
+}
+
+/// Every place `query` appears (the reader's find), in page order, at most `limit`.
+pub fn search(path: impl AsRef<Path>, query: &str, limit: usize) -> Result<Vec<TextMatch>, DocumentError> {
+    let path = path.as_ref();
+    let pages = global_cache().get_pdf(path)?.pages().len() as u32;
+    find::search_in(pages, |page| global_cache().get_page_text(path, page), query, limit)
 }
 
 /// Finds the word at point `(x, y)` on page `page_index`.
