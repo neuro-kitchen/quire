@@ -7,6 +7,8 @@ import dev.neurokitchen.quire.domain.model.PageSize
 import dev.neurokitchen.quire.domain.model.PaperTab
 import dev.neurokitchen.quire.domain.model.QuoteLocation
 import dev.neurokitchen.quire.domain.model.ReadingStatus
+import dev.neurokitchen.quire.presentation.designsystem.ReaderFont
+import dev.neurokitchen.quire.presentation.designsystem.ReaderTheme
 
 @Immutable
 data class ReaderState(
@@ -27,6 +29,11 @@ data class ReaderState(
     val notes: List<Note> = emptyList(),
     val noteDraft: String = "",
     val reading: ReadingStatus = ReadingStatus.Unread,
+    val isAnnotationsCollapsed: Boolean = false,
+    val isNotesCollapsed: Boolean = false,
+    val readerTheme: ReaderTheme = ReaderTheme.Dark,
+    val readerFont: ReaderFont = ReaderFont.Serif,
+    val fontSizeSp: Int = 16,
     /** The engine's message when something failed. */
     val error: String? = null,
 )

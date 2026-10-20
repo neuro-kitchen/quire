@@ -52,7 +52,7 @@ class ReaderViewModel(
             ReaderEvent.OnZoomReset -> zoom { 1f }
             is ReaderEvent.OnHighlight -> act {
                 val quote = event.quote.trim()
-                if (quote.isNotEmpty()) reader.addHighlight(referenceId, quote, event.prefix.takeLast(PREFIX_LENGTH))
+                if (quote.isNotEmpty()) reader.addHighlight(referenceId, quote, event.prefix.takeLast(PREFIX_LENGTH), color = event.color)
             }
             is ReaderEvent.OnHighlightClick -> _state.update { it.copy(focusedHighlight = event.id) }
             is ReaderEvent.OnHighlightComment -> act { reader.commentHighlight(event.id, event.comment) }
@@ -69,6 +69,13 @@ class ReaderViewModel(
             is ReaderEvent.OnReadingChange -> act {
                 reader.setReading(referenceId, event.status)
                 _state.update { it.copy(reading = event.status) }
+            }
+            ReaderEvent.OnToggleAnnotations -> _state.update { it.copy(isAnnotationsCollapsed = !it.isAnnotationsCollapsed) }
+            ReaderEvent.OnToggleNotes -> _state.update { it.copy(isNotesCollapsed = !it.isNotesCollapsed) }
+            is ReaderEvent.OnSetReaderTheme -> _state.update { it.copy(readerTheme = event.theme) }
+            is ReaderEvent.OnSetReaderFont -> _state.update { it.copy(readerFont = event.font) }
+            is ReaderEvent.OnChangeFontSize -> _state.update {
+                it.copy(fontSizeSp = (it.fontSizeSp + event.delta).coerceIn(12, 28))
             }
         }
     }

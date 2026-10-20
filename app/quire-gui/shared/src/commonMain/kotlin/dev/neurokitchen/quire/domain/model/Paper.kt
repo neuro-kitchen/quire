@@ -35,6 +35,7 @@ data class Highlight(
     /** Text just before the quote, telling repeated quotes apart. */
     val prefix: String = "",
     val comment: String? = null,
+    val color: String = "yellow",
 )
 
 data class Note(val id: String, val body: String, val updated: String)
@@ -50,3 +51,9 @@ data class PageRect(val left: Float, val top: Float, val right: Float, val botto
 
 /** Where a highlight's quote is in a PDF. */
 data class QuoteLocation(val highlightId: String, val page: Int, val rects: List<PageRect>)
+
+/** A single word hit-tested on a PDF page. */
+data class WordLocation(val text: String, val rect: PageRect)
+
+/** Selected text range and union bounding rectangles. */
+data class SelectedTextRange(val text: String, val rects: List<PageRect>)
