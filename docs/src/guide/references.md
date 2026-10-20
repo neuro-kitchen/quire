@@ -25,7 +25,8 @@ quire ref check -p thesis -r
 ```
 
 Issues include a missing year or authors, an unknown type, a title in capitals, a failed lookup,
-a page blocked by the publisher, and possible duplicates. `quire list` marks references with
+a page blocked by the publisher, possible duplicates, and (with `--retractions`, see
+[Finding and watching papers](discover.md)) retractions. `quire list` marks references with
 errors `!` and warnings `~`.
 
 ## Fixing

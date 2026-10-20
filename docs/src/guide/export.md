@@ -54,4 +54,5 @@ quire config set export.journal.months macro       # month = jul, not 7
 quire export --profile typst -o refs.bib
 ```
 
-See [Settings](../reference/config.md) for every key.
+See [Settings](../reference/config.md) for every key. To check that a document's citations are
+all in its bibliography, see [`quire folder check`](writing.md#checking-a-manuscript-quire-folder-check).
