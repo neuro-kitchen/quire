@@ -551,19 +551,56 @@ private fun SectionBody(
             }
         }
         ItemSection.Notes -> Column(verticalArrangement = Arrangement.spacedBy(Dimens.SpaceXs)) {
+            val wikilinkRegex = remember { Regex("\\[\\[([a-zA-Z0-9_:-]+)\\]\\]") }
             if (reference.notes.isEmpty()) BodyText("", Res.string.section_empty_notes)
             reference.notes.forEach { note ->
                 Row(verticalAlignment = Alignment.Top) {
                     Icon(painterResource(Res.drawable.ic_sticky_note_2), null, tint = colors.sectionNotes, modifier = Modifier.size(16.dp))
                     Column(Modifier.weight(1f).padding(start = Dimens.SpaceXs)) {
-                        Text(note.body, style = MaterialTheme.typography.bodySmall, color = colors.fillPrimary)
+                        val annotated = remember(note.body, colors.accent) {
+                            androidx.compose.ui.text.buildAnnotatedString {
+                                var lastIdx = 0
+                                wikilinkRegex.findAll(note.body).forEach { match ->
+                                    append(note.body.substring(lastIdx, match.range.first))
+                                    pushStyle(androidx.compose.ui.text.SpanStyle(color = colors.accent, fontWeight = FontWeight.Bold))
+                                    append(match.value)
+                                    pop()
+                                    lastIdx = match.range.last + 1
+                                }
+                                if (lastIdx < note.body.length) {
+                                    append(note.body.substring(lastIdx))
+                                }
+                            }
+                        }
+                        Text(annotated, style = MaterialTheme.typography.bodySmall, color = colors.fillPrimary)
                         Text(note.updated, style = MaterialTheme.typography.labelSmall, color = colors.fillSecondary)
                     }
                     RemoveButton { onEvent(LibraryEvent.OnNoteDelete(note.id)) }
                 }
             }
-            InputRow(noteDraft, stringResource(Res.string.item_add_note), { onEvent(LibraryEvent.OnNoteDraftChange(it)) }) {
+            InputRow(noteDraft, stringResource(Res.string.item_add_note) + " ([[key]] to link)", { onEvent(LibraryEvent.OnNoteDraftChange(it)) }) {
                 onEvent(LibraryEvent.OnNoteAdd)
+            }
+
+            // Backlinks & Mentions Section
+            if (reference.citeKey.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                        .background(colors.fillQuarternary.copy(alpha = 0.5f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Icon(painterResource(Res.drawable.ic_link), null, tint = colors.accent, modifier = Modifier.size(13.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "BACKLINKS TO [[@${reference.citeKey}]]",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                        color = colors.accent,
+                    )
+                }
             }
         }
         ItemSection.Projects -> Column {
