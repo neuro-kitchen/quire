@@ -27,4 +27,7 @@ sealed interface ReaderEvent {
     data class OnFindChange(val query: String) : ReaderEvent
     data object OnFindNext : ReaderEvent
     data object OnFindPrevious : ReaderEvent
+    data object OnToggleFigureDrawer : ReaderEvent
+    data object OnToggleSnapshotMode : ReaderEvent
+    data class OnShowCitation(val citation: dev.neurokitchen.quire.presentation.screens.reader.components.CitationDetail?) : ReaderEvent
 }
