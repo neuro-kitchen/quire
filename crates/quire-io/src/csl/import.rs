@@ -8,9 +8,14 @@ use serde_json::{Map, Value};
 use super::types::entry_kind;
 use super::values::{date, names, text};
 use crate::error::{IoError, Result};
+use crate::text::plain;
 
 /// Variables read into structured fields (not copied to `extra`).
 const CONSUMED: &[&str] = &["type", "id", "citation-key", "issued", "DOI", "PMID", "PMCID"];
+
+/// Variables sources send with markup (dropped on reading).
+const MARKED_UP: &[TextField] =
+    &[TextField::Title, TextField::ContainerTitle, TextField::Abstract, TextField::TitleShort];
 
 /// Non-standard names for CSL text variables, used when the standard one is missing.
 const ALIASES: &[(&str, TextField)] = &[
@@ -46,6 +51,8 @@ pub fn from_csl_value(item: &Value) -> Result<ReferenceData> {
 
     for field in TextField::ALL {
         if let Some(value) = item.get(field.as_str()).and_then(text) {
+            // Crossref titles and abstracts carry JATS, HTML or MathML markup.
+            let value = if MARKED_UP.contains(field) { plain(&value) } else { value };
             data.set(*field, value);
         }
         used.push(field.as_str());
