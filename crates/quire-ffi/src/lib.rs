@@ -29,7 +29,10 @@ pub use config::{
     ConfigEntry, ConfigKey, config_check, config_entries, config_keys, config_path, config_read, config_set,
     config_unset, config_write,
 };
-pub use pdf::{PageRect, PageSize, QuoteMatch, RenderedPage, pdf_find, pdf_init, pdf_page_sizes, pdf_render_page};
+pub use pdf::{
+    PageRect, PageSize, PdfWordRecord, QuoteMatch, RenderedPage, TextRangeRecord, pdf_find, pdf_init,
+    pdf_nearest_glyph, pdf_page_sizes, pdf_page_text, pdf_render_page, pdf_text_range, pdf_word_at,
+};
 pub use reader::{BlockKind, BlockRecord, HighlightRecord, NoteRecord, PaperRecord, ReaderTab, WordRecord};
 pub use records::{Creator, LibraryInfo, ProjectRecord, Query, ReferenceRecord, SortColumn, Source, TagRecord};
 
