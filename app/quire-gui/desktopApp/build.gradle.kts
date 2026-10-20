@@ -29,13 +29,9 @@ compose.desktop {
     application {
         mainClass = "dev.neurokitchen.quire.MainKt"
         nativeDistributions {
-            // PDFium for the reader (downloaded and checked by :shared:extractPdfium).
-            appResourcesRootDir.set(project(":shared").layout.buildDirectory.dir("pdfium/resources"))
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm)
             packageName = "quire"
             packageVersion = "0.1.0"
         }
     }
 }
-
-tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(":shared:extractPdfium") }

@@ -19,9 +19,19 @@ import org.koin.dsl.module
 
 /** Sample data: tests, previews, and platforms without the engine bridge yet (Android, iOS). */
 val sampleDataModule = module {
-    single<LibraryRepository> { SampleLibraryRepository() }
+    single<LibraryRepository> {
+        SampleLibraryRepository(
+            references = SampleLibraryRepository.REFERENCES + SampleLibraryRepository.EXTENDED_REFERENCES,
+        )
+    }
     single<SettingsRepository> { SampleSettingsRepository() }
-    single<ReaderRepository> { SampleReaderRepository() }
+    single<ReaderRepository> {
+        SampleReaderRepository(
+            initialHighlights = SampleReaderRepository.SAMPLE_HIGHLIGHTS,
+            initialNotes = SampleReaderRepository.SAMPLE_NOTES,
+            fakePdfs = true,
+        )
+    }
     single<PdfRepository> { SamplePdfRepository() }
 }
 
