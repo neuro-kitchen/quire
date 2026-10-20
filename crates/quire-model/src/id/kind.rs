@@ -42,6 +42,10 @@ id_kinds! {
     Device => "dev", "device";
     /// A highlighted passage of a paper's text, with an optional comment.
     Highlight => "hl", "highlight";
+    /// A search kept under a name (a smart project).
+    SavedSearch => "srch", "saved search";
+    /// A search of arXiv, PubMed or Crossref checked for new papers.
+    Alert => "alrt", "alert";
 }
 
 #[cfg(test)]

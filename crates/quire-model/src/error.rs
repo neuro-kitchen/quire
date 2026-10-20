@@ -42,6 +42,21 @@ pub enum ModelError {
     #[error("unknown issue code `{0}`")]
     UnknownIssue(String),
 
+    #[error("unknown reading status `{0}` (unread, reading, read)")]
+    UnknownReadingStatus(String),
+
+    #[error("invalid saved search name `{0}`: it must not be empty")]
+    InvalidSearchName(String),
+
+    #[error("unknown alert source `{0}` (arxiv, pubmed, crossref)")]
+    UnknownAlertSource(String),
+
+    #[error("`{0}` is not a user ID (64 hexadecimal digits; `quire user id` prints yours)")]
+    InvalidUser(String),
+
+    #[error("unknown role `{0}` (reader, editor, owner)")]
+    UnknownRole(String),
+
     #[error("invalid cite key `{input}`: {reason}")]
     InvalidCiteKey { input: String, reason: &'static str },
 }

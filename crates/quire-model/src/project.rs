@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{ModelError, Result};
 use crate::id::{DeviceId, ProjectId};
+use crate::member::UserId;
 use crate::record::RecordMeta;
 
 /// Longest slug accepted, in characters.
@@ -137,6 +138,10 @@ pub struct Project {
     pub slug: Slug,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent: Option<ProjectId>,
+    /// Who shared it (set when it is first shared; never changed after): the root of trust for
+    /// its members, on every device that receives it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner: Option<UserId>,
     pub meta: RecordMeta,
 }
 
@@ -148,6 +153,7 @@ impl Project {
             name: name.trim().into(),
             slug: Slug::from_name(name)?,
             parent,
+            owner: None,
             meta: RecordMeta::new(device),
         })
     }
