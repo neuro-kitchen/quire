@@ -4,8 +4,10 @@
 //!
 //! - one cite key for two papers: the one with the larger ID gets a free key (on every device the
 //!   same one), stamped as a new change so every device takes it;
-//! - an identifier another reference has here: left off the incoming copy (a possible duplicate
-//!   the duplicates view offers to merge), not stamped, so the other device keeps it;
+//! - the same paper added on both (an identifier in common): one reference; the other ID is an
+//!   alias of ours (`sync_alias`) and rows naming it follow; references merge part by part;
+//! - an identifier another (different) reference has here: left off the incoming copy (a possible
+//!   duplicate the duplicates view offers to merge), not stamped, so the other device keeps it;
 //! - a project with the same name under the same parent, a tag with the same name: the same
 //!   thing; their ID is recorded as an alias of ours (`sync_alias`) and rows naming it follow;
 //! - the same file attached to the same reference: kept once.
@@ -16,23 +18,33 @@
 
 use quire_core::Result;
 use quire_core::citekey::free_key;
-use quire_core::sync::{Distinct, Membership, Merged, Relation, Row, Stamp, Tagging, newer};
-use quire_model::{Attachment, DeviceId, Highlight, Id, IdKind, Note, Project, Reference, Tag, Timestamp};
+use quire_core::sync::{Distinct, Membership, Merged, Relation, Row, Stamp, Tagging, merge_reference, newer};
+use quire_model::reference::parts;
+use quire_model::{
+    Attachment, DeviceId, Highlight, Id, IdKind, Note, Project, ProjectMember, Reading, Reference, SavedSearch, Tag,
+    Timestamp,
+};
 use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::error::OrCore;
 use crate::repo::codec::id_blob;
-use crate::repo::{attachments, highlights, projects, references, tags};
+use crate::repo::{attachments, highlights, members, notes, projects, reading, references, tags};
 
-/// Merges `rows`; also returns the references this merge renamed (their change must reach every
+/// Merges `rows`; also returns the references this merge changed beyond what the sender sent
+/// (a new cite key, parts of the local copy, another ID): their change must reach every
 /// device, the sender too).
 pub fn merge(conn: &Connection, device: DeviceId, rows: Vec<Row>) -> Result<(Merged, Vec<quire_model::ReferenceId>)> {
     let mut merged = Merged::default();
-    let mut renamed = Vec::new();
+    let mut relog = Vec::new();
     let (mut projects_in, mut tags_in, mut rest) = (Vec::new(), Vec::new(), Vec::new());
     for row in rows {
+        // The hybrid clock moves past every stamp taken in; one from a broken clock is refused.
+        if !row.version().0.observe() {
+            merged.refused += 1;
+            continue;
+        }
         match row {
-            Row::Reference(r) => reference(conn, device, r, &mut merged, &mut renamed)?,
+            Row::Reference(r) => reference(conn, device, r, &mut merged, &mut relog)?,
             Row::Project(p) => projects_in.push(p),
             Row::Tag(t) => tags_in.push(t),
             other => rest.push(other),
@@ -68,10 +80,13 @@ pub fn merge(conn: &Connection, device: DeviceId, rows: Vec<Row>) -> Result<(Mer
             Row::Relation(r) => relation(conn, r, &mut merged)?,
             Row::Attachment(a) => attachment(conn, a, &mut merged)?,
             Row::Distinct(d) => distinct(conn, d, &mut merged)?,
+            Row::Reading(r) => self::reading(conn, r, &mut merged)?,
+            Row::SavedSearch(s) => saved_search(conn, s, &mut merged)?,
+            Row::Member(m) => member(conn, m, &mut merged)?,
             Row::Reference(_) | Row::Project(_) | Row::Tag(_) => unreachable!("applied above"),
         }
     }
-    Ok((merged, renamed))
+    Ok((merged, relog))
 }
 
 fn order(row: &Row) -> u8 {
@@ -86,8 +101,9 @@ fn order(row: &Row) -> u8 {
     }
 }
 
-/// Our ID for `id` (another device's project or tag that is the same as ours), else `id`.
-fn alias<K: IdKind>(conn: &Connection, id: Id<K>) -> Result<Id<K>> {
+/// Our ID for `id` (another device's project, tag or reference that is the same as ours), else
+/// `id`.
+pub(super) fn alias<K: IdKind>(conn: &Connection, id: Id<K>) -> Result<Id<K>> {
     let local: Option<[u8; 16]> = conn
         .query_row("SELECT local FROM sync_alias WHERE remote = ?1", [id_blob(id)], |row| row.get(0))
         .optional()
@@ -118,46 +134,72 @@ fn reference_exists(conn: &Connection, id: quire_model::ReferenceId) -> Result<b
 fn reference(
     conn: &Connection,
     device: DeviceId,
-    mut r: Reference,
+    incoming: Reference,
     merged: &mut Merged,
-    renamed: &mut Vec<quire_model::ReferenceId>,
+    relog: &mut Vec<quire_model::ReferenceId>,
 ) -> Result<()> {
-    let local = references::by_id(conn, r.id)?;
-    if let Some(local) = &local
-        && !newer((r.meta.updated_at, r.meta.updated_by), (local.meta.updated_at, local.meta.updated_by))
-    {
-        merged.kept += 1;
-        return Ok(());
+    let mut r = incoming;
+    let sent_as = r.id;
+    r.id = alias(conn, r.id)?;
+    let mut local = references::by_id(conn, r.id)?;
+    if local.is_none() && !r.meta.is_deleted() {
+        // The same paper here under another ID (added on both sides): one reference; rows naming
+        // the other ID follow this one.
+        for identifier in &r.data.identifiers {
+            if let Some(same) = references::by_identifier(conn, identifier)?.filter(|s| s.id != r.id) {
+                set_alias(conn, sent_as, same.id)?;
+                r.id = same.id;
+                local = Some(same);
+                break;
+            }
+        }
     }
-    if let Some(mut other) = references::by_cite_key(conn, &r.cite_key)?
-        && other.id != r.id
+    let mut result = match &local {
+        Some(local) => {
+            let combined = merge_reference(local, &r);
+            if &combined == local {
+                merged.kept += 1;
+                return Ok(());
+            }
+            combined
+        }
+        None => r.clone(),
+    };
+    if let Some(mut other) = references::by_cite_key(conn, &result.cite_key)?
+        && other.id != result.id
     {
         // Two papers, one key: the one with the larger ID takes a new key, on every device
         // (renaming whichever arrives would make devices rename each other back and forth).
-        let local_loses = other.id > r.id;
-        let loser = if local_loses { &mut other } else { &mut r };
+        let local_loses = other.id > result.id;
+        let loser = if local_loses { &mut other } else { &mut result };
         let old = loser.cite_key.to_string();
         loser.cite_key = free_key(&old, |key| references::cite_key_taken(conn, key))?;
+        loser.clocks.insert(parts::CITE_KEY.into(), Timestamp::now());
         loser.meta.touch(device);
         merged.renamed.push((old, loser.cite_key.to_string()));
-        renamed.push(loser.id);
+        relog.push(loser.id);
         if local_loses {
             references::update(conn, &other)?;
         }
     }
+    // An identifier another reference here holds stays with it (a possible duplicate to merge).
     let mut kept_ids = Vec::new();
-    for identifier in std::mem::take(&mut r.data.identifiers) {
+    for identifier in std::mem::take(&mut result.data.identifiers) {
         match references::by_identifier(conn, &identifier)? {
-            Some(other) if other.id != r.id => {
-                merged.dropped_identifiers.push((r.cite_key.to_string(), identifier.to_string()))
+            Some(other) if other.id != result.id => {
+                merged.dropped_identifiers.push((result.cite_key.to_string(), identifier.to_string()))
             }
             _ => kept_ids.push(identifier),
         }
     }
-    r.data.identifiers = kept_ids;
+    result.data.identifiers = kept_ids;
     match local {
-        Some(_) => references::update(conn, &r)?,
-        None => references::insert(conn, &r, None)?,
+        Some(_) => references::update(conn, &result)?,
+        None => references::insert(conn, &result, None)?,
+    }
+    // Parts of this copy the sender lacks (or another ID for the paper): it must hear back.
+    if result != r || result.id != sent_as {
+        relog.push(result.id);
     }
     merged.applied += 1;
     Ok(())
@@ -196,7 +238,7 @@ fn project(conn: &Connection, mut p: Project, merged: &mut Merged) -> Result<()>
 
 fn tag(conn: &Connection, mut t: Tag, merged: &mut Merged) -> Result<()> {
     t.id = alias(conn, t.id)?;
-    let local = super::rows::tag(conn, t.id)?;
+    let local = tags::by_id(conn, t.id)?;
     if local.is_none()
         && !t.meta.is_deleted()
         && let Some(same) = tags::by_key(conn, &t.key())?
@@ -244,6 +286,7 @@ fn wins(incoming: &Stamp, stored: Option<Stamp>) -> bool {
 
 fn membership(conn: &Connection, mut m: Membership, merged: &mut Merged) -> Result<()> {
     m.project = alias(conn, m.project)?;
+    m.reference = alias(conn, m.reference)?;
     if projects::by_id(conn, m.project)?.is_none() || !reference_exists(conn, m.reference)? {
         merged.kept += 1;
         return Ok(());
@@ -277,7 +320,8 @@ fn membership(conn: &Connection, mut m: Membership, merged: &mut Merged) -> Resu
 
 fn tagging(conn: &Connection, mut t: Tagging, merged: &mut Merged) -> Result<()> {
     t.tag = alias(conn, t.tag)?;
-    if super::rows::tag(conn, t.tag)?.is_none() || !reference_exists(conn, t.reference)? {
+    t.reference = alias(conn, t.reference)?;
+    if tags::by_id(conn, t.tag)?.is_none() || !reference_exists(conn, t.reference)? {
         merged.kept += 1;
         return Ok(());
     }
@@ -308,7 +352,8 @@ fn tagging(conn: &Connection, mut t: Tagging, merged: &mut Merged) -> Result<()>
     Ok(())
 }
 
-fn relation(conn: &Connection, r: Relation, merged: &mut Merged) -> Result<()> {
+fn relation(conn: &Connection, mut r: Relation, merged: &mut Merged) -> Result<()> {
+    (r.a, r.b) = ordered(alias(conn, r.a)?, alias(conn, r.b)?);
     if !reference_exists(conn, r.a)? || !reference_exists(conn, r.b)? {
         merged.kept += 1;
         return Ok(());
@@ -331,32 +376,34 @@ fn relation(conn: &Connection, r: Relation, merged: &mut Merged) -> Result<()> {
     Ok(())
 }
 
-fn note(conn: &Connection, n: Note, merged: &mut Merged) -> Result<()> {
+fn note(conn: &Connection, mut n: Note, merged: &mut Merged) -> Result<()> {
+    n.reference = n.reference.map(|r| alias(conn, r)).transpose()?;
     if let Some(reference) = n.reference
         && !reference_exists(conn, reference)?
     {
         merged.kept += 1;
         return Ok(());
     }
-    match tags::note(conn, n.id)? {
+    match notes::by_id(conn, n.id)? {
         Some(local)
             if !newer((n.meta.updated_at, n.meta.updated_by), (local.meta.updated_at, local.meta.updated_by)) =>
         {
             merged.kept += 1
         }
         Some(_) => {
-            tags::update_note(conn, &n)?;
+            notes::update(conn, &n)?;
             merged.applied += 1;
         }
         None => {
-            tags::insert_note(conn, &n)?;
+            notes::insert(conn, &n)?;
             merged.applied += 1;
         }
     }
     Ok(())
 }
 
-fn highlight(conn: &Connection, h: Highlight, merged: &mut Merged) -> Result<()> {
+fn highlight(conn: &Connection, mut h: Highlight, merged: &mut Merged) -> Result<()> {
+    h.reference = alias(conn, h.reference)?;
     if !reference_exists(conn, h.reference)? {
         merged.kept += 1;
         return Ok(());
@@ -379,7 +426,8 @@ fn highlight(conn: &Connection, h: Highlight, merged: &mut Merged) -> Result<()>
     Ok(())
 }
 
-fn attachment(conn: &Connection, a: Attachment, merged: &mut Merged) -> Result<()> {
+fn attachment(conn: &Connection, mut a: Attachment, merged: &mut Merged) -> Result<()> {
+    a.reference = alias(conn, a.reference)?;
     if !reference_exists(conn, a.reference)? {
         merged.kept += 1;
         return Ok(());
@@ -411,7 +459,8 @@ fn attachment(conn: &Connection, a: Attachment, merged: &mut Merged) -> Result<(
     Ok(())
 }
 
-fn distinct(conn: &Connection, d: Distinct, merged: &mut Merged) -> Result<()> {
+fn distinct(conn: &Connection, mut d: Distinct, merged: &mut Merged) -> Result<()> {
+    (d.a, d.b) = ordered(alias(conn, d.a)?, alias(conn, d.b)?);
     if !reference_exists(conn, d.a)? || !reference_exists(conn, d.b)? {
         merged.kept += 1;
         return Ok(());
@@ -428,6 +477,86 @@ fn distinct(conn: &Connection, d: Distinct, merged: &mut Merged) -> Result<()> {
         merged.kept += 1
     }
     Ok(())
+}
+
+fn reading(conn: &Connection, mut r: Reading, merged: &mut Merged) -> Result<()> {
+    r.reference = alias(conn, r.reference)?;
+    if !reference_exists(conn, r.reference)? {
+        merged.kept += 1;
+        return Ok(());
+    }
+    match reading::reading_by_id(conn, r.reference)? {
+        Some(local)
+            if !newer((r.meta.updated_at, r.meta.updated_by), (local.meta.updated_at, local.meta.updated_by)) =>
+        {
+            merged.kept += 1
+        }
+        _ => {
+            reading::set_reading(conn, &r)?;
+            merged.applied += 1;
+        }
+    }
+    Ok(())
+}
+
+fn member(conn: &Connection, mut m: ProjectMember, merged: &mut Merged) -> Result<()> {
+    m.project = alias(conn, m.project)?;
+    if projects::by_id(conn, m.project)?.is_none() {
+        merged.kept += 1;
+        return Ok(());
+    }
+    match members::get(conn, m.project, m.user.as_str())? {
+        Some(local)
+            if !newer((m.meta.updated_at, m.meta.updated_by), (local.meta.updated_at, local.meta.updated_by)) =>
+        {
+            merged.kept += 1
+        }
+        _ => {
+            members::set(conn, &m)?;
+            merged.applied += 1;
+        }
+    }
+    Ok(())
+}
+
+fn saved_search(conn: &Connection, s: SavedSearch, merged: &mut Merged) -> Result<()> {
+    let local = reading::search_by_id(conn, s.id)?;
+    if let Some(local) = &local
+        && !newer((s.meta.updated_at, s.meta.updated_by), (local.meta.updated_at, local.meta.updated_by))
+    {
+        merged.kept += 1;
+        return Ok(());
+    }
+    // The same name saved on both devices: the incoming one is kept under its name with its ID
+    // suffix, so neither query is lost.
+    let mut s = s;
+    if !s.meta.is_deleted() {
+        let taken: Option<[u8; 16]> = conn
+            .query_row(
+                "SELECT id FROM saved_search WHERE key = ?1 AND deleted_at IS NULL AND id != ?2",
+                params![s.key(), id_blob(s.id)],
+                |row| row.get(0),
+            )
+            .optional()
+            .or_core()?;
+        if taken.is_some() {
+            s.name = format!("{} ({})", s.name, &s.id.to_string()[5..11]);
+        }
+    }
+    match local {
+        Some(_) => reading::update_search(conn, &s)?,
+        None => reading::insert_search(conn, &s)?,
+    }
+    merged.applied += 1;
+    Ok(())
+}
+
+/// A pair in stored order (`a < b` by bytes, as the pair tables keep it).
+fn ordered(
+    a: quire_model::ReferenceId,
+    b: quire_model::ReferenceId,
+) -> (quire_model::ReferenceId, quire_model::ReferenceId) {
+    if id_blob(a) < id_blob(b) { (a, b) } else { (b, a) }
 }
 
 fn millis(t: Option<Timestamp>) -> Option<i64> {

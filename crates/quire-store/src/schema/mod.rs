@@ -16,6 +16,12 @@ pub fn migrations() -> Migrations<'static> {
         M::up(include_str!("008_highlight.sql")),
         M::up(include_str!("009_search.sql")),
         M::up(include_str!("010_sync.sql")),
+        M::up(include_str!("011_imported.sql")),
+        M::up(include_str!("012_reading_saved_search.sql")),
+        M::up(include_str!("013_change_log_triggers.sql")),
+        M::up(include_str!("014_alert.sql")),
+        M::up(include_str!("015_field_clocks.sql")),
+        M::up(include_str!("016_sharing.sql")),
     ])
 }
 
