@@ -7,12 +7,15 @@
 //!   is the library copy).
 //! - [`protocol`]: the messages and their framing.
 //! - [`transport`]: iroh endpoints, accepting only known peers.
+//! - [`identity`]: people's keys and the certificates of their devices.
 //! - [`error`]: the errors ([`SyncError`]).
 
 pub mod error;
+pub mod identity;
 pub mod protocol;
 pub mod session;
 pub mod transport;
 
 pub use error::{Result, SyncError};
-pub use session::{Replica, Report, Role};
+pub use identity::Certificate;
+pub use session::{Peer, Replica, Report, Role};

@@ -14,6 +14,15 @@ use crate::session::{self, Replica, Report, Role};
 /// How long to wait to get online (a relay connection) before giving up.
 const ONLINE_WAIT: std::time::Duration = std::time::Duration::from_secs(20);
 
+/// How long to keep looking for a peer's address before giving up, and how often to ask.
+const ADDRESS_WAIT: std::time::Duration = std::time::Duration::from_secs(45);
+const ADDRESS_RETRY: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// Whether a connect error means the peer's address is not (yet) known.
+fn is_not_found(error: &str) -> bool {
+    error.contains("No addressing information")
+}
+
 /// The application protocol on the QUIC connection.
 pub const ALPN: &[u8] = b"quire/sync/1";
 
@@ -59,9 +68,21 @@ impl Device {
     /// Syncs `replica` with the device `peer` (its ID).
     pub async fn sync_with<R: Replica>(&self, replica: &R, peer: &str) -> Result<Report> {
         let id = EndpointId::from_str(peer.trim()).map_err(|e| SyncError::Network(format!("`{peer}`: {e}")))?;
-        let connection = self.endpoint.connect(id, ALPN).await.map_err(|e| SyncError::Network(e.to_string()))?;
+        // A peer that just came online may not have published its address yet: ask again for a
+        // while (seen live: ~10 s after `sync serve` started, none was found yet).
+        let started = std::time::Instant::now();
+        let connection = loop {
+            match self.endpoint.connect(id, ALPN).await {
+                Ok(connection) => break connection,
+                Err(error) if started.elapsed() < ADDRESS_WAIT && is_not_found(&error.to_string()) => {
+                    tracing::debug!(%error, "no address for the peer yet");
+                    tokio::time::sleep(ADDRESS_RETRY).await;
+                }
+                Err(error) => return Err(SyncError::Network(error.to_string())),
+            }
+        };
         let (mut send, mut receive) = connection.open_bi().await.map_err(|e| SyncError::Network(e.to_string()))?;
-        let report = session::run(replica, Role::Client, &mut receive, &mut send).await;
+        let report = session::run(replica, Role::Client, Some(&id.to_string()), &mut receive, &mut send).await;
         let _ = send.finish();
         // The server closes once it has everything; closing first could drop the last bytes.
         if report.is_ok() {
@@ -102,7 +123,7 @@ impl Device {
             }
             let outcome = match connection.accept_bi().await {
                 Ok((mut send, mut receive)) => {
-                    let report = session::run(replica, Role::Server, &mut receive, &mut send).await;
+                    let report = session::run(replica, Role::Server, Some(&remote), &mut receive, &mut send).await;
                     let _ = send.finish();
                     // The session ends with the client's last message read: all is delivered.
                     connection.close(0u8.into(), b"done");
