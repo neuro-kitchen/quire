@@ -19,11 +19,12 @@ data class SettingsState(
 
 /** The panes on the left; all but [ConfigFile] are forms over the keys of some tables. */
 enum class SettingsSection(val tables: Set<String>) {
+    Appearance(emptySet()),
+    Reader(setOf("reader")),
     General(setOf("user", "access")),
     Libraries(setOf("library", "libraries")),
-    Sync(setOf("peers")),
     Export(setOf("export")),
-    Reader(setOf("reader")),
+    Shortcuts(emptySet()),
     ConfigFile(emptySet()),
 }
 
