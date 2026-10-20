@@ -5,6 +5,7 @@
 mod citekey;
 mod field;
 mod kind;
+pub mod parts;
 mod provenance;
 
 use std::collections::BTreeMap;
@@ -20,7 +21,7 @@ use crate::creator::Creator;
 use crate::date::Date;
 use crate::id::{DeviceId, ReferenceId};
 use crate::identifier::Identifier;
-use crate::record::RecordMeta;
+use crate::record::{RecordMeta, Timestamp};
 
 /// The bibliographic content of a work.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -94,6 +95,10 @@ pub struct Reference {
     pub data: ReferenceData,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub provenance: BTreeMap<Field, Provenance>,
+    /// When each part last changed (a field name, `cite-key`, `extra`, `trash`), for merging two
+    /// devices' edits field by field. A part without a clock last changed at `meta.updated_at`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub clocks: BTreeMap<String, Timestamp>,
     pub meta: RecordMeta,
 }
 
@@ -102,7 +107,10 @@ impl Reference {
     pub fn new(cite_key: CiteKey, data: ReferenceData, origin: Origin, device: DeviceId) -> Self {
         let stamp = Provenance::now(origin);
         let provenance = data.present_fields().into_iter().map(|f| (f, stamp.clone())).collect();
-        Self { id: ReferenceId::new(), cite_key, data, provenance, meta: RecordMeta::new(device) }
+        let meta = RecordMeta::new(device);
+        // Every part dates from now: a later edit of one part does not make the others look new.
+        let clocks = parts::names().into_iter().map(|part| (part, meta.created_at)).collect();
+        Self { id: ReferenceId::new(), cite_key, data, provenance, clocks, meta }
     }
 }
 

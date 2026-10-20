@@ -32,6 +32,10 @@ name_enum! {
         PdfMismatch => "pdf-mismatch",
         /// Another reference looks like the same work (detail says which and why).
         PossibleDuplicate => "possible-duplicate",
+        /// Retracted, withdrawn or removed (Crossref, incl. Retraction Watch; detail: the notice).
+        Retracted => "retracted",
+        /// The publisher issued an expression of concern (detail: the notice).
+        Concern => "expression-of-concern",
     }
 }
 
@@ -47,14 +51,14 @@ pub enum Severity {
 impl IssueCode {
     pub fn severity(self) -> Severity {
         match self {
-            Self::NoTitle | Self::NoCreators | Self::NoDate | Self::Blocked => Severity::Error,
+            Self::NoTitle | Self::NoCreators | Self::NoDate | Self::Blocked | Self::Retracted => Severity::Error,
             _ => Severity::Warning,
         }
     }
 
     /// Whether the issue is recorded when it happens (not computable from the fields later).
     pub fn is_recorded(self) -> bool {
-        matches!(self, Self::Fallback | Self::Blocked | Self::PdfMismatch)
+        matches!(self, Self::Fallback | Self::Blocked | Self::PdfMismatch | Self::Retracted | Self::Concern)
     }
 }
 
@@ -97,6 +101,8 @@ impl Issue {
             IssueCode::Blocked => "blocked by the publisher",
             IssueCode::PdfMismatch => "the PDF shows another identifier",
             IssueCode::PossibleDuplicate => "possible duplicate",
+            IssueCode::Retracted => "retracted",
+            IssueCode::Concern => "expression of concern",
         };
         match &self.detail {
             Some(detail) => format!("{text}: {detail}"),
