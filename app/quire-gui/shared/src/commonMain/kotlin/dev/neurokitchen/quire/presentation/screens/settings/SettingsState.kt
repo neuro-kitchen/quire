@@ -2,6 +2,9 @@ package dev.neurokitchen.quire.presentation.screens.settings
 
 import androidx.compose.runtime.Immutable
 import dev.neurokitchen.quire.domain.model.SettingKind
+import dev.neurokitchen.quire.presentation.designsystem.AppTheme
+import dev.neurokitchen.quire.presentation.designsystem.ReaderFont
+import dev.neurokitchen.quire.presentation.designsystem.ReaderTheme
 
 @Immutable
 data class SettingsState(
@@ -13,6 +16,10 @@ data class SettingsState(
     /** The rows of the selected form section. */
     val fields: List<SettingField> = emptyList(),
     val raw: RawConfigState = RawConfigState(),
+    val appTheme: AppTheme = AppTheme.Obsidian,
+    val readerTheme: ReaderTheme = ReaderTheme.Dark,
+    val readerFont: ReaderFont = ReaderFont.Serif,
+    val readerFontSize: Int = 16,
     /** Loading failed (the engine's message). */
     val error: String? = null,
 )

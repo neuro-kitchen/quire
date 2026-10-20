@@ -1,14 +1,28 @@
 package dev.neurokitchen.quire.presentation.desktop
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import dev.neurokitchen.quire.data.repository.SamplePreferencesRepository
+import dev.neurokitchen.quire.domain.repository.PreferencesRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
-class DesktopViewModel : ViewModel() {
-    private val _state = MutableStateFlow(DesktopState())
+class DesktopViewModel(
+    private val preferencesRepository: PreferencesRepository = SamplePreferencesRepository(),
+) : ViewModel() {
+    private val _state = MutableStateFlow(DesktopState(appTheme = preferencesRepository.preferences.value.appTheme))
     val state: StateFlow<DesktopState> = _state.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            preferencesRepository.preferences.collect { prefs ->
+                _state.update { it.copy(appTheme = prefs.appTheme) }
+            }
+        }
+    }
 
     fun onEvent(event: DesktopEvent) {
         when (event) {
@@ -24,7 +38,10 @@ class DesktopViewModel : ViewModel() {
                 val selected = if (state.selected == event.id) papers.getOrNull(index - 1)?.id else state.selected
                 state.copy(papers = papers, selected = selected)
             }
-            is DesktopEvent.OnSetAppTheme -> _state.update { it.copy(appTheme = event.theme) }
+            is DesktopEvent.OnSetAppTheme -> {
+                _state.update { it.copy(appTheme = event.theme) }
+                viewModelScope.launch { preferencesRepository.setAppTheme(event.theme) }
+            }
         }
     }
 }

@@ -3,6 +3,9 @@ package dev.neurokitchen.quire.presentation.screens.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.neurokitchen.quire.AppInfo
+import dev.neurokitchen.quire.data.repository.SamplePreferencesRepository
+import dev.neurokitchen.quire.domain.repository.PreferencesRepository
+import dev.neurokitchen.quire.presentation.designsystem.ReaderTheme
 import dev.neurokitchen.quire.domain.model.SettingEntry
 import dev.neurokitchen.quire.domain.model.SettingKey
 import dev.neurokitchen.quire.domain.model.SettingKind
@@ -23,8 +26,17 @@ import kotlinx.coroutines.launch
 class SettingsViewModel(
     private val settings: SettingsRepository,
     private val library: LibraryRepository,
+    private val preferences: PreferencesRepository = SamplePreferencesRepository(),
 ) : ViewModel() {
-    private val _state = MutableStateFlow(SettingsState(version = AppInfo.VERSION))
+    private val _state = MutableStateFlow(
+        SettingsState(
+            version = AppInfo.VERSION,
+            appTheme = preferences.preferences.value.appTheme,
+            readerTheme = preferences.preferences.value.readerTheme,
+            readerFont = preferences.preferences.value.readerFont,
+            readerFontSize = preferences.preferences.value.readerFontSize,
+        )
+    )
     val state: StateFlow<SettingsState> = _state.asStateFlow()
 
     private var keys: List<SettingKey> = emptyList()
@@ -33,6 +45,18 @@ class SettingsViewModel(
 
     init {
         viewModelScope.launch { load() }
+        viewModelScope.launch {
+            preferences.preferences.collect { prefs ->
+                _state.update {
+                    it.copy(
+                        appTheme = prefs.appTheme,
+                        readerTheme = prefs.readerTheme,
+                        readerFont = prefs.readerFont,
+                        readerFontSize = prefs.readerFontSize,
+                    )
+                }
+            }
+        }
     }
 
     fun onEvent(event: SettingsEvent) {
@@ -64,6 +88,27 @@ class SettingsViewModel(
             }
             SettingsEvent.OnRawRevert -> _state.update {
                 it.copy(raw = it.raw.copy(text = it.raw.saved, problems = emptyList(), error = null))
+            }
+            is SettingsEvent.OnSetAppTheme -> viewModelScope.launch {
+                preferences.setAppTheme(event.theme)
+            }
+            is SettingsEvent.OnSetReaderTheme -> viewModelScope.launch {
+                preferences.setReaderTheme(event.theme)
+                val engineTheme = when (event.theme) {
+                    ReaderTheme.Light -> "light"
+                    ReaderTheme.Sepia -> "sepia"
+                    ReaderTheme.Solarized -> "contrast"
+                    ReaderTheme.Nord -> "dark"
+                    ReaderTheme.Dark -> "dark"
+                    ReaderTheme.Oled -> "dark"
+                }
+                runCatching { settings.set("reader.theme", engineTheme) }
+            }
+            is SettingsEvent.OnSetReaderFont -> viewModelScope.launch {
+                preferences.setReaderFont(event.font)
+            }
+            is SettingsEvent.OnSetReaderFontSize -> viewModelScope.launch {
+                preferences.setReaderFontSize(event.size)
             }
         }
     }

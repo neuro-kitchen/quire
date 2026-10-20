@@ -3,6 +3,7 @@ package dev.neurokitchen.quire.di
 import dev.neurokitchen.quire.presentation.screens.tools.ToolsViewModel
 import dev.neurokitchen.quire.data.repository.SampleLibraryRepository
 import dev.neurokitchen.quire.data.repository.SamplePdfRepository
+import dev.neurokitchen.quire.data.repository.SamplePreferencesRepository
 import dev.neurokitchen.quire.data.repository.SampleReaderRepository
 import dev.neurokitchen.quire.data.repository.SampleSettingsRepository
 import dev.neurokitchen.quire.domain.repository.AttachmentRepository
@@ -11,6 +12,7 @@ import dev.neurokitchen.quire.domain.repository.ExchangeRepository
 import dev.neurokitchen.quire.domain.repository.LibrariesRepository
 import dev.neurokitchen.quire.domain.repository.LibraryRepository
 import dev.neurokitchen.quire.domain.repository.PdfRepository
+import dev.neurokitchen.quire.domain.repository.PreferencesRepository
 import dev.neurokitchen.quire.domain.repository.ReaderRepository
 import dev.neurokitchen.quire.domain.repository.SearchRepository
 import dev.neurokitchen.quire.domain.repository.SettingsRepository
@@ -40,6 +42,7 @@ val sampleDataModule = module {
         )
     }
     single<PdfRepository> { SamplePdfRepository() }
+    single<PreferencesRepository> { SamplePreferencesRepository() }
     // No engine on these platforms yet: every call answers "needs the engine".
     single<AttachmentRepository> { object : AttachmentRepository {} }
     single<SearchRepository> { object : SearchRepository {} }

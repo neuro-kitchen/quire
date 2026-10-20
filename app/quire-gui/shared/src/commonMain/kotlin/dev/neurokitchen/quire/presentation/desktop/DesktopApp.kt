@@ -58,8 +58,11 @@ fun DesktopApp(
 
 /** The desktop Settings window's content. */
 @Composable
-fun DesktopSettings() {
-    QuireTheme(desktop = true) {
+fun DesktopSettings(
+    viewModel: DesktopViewModel = koinViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    QuireTheme(appTheme = state.appTheme, desktop = true) {
         Surface { SettingsRoute() }
     }
 }
