@@ -52,6 +52,9 @@ data class PageRect(val left: Float, val top: Float, val right: Float, val botto
 /** Where a highlight's quote is in a PDF. */
 data class QuoteLocation(val highlightId: String, val page: Int, val rects: List<PageRect>)
 
+/** One place a find on a PDF matched: its page and line boxes. */
+data class PdfMatch(val page: Int, val rects: List<PageRect>)
+
 /** A single word hit-tested on a PDF page. */
 data class WordLocation(val text: String, val rect: PageRect)
 

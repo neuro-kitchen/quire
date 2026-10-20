@@ -4,6 +4,7 @@ import dev.neurokitchen.quire.domain.model.Highlight
 import dev.neurokitchen.quire.domain.model.Note
 import dev.neurokitchen.quire.domain.model.PageImage
 import dev.neurokitchen.quire.domain.model.PageSize
+import dev.neurokitchen.quire.domain.model.PdfMatch
 import dev.neurokitchen.quire.domain.model.Paper
 import dev.neurokitchen.quire.domain.model.QuoteLocation
 import dev.neurokitchen.quire.domain.model.ReadingStatus
@@ -39,7 +40,7 @@ interface ReaderRepository {
     suspend fun removeNote(noteId: String)
 }
 
-/** PDF pages (PDFium). Paths are files from [ReaderRepository.pdfFiles]. */
+/** PDF pages and their text layer (hayro). Paths are files from [ReaderRepository.pdfFiles]. */
 interface PdfRepository {
     suspend fun pageSizes(path: String): List<PageSize>
     /** Page `index` rendered `width` pixels wide. */
@@ -51,4 +52,6 @@ interface PdfRepository {
     suspend fun nearestGlyph(path: String, page: Int, x: Float, y: Float): Int? = null
     suspend fun textRange(path: String, page: Int, start: Int, end: Int): SelectedTextRange? = null
     suspend fun pageText(path: String, page: Int): String? = null
+    /** Every place `query` appears, in page order, at most [limit] (the last word as typed so far). */
+    suspend fun search(path: String, query: String, limit: Int = 500): List<PdfMatch> = emptyList()
 }
