@@ -1,5 +1,5 @@
 //! `ref <action>`: everything done to references (add, list, show, link, unlink, rm, restore,
-//! copy, check, refetch, edit, duplicates, merge, distinct). `add`, `list` and `show` are also top-level
+//! copy, check, refetch, edit, duplicates, merge, distinct, cites, cited-by, similar). `add`, `list` and `show` are also top-level
 //! commands.
 //!
 //! One module per action; `link` also serves `unlink`, `trash` serves `rm` and `restore`.
@@ -10,8 +10,10 @@ pub mod check;
 pub mod copy;
 pub mod duplicates;
 pub mod edit;
+pub mod graph;
 pub mod link;
 pub mod list;
+pub mod mark;
 pub mod refetch;
 pub mod relate;
 pub mod show;
@@ -20,6 +22,7 @@ pub mod trash;
 use std::process::ExitCode;
 
 use clap::{Args, Subcommand};
+use quire_engine::GraphKind;
 
 use crate::context::Context;
 
@@ -45,6 +48,8 @@ enum Action {
     Rm(trash::TrashArgs),
     /// Take references out of the trash
     Restore(trash::TrashArgs),
+    /// Set the reading status: unread, reading or read
+    Mark(mark::MarkArgs),
     /// Mark two references as related (both ways)
     Relate(relate::RelateArgs),
     /// Remove the relation between two references
@@ -65,6 +70,12 @@ enum Action {
     Merge(duplicates::MergeArgs),
     /// Record that two references are not duplicates
     Distinct(duplicates::DistinctArgs),
+    /// The works a reference cites (OpenAlex); --add adds them
+    Cites(graph::GraphArgs),
+    /// Works citing a reference, most cited first (OpenAlex)
+    CitedBy(graph::GraphArgs),
+    /// Works related to a reference (OpenAlex)
+    Similar(graph::GraphArgs),
 }
 
 pub async fn run(context: &Context, args: &RefArgs) -> anyhow::Result<ExitCode> {
@@ -78,6 +89,7 @@ pub async fn run(context: &Context, args: &RefArgs) -> anyhow::Result<ExitCode> 
         Action::Unlink(args) => link::run(engine, args, false).await,
         Action::Rm(args) => trash::run(engine, args, true).await,
         Action::Restore(args) => trash::run(engine, args, false).await,
+        Action::Mark(args) => mark::run(engine, args).await,
         Action::Relate(args) => relate::run(engine, args, true).await.and(done),
         Action::Unrelate(args) => relate::run(engine, args, false).await.and(done),
         Action::Copy(args) => copy::run(context, engine, args).await,
@@ -88,6 +100,9 @@ pub async fn run(context: &Context, args: &RefArgs) -> anyhow::Result<ExitCode> 
         Action::Duplicates(args) => duplicates::list(engine, args).await.and(done),
         Action::Merge(args) => duplicates::merge(engine, args).await.and(done),
         Action::Distinct(args) => duplicates::distinct(engine, args).await.and(done),
+        Action::Cites(args) => graph::run(context, args, GraphKind::References).await,
+        Action::CitedBy(args) => graph::run(context, args, GraphKind::Citing).await,
+        Action::Similar(args) => graph::run(context, args, GraphKind::Related).await,
     }
 }
 

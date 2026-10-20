@@ -1,12 +1,13 @@
 //! `ref check`: references with metadata issues (fields missing or doubtful, a fallback source
-//! used, blocked by a publisher) and inputs whose lookup failed.
+//! used, blocked by a publisher, retracted) and inputs whose lookup failed. `--retractions` asks
+//! Crossref first.
 
 use clap::Args;
 use quire_engine::{Issue, Severity, SlugPath};
 
 use crate::context::Context;
 
-use crate::output::{self, style};
+use crate::output::{self, Tone, style};
 
 #[derive(Args, Debug)]
 pub struct CheckArgs {
@@ -22,6 +23,9 @@ pub struct CheckArgs {
     /// Only errors, not warnings
     #[arg(long)]
     errors: bool,
+    /// First ask Crossref (with Retraction Watch's data) about retractions and expressions of concern
+    #[arg(long)]
+    retractions: bool,
     /// Print JSON
     #[arg(long)]
     json: bool,
@@ -30,6 +34,18 @@ pub struct CheckArgs {
 pub async fn run(context: &Context, args: &CheckArgs) -> anyhow::Result<()> {
     let engine = context.engine().await?;
     let (project, recursive) = context.project(args.project.as_ref(), args.recursive, args.all);
+    if args.retractions {
+        let found = engine.check_retractions(project.as_ref(), recursive).await?;
+        for item in found.iter().filter(|f| f.error.is_some()) {
+            output::report(
+                Tone::Warn,
+                "not checked",
+                format!("{}: {}", item.reference.cite_key, item.error.as_deref().unwrap_or("")),
+            );
+        }
+        let flagged = found.iter().filter(|f| f.error.is_none()).count();
+        output::hint(format!("Crossref: {flagged} references with notices (corrections included)"));
+    }
     let mut checked = engine.check(project.as_ref(), recursive).await?;
     if args.errors {
         checked.retain_mut(|c| {

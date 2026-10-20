@@ -1,7 +1,9 @@
-//! `project new|list|tree|rename|rm`.
+//! `project new|list|tree|rename|rm|share|members|unshare`. Sharing: a project (with its
+//! subprojects, references and PDFs) is visible to its members' devices when they sync with
+//! yours; tags, notes, highlights and reading status stay yours.
 
 use clap::{Args, Subcommand};
-use quire_engine::{Engine, SlugPath};
+use quire_engine::{Engine, MemberRole, SlugPath, UserId};
 
 use crate::output::{self, Tone, style, tree};
 
@@ -37,10 +39,57 @@ enum Action {
         #[arg(short, long)]
         recursive: bool,
     },
+    /// Share a project with someone (their `quire user id`); they sync with one of your devices
+    Share {
+        path: SlugPath,
+        user: UserId,
+        /// What to call them in lists
+        #[arg(long)]
+        name: String,
+        /// reader, editor or owner
+        #[arg(long, default_value = "editor")]
+        role: MemberRole,
+    },
+    /// Who a project is shared with
+    Members { path: SlugPath },
+    /// Stop sharing a project with someone
+    Unshare { path: SlugPath, user: UserId },
 }
 
 pub async fn run(engine: &Engine, args: &ProjectArgs) -> anyhow::Result<()> {
     match &args.action {
+        Action::Share { path, user, name, role } => {
+            let member = engine.share_project(path, user, name, *role).await?;
+            output::report(
+                Tone::Ok,
+                "shared",
+                format!("{path} with {} ({}, {})", member.name, member.user.short(), member.role),
+            );
+            output::hint(format!(
+                "{} sees it once one of their devices syncs with one of yours: add theirs with `quire sync peer add {} <device-id>`",
+                member.name,
+                member.name.to_lowercase().replace(' ', "-")
+            ));
+        }
+        Action::Members { path } => {
+            let (project, members) = engine.project_members(path).await?;
+            match &project.owner {
+                Some(owner) => anstream::println!("{}  owner", style::paint(style::KEY, owner.short())),
+                None => output::hint(format!("{path} is not shared")),
+            }
+            for member in &members {
+                anstream::println!(
+                    "{}  {}  {}",
+                    style::paint(style::KEY, member.user.short()),
+                    member.role,
+                    member.name
+                );
+            }
+        }
+        Action::Unshare { path, user } => {
+            let member = engine.unshare_project(path, user).await?;
+            output::report(Tone::Ok, "unshared", format!("{path}: {} no longer sees it", member.name));
+        }
         Action::New { name, parent } => {
             let (path, _) = engine.create_project(name, parent.as_ref()).await?;
             output::report(Tone::Ok, "created", style::paint(style::KEY, path));

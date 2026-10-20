@@ -134,7 +134,17 @@ fn show(report: &SyncReport) {
     if report.joined {
         parts.push("joined its library".into());
     }
+    if let Some(user) = &report.collaborator {
+        parts.push(format!("a collaborator ({}…): shared projects only", &user[..12.min(user.len())]));
+    }
     output::report(Tone::Ok, "synced", format!("with {peer}…  {}", parts.join("; ")));
+    if r.refused > 0 {
+        output::note(
+            Tone::Warn,
+            "refused",
+            format!("{} change(s): beyond the sender's role, or stamped by a clock more than a day ahead", r.refused),
+        );
+    }
     for (old, new) in &r.renamed {
         output::note(Tone::Warn, "renamed", format!("{old} → {new} (another paper had that key)"));
     }
