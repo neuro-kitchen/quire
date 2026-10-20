@@ -41,27 +41,9 @@ impl Fetcher {
 /// The first result's `abstractText`, without markup, if it has one.
 pub fn abstract_in(response: &Value) -> Option<String> {
     let text = response.pointer("/resultList/result/0/abstractText")?.as_str()?;
-    let plain = strip_tags(text);
+    // Europe PMC keeps PubMed's markup (section headings, sub/superscripts).
+    let plain = quire_io::text::plain(text);
     Some(plain).filter(|t| t.chars().count() >= 40)
-}
-
-/// `<h4>Background</h4>Text<sup>2</sup>` → `Background Text2`: Europe PMC keeps PubMed's markup
-/// (section headings, sub/superscripts).
-fn strip_tags(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    let mut in_tag = false;
-    for c in text.chars() {
-        match c {
-            '<' => in_tag = true,
-            '>' if in_tag => {
-                in_tag = false;
-                out.push(' ');
-            }
-            _ if !in_tag => out.push(c),
-            _ => {}
-        }
-    }
-    out.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 #[cfg(test)]
@@ -70,7 +52,6 @@ mod tests {
 
     #[test]
     fn strips_markup() {
-        assert_eq!(strip_tags("<h4>Background</h4>Temperature<sup>2</sup>  rises."), "Background Temperature 2 rises.");
         assert_eq!(abstract_in(&serde_json::json!({"resultList": {"result": []}})), None);
     }
 }

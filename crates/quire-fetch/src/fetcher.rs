@@ -70,6 +70,10 @@ pub struct Endpoints {
     pub unpaywall: Url,
     /// Europe PMC REST API, `https://www.ebi.ac.uk/europepmc/webservices/rest/`.
     pub europepmc: Url,
+    /// OpenAlex API, `https://api.openalex.org/`.
+    pub openalex: Url,
+    /// NCBI E-utilities, `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/`.
+    pub eutils: Url,
 }
 
 impl Endpoints {
@@ -85,6 +89,8 @@ impl Endpoints {
             arxiv_html: at("html/"),
             unpaywall: at("unpaywall/"),
             europepmc: at("europepmc/"),
+            openalex: at("openalex/"),
+            eutils: at("eutils/"),
         }
     }
 }
@@ -101,6 +107,8 @@ impl Default for Endpoints {
             arxiv_html: url("https://arxiv.org/html/"),
             unpaywall: url("https://api.unpaywall.org/v2/"),
             europepmc: url("https://www.ebi.ac.uk/europepmc/webservices/rest/"),
+            openalex: url("https://api.openalex.org/"),
+            eutils: url("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"),
         }
     }
 }

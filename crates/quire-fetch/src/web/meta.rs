@@ -1,5 +1,6 @@
 //! Reading `<meta name|property="…" content="…">` tags and `<title>` from an HTML page.
 
+use quire_io::text::squash;
 use scraper::{Html, Selector};
 
 /// A page's metadata tags, names lowercased, in document order (names may repeat, e.g. one
@@ -44,11 +45,6 @@ pub fn read_tags(html: &str) -> Tags {
         .map(|t| squash(&t.text().collect::<String>()))
         .filter(|t| !t.is_empty());
     Tags { pairs, title }
-}
-
-/// Trims and collapses runs of whitespace.
-fn squash(text: &str) -> String {
-    text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 #[cfg(test)]
