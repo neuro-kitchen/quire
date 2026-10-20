@@ -42,7 +42,7 @@ pub fn to_markdown(bytes: &[u8]) -> Result<String> {
 fn convert(bytes: &[u8]) -> Result<(Option<String>, u32)> {
     let parsed = std::panic::catch_unwind(|| pdf_inspector::process_pdf_mem(bytes))
         .map_err(|_| IoError::NotPdf("the PDF could not be read (malformed)".into()))?;
-    let result = parsed.map_err(|e| IoError::NotPdf(e.to_string()))?;
+    let result = parsed.map_err(|e| not_pdf(&e))?;
     let markdown = result.markdown.filter(|m| !m.trim().is_empty());
     Ok((markdown, result.page_count))
 }
@@ -153,8 +153,7 @@ pub fn inspect(bytes: &[u8]) -> Result<PdfInfo> {
         return Err(IoError::NotPdf("the file does not start with %PDF-".into()));
     }
     let options = pdf_inspector::PdfOptions::new().pages(PAGES_READ);
-    let result =
-        pdf_inspector::process_pdf_mem_with_options(bytes, options).map_err(|e| IoError::NotPdf(e.to_string()))?;
+    let result = pdf_inspector::process_pdf_mem_with_options(bytes, options).map_err(|e| not_pdf(&e))?;
     let kind = match result.pdf_type {
         pdf_inspector::PdfType::TextBased => PdfKind::Text,
         pdf_inspector::PdfType::Scanned | pdf_inspector::PdfType::ImageBased => PdfKind::Scanned,
@@ -205,6 +204,13 @@ pub fn find_identifiers(text: &str) -> Vec<Identifier> {
         }
     }
     found
+}
+
+/// pdf-inspector's error, without its own "Not a PDF:" (ours says it).
+fn not_pdf(error: &impl std::fmt::Display) -> IoError {
+    let text = error.to_string();
+    let detail = text.strip_prefix("Not a PDF:").map_or(text.as_str(), str::trim_start);
+    IoError::NotPdf(detail.to_string())
 }
 
 #[cfg(test)]
