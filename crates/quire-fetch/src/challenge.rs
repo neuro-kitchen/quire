@@ -31,7 +31,7 @@ const INTERSTITIAL: &[&str] = &[
 
 /// Whether a response is a challenge: the Cloudflare header; for an error status any marker in
 /// the body; for a successful one only an interstitial marker.
-pub fn is_challenge(cf_mitigated: Option<&str>, body: &str, success: bool) -> bool {
+pub(crate) fn is_challenge(cf_mitigated: Option<&str>, body: &str, success: bool) -> bool {
     let markers = if success { INTERSTITIAL } else { MARKERS };
     cf_mitigated.is_some_and(|v| v.eq_ignore_ascii_case("challenge")) || markers.iter().any(|m| body.contains(m))
 }

@@ -39,7 +39,7 @@ impl Fetcher {
 }
 
 /// The first result's `abstractText`, without markup, if it has one.
-pub fn abstract_in(response: &Value) -> Option<String> {
+pub(crate) fn abstract_in(response: &Value) -> Option<String> {
     let text = response.pointer("/resultList/result/0/abstractText")?.as_str()?;
     // Europe PMC keeps PubMed's markup (section headings, sub/superscripts).
     let plain = quire_io::text::plain(text);
