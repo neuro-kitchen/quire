@@ -201,6 +201,59 @@ fun ReaderScreen(
 
                 StatusLine(state)
                 when {
+                    state.mode == ReaderMode.Split && state.pdf.pages.isNotEmpty() -> {
+                        var splitWeight by remember { mutableFloatStateOf(0.5f) }
+                        Row(Modifier.fillMaxSize()) {
+                            Box(Modifier.weight(splitWeight).fillMaxHeight()) {
+                                TextReaderView(
+                                    tabs = state.tabs,
+                                    selectedTab = state.selectedTab,
+                                    highlights = state.highlights,
+                                    focused = state.focusedHighlight,
+                                    readerTheme = state.readerTheme,
+                                    readerFont = state.readerFont,
+                                    fontSizeSp = state.fontSizeSp,
+                                    onTabClick = { onEvent(ReaderEvent.OnTabClick(it)) },
+                                    onSelection = { selection = it },
+                                    onHighlight = { quote, prefix, color ->
+                                        onEvent(ReaderEvent.OnHighlight(quote, prefix, color))
+                                    },
+                                    onAddNote = { body ->
+                                        onEvent(ReaderEvent.OnNoteDraftChange(body))
+                                        onEvent(ReaderEvent.OnNoteAdd)
+                                    },
+                                    loadFigure = loadFigure,
+                                    findMatches = if (state.find.isOpen) state.find.textMatches else emptyList(),
+                                    currentFind = state.find.current,
+                                )
+                            }
+                            DraggableSplitter(
+                                onDelta = { delta ->
+                                    splitWeight = (splitWeight + delta / 800f).coerceIn(0.25f, 0.75f)
+                                },
+                            )
+                            Box(Modifier.weight(1f - splitWeight).fillMaxHeight()) {
+                                PdfPagesView(
+                                    pages = state.pdf.pages,
+                                    zoom = state.pdf.zoom,
+                                    locations = state.pdf.locations,
+                                    focused = state.focusedHighlight,
+                                    loadPage = loadPage,
+                                    readerTheme = state.readerTheme,
+                                    textLayer = textLayer,
+                                    matches = if (state.find.isOpen) state.find.pdfMatches else emptyList(),
+                                    currentMatch = state.find.current,
+                                    onHighlight = { quote, prefix, color ->
+                                        onEvent(ReaderEvent.OnHighlight(quote, prefix, color))
+                                    },
+                                    onAddNote = { body ->
+                                        onEvent(ReaderEvent.OnNoteDraftChange(body))
+                                        onEvent(ReaderEvent.OnNoteAdd)
+                                    },
+                                )
+                            }
+                        }
+                    }
                     state.mode == ReaderMode.Pdf && state.pdf.pages.isNotEmpty() -> PdfPagesView(
                         pages = state.pdf.pages,
                         zoom = state.pdf.zoom,
