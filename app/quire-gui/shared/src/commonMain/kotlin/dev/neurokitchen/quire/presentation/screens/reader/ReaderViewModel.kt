@@ -97,6 +97,9 @@ class ReaderViewModel(
             is ReaderEvent.OnChangeFontSize -> _state.update {
                 it.copy(fontSizeSp = (it.fontSizeSp + event.delta).coerceIn(12, 28))
             }
+            ReaderEvent.OnToggleFigureDrawer -> _state.update { it.copy(isFigureDrawerOpen = !it.isFigureDrawerOpen) }
+            ReaderEvent.OnToggleSnapshotMode -> _state.update { it.copy(isSnapshotMode = !it.isSnapshotMode) }
+            is ReaderEvent.OnShowCitation -> _state.update { it.copy(activeCitation = event.citation) }
         }
     }
 

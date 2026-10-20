@@ -35,6 +35,8 @@ import dev.neurokitchen.quire.presentation.designsystem.Dimens
 import dev.neurokitchen.quire.presentation.designsystem.QuireTheme
 import dev.neurokitchen.quire.presentation.designsystem.components.DraggableSplitter
 import dev.neurokitchen.quire.presentation.screens.reader.components.AnnotationsSidebar
+import dev.neurokitchen.quire.presentation.screens.reader.components.CitationHoverCard
+import dev.neurokitchen.quire.presentation.screens.reader.components.FigureDrawer
 import dev.neurokitchen.quire.presentation.screens.reader.components.NotesPanel
 import dev.neurokitchen.quire.presentation.screens.reader.components.PdfPagesView
 import dev.neurokitchen.quire.presentation.screens.reader.components.ReaderSearchBar
@@ -77,6 +79,7 @@ fun ReaderScreen(
     var selection by remember(state.referenceId) { mutableStateOf<Pair<String, String>?>(null) }
     var sidebarWidthDp by remember { mutableFloatStateOf(260f) }
     var notesWidthDp by remember { mutableFloatStateOf(280f) }
+    var figureDrawerWidthDp by remember { mutableFloatStateOf(320f) }
     val rootFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
@@ -154,6 +157,8 @@ fun ReaderScreen(
                     reading = state.reading,
                     isAnnotationsCollapsed = state.isAnnotationsCollapsed,
                     isNotesCollapsed = state.isNotesCollapsed,
+                    isFigureDrawerOpen = state.isFigureDrawerOpen,
+                    isSnapshotMode = state.isSnapshotMode,
                     isSearchOpen = state.find.isOpen,
                     readerTheme = state.readerTheme,
                     readerFont = state.readerFont,
@@ -178,6 +183,8 @@ fun ReaderScreen(
                     onReadingChange = { onEvent(ReaderEvent.OnReadingChange(it)) },
                     onToggleAnnotations = { onEvent(ReaderEvent.OnToggleAnnotations) },
                     onToggleNotes = { onEvent(ReaderEvent.OnToggleNotes) },
+                    onToggleFigureDrawer = { onEvent(ReaderEvent.OnToggleFigureDrawer) },
+                    onToggleSnapshotMode = { onEvent(ReaderEvent.OnToggleSnapshotMode) },
                     onToggleSearch = { onEvent(ReaderEvent.OnFindToggle) },
                     onSetReaderTheme = { onEvent(ReaderEvent.OnSetReaderTheme(it)) },
                     onSetReaderFont = { onEvent(ReaderEvent.OnSetReaderFont(it)) },
@@ -243,11 +250,16 @@ fun ReaderScreen(
                                     textLayer = textLayer,
                                     matches = if (state.find.isOpen) state.find.pdfMatches else emptyList(),
                                     currentMatch = state.find.current,
+                                    isSnapshotMode = state.isSnapshotMode,
                                     onHighlight = { quote, prefix, color ->
                                         onEvent(ReaderEvent.OnHighlight(quote, prefix, color))
                                     },
                                     onAddNote = { body ->
                                         onEvent(ReaderEvent.OnNoteDraftChange(body))
+                                        onEvent(ReaderEvent.OnNoteAdd)
+                                    },
+                                    onAddSnapshot = { rect, page ->
+                                        onEvent(ReaderEvent.OnNoteDraftChange("[Area Snapshot p. ${page + 1}: (${rect.left.toInt()}, ${rect.top.toInt()}) - (${rect.right.toInt()}, ${rect.bottom.toInt()})]"))
                                         onEvent(ReaderEvent.OnNoteAdd)
                                     },
                                 )
@@ -264,11 +276,16 @@ fun ReaderScreen(
                         textLayer = textLayer,
                         matches = if (state.find.isOpen) state.find.pdfMatches else emptyList(),
                         currentMatch = state.find.current,
+                        isSnapshotMode = state.isSnapshotMode,
                         onHighlight = { quote, prefix, color ->
                             onEvent(ReaderEvent.OnHighlight(quote, prefix, color))
                         },
                         onAddNote = { body ->
                             onEvent(ReaderEvent.OnNoteDraftChange(body))
+                            onEvent(ReaderEvent.OnNoteAdd)
+                        },
+                        onAddSnapshot = { rect, page ->
+                            onEvent(ReaderEvent.OnNoteDraftChange("[Area Snapshot p. ${page + 1}: (${rect.left.toInt()}, ${rect.top.toInt()}) - (${rect.right.toInt()}, ${rect.bottom.toInt()})]"))
                             onEvent(ReaderEvent.OnNoteAdd)
                         },
                     )
@@ -312,7 +329,27 @@ fun ReaderScreen(
                     modifier = Modifier.width(notesWidthDp.dp),
                 )
             }
+            if (state.isFigureDrawerOpen) {
+                DraggableSplitter(
+                    onDelta = { delta ->
+                        figureDrawerWidthDp = (figureDrawerWidthDp - delta).coerceIn(240f, 550f)
+                    },
+                )
+                FigureDrawer(
+                    isOpen = true,
+                    tabs = state.tabs,
+                    loadFigure = loadFigure,
+                    onClose = { onEvent(ReaderEvent.OnToggleFigureDrawer) },
+                    modifier = Modifier.width(figureDrawerWidthDp.dp),
+                )
+            }
         }
+
+        // Citation Hover / Popover Card
+        CitationHoverCard(
+            citation = state.activeCitation,
+            onDismissRequest = { onEvent(ReaderEvent.OnShowCitation(null)) },
+        )
     }
 }
 

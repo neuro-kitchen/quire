@@ -93,8 +93,10 @@ fun PdfPagesView(
     matches: List<PdfMatch> = emptyList(),
     /** The match to bring into view and mark; ignored without matches. */
     currentMatch: Int = 0,
+    isSnapshotMode: Boolean = false,
     onHighlight: (quote: String, prefix: String, color: String) -> Unit = { _, _, _ -> },
     onAddNote: (body: String) -> Unit = {},
+    onAddSnapshot: (rect: PageRect, pageIndex: Int) -> Unit = { _, _ -> },
 ) {
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -129,7 +131,9 @@ fun PdfPagesView(
                     current = current?.takeIf { it.page == index },
                     activeSelection = selection?.takeIf { it.page == index },
                     textLayer = textLayer,
+                    isSnapshotMode = isSnapshotMode,
                     onSelect = { selection = it },
+                    onAddSnapshot = { rect -> onAddSnapshot(rect, index) },
                     loadPage = loadPage,
                 )
             }
@@ -198,7 +202,9 @@ private fun PageItem(
     current: PdfMatch?,
     activeSelection: ActivePdfSelection?,
     textLayer: PdfTextLayer,
+    isSnapshotMode: Boolean = false,
     onSelect: (ActivePdfSelection?) -> Unit,
+    onAddSnapshot: (PageRect) -> Unit = {},
     loadPage: suspend (Int, Int) -> PageImage?,
 ) {
     val widthPx = with(LocalDensity.current) { width.toPx() }.roundToInt()
@@ -207,6 +213,8 @@ private fun PageItem(
     }
     val colors = QuireTheme.colors
     val scope = rememberCoroutineScope()
+    var snapshotStart by remember { mutableStateOf<Offset?>(null) }
+    var snapshotCurrent by remember { mutableStateOf<Offset?>(null) }
 
     Box(
         modifier = Modifier
@@ -215,45 +223,81 @@ private fun PageItem(
             .shadow(6.dp, RoundedCornerShape(Dimens.RadiusSmall))
             .clip(RoundedCornerShape(Dimens.RadiusSmall))
             .background(Color.White)
-            .pointerInput(index, textLayer) {
-                // Pixels to points: the page is drawn the box's width.
+            .pointerInput(index, textLayer, isSnapshotMode) {
                 fun points(offset: Offset): Offset = offset / (this.size.width.toFloat() / size.width)
-                detectTapGestures(
-                    onTap = { onSelect(null) },
-                    onDoubleTap = { offset ->
-                        val at = points(offset)
-                        scope.launch {
-                            val word = textLayer.wordAt(index, at.x, at.y) ?: return@launch
-                            val first = textLayer.glyphAt(index, word.rect.left + 0.5f, (word.rect.top + word.rect.bottom) / 2) ?: return@launch
-                            val last = textLayer.glyphAt(index, word.rect.right - 0.5f, (word.rect.top + word.rect.bottom) / 2) ?: return@launch
-                            select(textLayer, index, first, last)?.let(onSelect)
-                        }
-                    },
-                )
+                if (isSnapshotMode) {
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            val at = points(offset)
+                            snapshotStart = at
+                            snapshotCurrent = at
+                        },
+                        onDrag = { change, _ ->
+                            change.consume()
+                            snapshotCurrent = points(change.position)
+                        },
+                        onDragEnd = {
+                            val s = snapshotStart
+                            val c = snapshotCurrent
+                            if (s != null && c != null) {
+                                val rect = PageRect(
+                                    left = minOf(s.x, c.x),
+                                    top = minOf(s.y, c.y),
+                                    right = maxOf(s.x, c.x),
+                                    bottom = maxOf(s.y, c.y),
+                                )
+                                if ((rect.right - rect.left) > 5f && (rect.bottom - rect.top) > 5f) {
+                                    onAddSnapshot(rect)
+                                }
+                            }
+                            snapshotStart = null
+                            snapshotCurrent = null
+                        },
+                        onDragCancel = {
+                            snapshotStart = null
+                            snapshotCurrent = null
+                        },
+                    )
+                } else {
+                    detectTapGestures(
+                        onTap = { onSelect(null) },
+                        onDoubleTap = { offset ->
+                            val at = points(offset)
+                            scope.launch {
+                                val word = textLayer.wordAt(index, at.x, at.y) ?: return@launch
+                                val first = textLayer.glyphAt(index, word.rect.left + 0.5f, (word.rect.top + word.rect.bottom) / 2) ?: return@launch
+                                val last = textLayer.glyphAt(index, word.rect.right - 0.5f, (word.rect.top + word.rect.bottom) / 2) ?: return@launch
+                                select(textLayer, index, first, last)?.let(onSelect)
+                            }
+                        },
+                    )
+                }
             }
-            .pointerInput(index, textLayer) {
-                fun points(offset: Offset): Offset = offset / (this.size.width.toFloat() / size.width)
-                var anchor: Int? = null
-                var pending: Job? = null
-                detectDragGestures(
-                    onDragStart = { offset ->
-                        val at = points(offset)
-                        anchor = null
-                        scope.launch { anchor = textLayer.glyphAt(index, at.x, at.y) }
-                    },
-                    onDrag = { change, _ ->
-                        change.consume()
-                        val at = points(change.position)
-                        // The latest position wins: an older range still being read is dropped.
-                        pending?.cancel()
-                        pending = scope.launch {
-                            val from = anchor ?: return@launch
-                            val to = textLayer.glyphAt(index, at.x, at.y) ?: return@launch
-                            select(textLayer, index, from, to)?.let(onSelect)
-                        }
-                    },
-                )
-            },
+            .then(
+                if (isSnapshotMode) Modifier
+                else Modifier.pointerInput(index, textLayer) {
+                    fun points(offset: Offset): Offset = offset / (this.size.width.toFloat() / size.width)
+                    var anchor: Int? = null
+                    var pending: Job? = null
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            val at = points(offset)
+                            anchor = null
+                            scope.launch { anchor = textLayer.glyphAt(index, at.x, at.y) }
+                        },
+                        onDrag = { change, _ ->
+                            change.consume()
+                            val at = points(change.position)
+                            pending?.cancel()
+                            pending = scope.launch {
+                                val from = anchor ?: return@launch
+                                val to = textLayer.glyphAt(index, at.x, at.y) ?: return@launch
+                                select(textLayer, index, from, to)?.let(onSelect)
+                            }
+                        },
+                    )
+                }
+            ),
     ) {
         image?.let {
             Image(bitmap = it, contentDescription = null, contentScale = ContentScale.FillBounds, modifier = Modifier.fillMaxSize())
@@ -262,7 +306,6 @@ private fun PageItem(
         Canvas(Modifier.fillMaxSize()) {
             val scale = this.size.width / size.width
             for (location in locations) {
-                // The engine keeps no colour per highlight yet: all are drawn in the one it means.
                 val isFocused = location.highlightId == focused
                 location.rects.forEach { box(it, scale, colors.highlightYellow.copy(alpha = if (isFocused) 0.55f else 0.35f), if (isFocused) colors.accent else null) }
             }
@@ -271,6 +314,18 @@ private fun PageItem(
                 match.rects.forEach { box(it, scale, colors.findMatch.copy(alpha = if (isCurrent) 0.5f else 0.25f), if (isCurrent) colors.findMatch else null) }
             }
             activeSelection?.rects?.forEach { box(it, scale, SelectionFill, SelectionStroke) }
+
+            // Snapshot Marquee Overlay
+            if (snapshotStart != null && snapshotCurrent != null) {
+                val s = snapshotStart!!
+                val c = snapshotCurrent!!
+                val left = minOf(s.x, c.x) * scale
+                val top = minOf(s.y, c.y) * scale
+                val w = kotlin.math.abs(c.x - s.x) * scale
+                val h = kotlin.math.abs(c.y - s.y) * scale
+                drawRect(color = colors.accent.copy(alpha = 0.2f), topLeft = Offset(left, top), size = Size(w, h))
+                drawRect(color = colors.accent, topLeft = Offset(left, top), size = Size(w, h), style = Stroke(width = 2.dp.toPx()))
+            }
         }
     }
 }

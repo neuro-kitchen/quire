@@ -38,6 +38,9 @@ data class ReaderState(
     /** The engine's message when something failed. */
     val error: String? = null,
     val find: FindState = FindState(),
+    val isFigureDrawerOpen: Boolean = false,
+    val isSnapshotMode: Boolean = false,
+    val activeCitation: dev.neurokitchen.quire.presentation.screens.reader.components.CitationDetail? = null,
 )
 
 /**

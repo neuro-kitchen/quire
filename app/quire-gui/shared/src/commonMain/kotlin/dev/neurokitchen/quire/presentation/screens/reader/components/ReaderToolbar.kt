@@ -45,6 +45,7 @@ import dev.neurokitchen.quire.presentation.designsystem.ReaderTheme
 import dev.neurokitchen.quire.presentation.designsystem.readerColors
 import dev.neurokitchen.quire.presentation.screens.reader.ReaderMode
 import dev.neurokitchen.quire.resources.Res
+import dev.neurokitchen.quire.resources.ic_auto_fix_high
 import dev.neurokitchen.quire.resources.ic_inventory_2
 import dev.neurokitchen.quire.resources.ic_search
 import dev.neurokitchen.quire.resources.ic_sticky_note_2
@@ -77,6 +78,8 @@ fun ReaderToolbar(
     reading: ReadingStatus,
     isAnnotationsCollapsed: Boolean = false,
     isNotesCollapsed: Boolean = false,
+    isFigureDrawerOpen: Boolean = false,
+    isSnapshotMode: Boolean = false,
     isSearchOpen: Boolean = false,
     readerTheme: ReaderTheme = ReaderTheme.Dark,
     readerFont: ReaderFont = ReaderFont.Serif,
@@ -89,6 +92,8 @@ fun ReaderToolbar(
     onReadingChange: (ReadingStatus) -> Unit,
     onToggleAnnotations: () -> Unit = {},
     onToggleNotes: () -> Unit = {},
+    onToggleFigureDrawer: () -> Unit = {},
+    onToggleSnapshotMode: () -> Unit = {},
     onToggleSearch: () -> Unit = {},
     onSetReaderTheme: (ReaderTheme) -> Unit = {},
     onSetReaderFont: (ReaderFont) -> Unit = {},
@@ -139,6 +144,42 @@ fun ReaderToolbar(
                 tint = if (!isNotesCollapsed) colors.accent else colors.fillSecondary,
                 modifier = Modifier.size(16.dp),
             )
+        }
+
+        // Toggle Figures & Tables Drawer
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(Dimens.ToolbarButton)
+                .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                .background(if (isFigureDrawerOpen) colors.accent.copy(alpha = 0.15f) else Color.Transparent)
+                .clickable(onClick = onToggleFigureDrawer),
+        ) {
+            Icon(
+                painterResource(Res.drawable.ic_inventory_2),
+                contentDescription = "Toggle Figures & Tables Drawer",
+                tint = if (isFigureDrawerOpen) colors.accent else colors.fillSecondary,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+
+        // Toggle Area Snapshot Mode
+        if (hasPdf) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(Dimens.ToolbarButton)
+                    .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                    .background(if (isSnapshotMode) colors.accent.copy(alpha = 0.2f) else Color.Transparent)
+                    .clickable(onClick = onToggleSnapshotMode),
+            ) {
+                Icon(
+                    painterResource(Res.drawable.ic_auto_fix_high),
+                    contentDescription = "Area Snapshot Tool",
+                    tint = if (isSnapshotMode) colors.accent else colors.fillSecondary,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
         }
 
         Spacer(Modifier.width(2.dp))
