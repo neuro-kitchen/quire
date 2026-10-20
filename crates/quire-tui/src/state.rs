@@ -1,7 +1,10 @@
 //! Everything the TUI shows and remembers: the data loaded from the engine and the interface's
 //! own state (focus, selection, filter, sort, prompts). Changed only by [`crate::update`].
 
-use quire_engine::{Issue, IssueCode, Note, PdfStatus, ProjectSummary, Reference, Severity, SlugPath, Tag, TagKind};
+use quire_engine::{
+    Issue, IssueCode, Note, PdfStatus, ProjectSummary, ReadingStatus, Reference, SavedSearch, Severity, SlugPath, Tag,
+    TagKind,
+};
 use std::collections::HashMap;
 
 use quire_model::ReferenceId;
@@ -19,6 +22,8 @@ pub struct Row {
     /// For a full-text search result: the matching words in context, and whether only the
     /// paper's text matched.
     pub hit: Option<(String, bool)>,
+    /// Reading status (unread when `None`).
+    pub reading: Option<ReadingStatus>,
 }
 
 impl Row {
@@ -50,6 +55,8 @@ pub enum Scope {
     Project(SlugPath),
     /// Full-text search results, best first.
     Search(String),
+    /// A saved search, by name (run again when opened).
+    Saved(String),
     /// References that look like the same work as another.
     Duplicates,
     Trash,
@@ -117,6 +124,8 @@ pub enum Prompt {
     Export,
     /// Words to search the whole library for (full text).
     Search,
+    /// A name to keep the open search under.
+    SaveSearch,
 }
 
 /// Engine work running in the background (a lookup, a download, a merge), for the jobs panel.
@@ -143,6 +152,8 @@ pub struct State {
     pub colored: Vec<Tag>,
     /// How many pairs of references look like duplicates (shown in the left pane).
     pub duplicate_pairs: usize,
+    /// Saved searches, by name (after the projects in the left pane).
+    pub saved: Vec<SavedSearch>,
     pub scope: Scope,
     /// Index into the left pane: 0 = all, 1..=projects = projects, last = trash.
     pub scope_index: usize,
@@ -173,6 +184,9 @@ pub struct State {
     pub reader_settings: Settings,
     /// Where each paper was left (block index), by reference.
     pub positions: HashMap<ReferenceId, usize>,
+    /// Whether the terminal shows images (kitty, sixel, iTerm2), once asked (`None`: not yet).
+    /// Figures are downloaded for the reader only when it does.
+    pub graphics: Option<bool>,
 }
 
 impl State {
@@ -182,6 +196,7 @@ impl State {
             projects: Vec::new(),
             colored: Vec::new(),
             duplicate_pairs: 0,
+            saved: Vec::new(),
             scope: Scope::All,
             scope_index: 0,
             rows: Vec::new(),
@@ -203,20 +218,23 @@ impl State {
             reader: None,
             reader_settings: Settings::default(),
             positions: HashMap::new(),
+            graphics: None,
         }
     }
 
-    /// Entries of the left pane: all, the projects, duplicates, the trash.
+    /// Entries of the left pane: all, the projects, the saved searches, duplicates, the trash.
     pub fn scope_count(&self) -> usize {
-        self.projects.len() + 3
+        self.projects.len() + self.saved.len() + 3
     }
 
     /// The scope at `index` of the left pane.
     pub fn scope_at(&self, index: usize) -> Scope {
+        let (projects, saved) = (self.projects.len(), self.saved.len());
         match index {
             0 => Scope::All,
-            i if i <= self.projects.len() => Scope::Project(self.projects[i - 1].path.clone()),
-            i if i == self.projects.len() + 1 => Scope::Duplicates,
+            i if i <= projects => Scope::Project(self.projects[i - 1].path.clone()),
+            i if i <= projects + saved => Scope::Saved(self.saved[i - projects - 1].name.clone()),
+            i if i == projects + saved + 1 => Scope::Duplicates,
             _ => Scope::Trash,
         }
     }

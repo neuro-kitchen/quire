@@ -9,7 +9,7 @@ mod jobs;
 mod prompt;
 mod reader;
 
-use quire_engine::{ProjectSummary, SlugPath, Tag};
+use quire_engine::{ProjectSummary, ReadingStatus, SavedSearch, SlugPath, Tag};
 use quire_model::ReferenceId;
 
 use crate::reader::{ReaderAction, Settings};
@@ -47,6 +47,10 @@ pub enum Action {
     Refetch,
     /// Take the selected reference out of the open project.
     Unlink,
+    /// Copy the selected reference's cite key.
+    CopyKey,
+    /// Move the selected paper to the next reading status (unread → reading → read).
+    CycleReading,
     /// Open or close the jobs panel.
     ToggleJobs,
     Reload,
@@ -55,6 +59,7 @@ pub enum Action {
         projects: Vec<ProjectSummary>,
         colored: Vec<Tag>,
         duplicate_pairs: usize,
+        saved: Vec<SavedSearch>,
     },
     Rows(Vec<Row>),
     DetailsLoaded(Details),
@@ -71,6 +76,13 @@ pub enum Action {
     /// Keys inside the reader.
     Reader(ReaderAction),
     /// The reader's text arrived (or failed).
+    /// The terminal said whether it shows images.
+    GraphicsDetected(bool),
+    /// A figure image's file arrived (or failed).
+    FigureLoaded {
+        url: String,
+        result: Result<std::path::PathBuf, String>,
+    },
     TextLoaded {
         id: ReferenceId,
         text: Result<quire_engine::PaperText, String>,
@@ -118,6 +130,10 @@ pub enum Effect {
     RefreshText(ReferenceId),
     /// Load a paper's highlights and notes for the reader.
     LoadAnnotations(ReferenceId),
+    /// Download a figure image (cached by the engine).
+    LoadFigure(String),
+    /// Ask the terminal whether it shows images: the event loop pauses reading keys for it.
+    DetectGraphics,
     AddHighlight {
         reference: ReferenceId,
         quote: String,
@@ -155,6 +171,21 @@ pub enum Effect {
         scope: Scope,
         path: String,
     },
+    /// Put `text` on the clipboard: the event loop writes to the terminal (OSC 52).
+    Clipboard {
+        text: String,
+        what: String,
+    },
+    SetReading {
+        reference: ReferenceId,
+        status: ReadingStatus,
+    },
+    /// The reader opened a paper: mark it reading if unread.
+    Opened(ReferenceId),
+    SaveSearch {
+        name: String,
+        query: String,
+    },
 }
 
 /// Lines moved by page up / down.
@@ -165,9 +196,23 @@ pub fn update(state: &mut State, action: Action) -> Vec<Effect> {
         Action::Read => return reader::open(state),
         Action::TextLoaded { id, text } => {
             reader::text_loaded(state, id, text);
+            return reader::figure(state).into_iter().collect();
+        }
+        Action::Reader(action) => {
+            let mut effects = reader::action(state, action);
+            effects.extend(reader::figure(state));
+            return effects;
+        }
+        Action::GraphicsDetected(available) => {
+            state.graphics = Some(available);
+            return reader::figure(state).into_iter().collect();
+        }
+        Action::FigureLoaded { url, result } => {
+            if let Some(open) = state.reader.as_mut() {
+                open.figure_loaded(url, result);
+            }
             return Vec::new();
         }
-        Action::Reader(action) => return reader::action(state, action),
         Action::JobFinished(id) => {
             jobs::finished(state, id);
             return Vec::new();
@@ -232,6 +277,10 @@ pub fn update(state: &mut State, action: Action) -> Vec<Effect> {
                 state.warn("no duplicate to merge (≈ marks possible duplicates)");
                 return Vec::new();
             }
+            if kind == Prompt::SaveSearch && !matches!(state.scope, Scope::Search(_)) {
+                state.warn("search first (Ctrl-f), then w saves the search");
+                return Vec::new();
+            }
             state.input = if kind == Prompt::Filter { state.filter.clone() } else { String::new() };
             state.prompt = Some(kind);
         }
@@ -248,6 +297,25 @@ pub fn update(state: &mut State, action: Action) -> Vec<Effect> {
         Action::ExtractText => return job_on_selected(state, "extract the text of", Effect::ExtractText),
         Action::Refetch => return job_on_selected(state, "refetch", Effect::Refetch),
         Action::Edit => return selected(state).map(Effect::Edit).into_iter().collect(),
+        Action::CycleReading => {
+            let Some(row) = state.current() else { return Vec::new() };
+            let status = match row.reading.unwrap_or(ReadingStatus::Unread) {
+                ReadingStatus::Unread => ReadingStatus::Reading,
+                ReadingStatus::Reading => ReadingStatus::Read,
+                ReadingStatus::Read => ReadingStatus::Unread,
+            };
+            return vec![Effect::SetReading { reference: row.reference.id, status }];
+        }
+        Action::CopyKey => {
+            return state
+                .current()
+                .map(|row| {
+                    let key = row.reference.cite_key.to_string();
+                    Effect::Clipboard { what: format!("cite key {key}"), text: key }
+                })
+                .into_iter()
+                .collect();
+        }
         Action::Unlink => {
             let Scope::Project(path) = state.scope.clone() else {
                 state.warn("open a project first: unlink takes a reference out of the open project");
@@ -259,10 +327,11 @@ pub fn update(state: &mut State, action: Action) -> Vec<Effect> {
         Action::Reload | Action::Changed => {
             return vec![Effect::LoadSidebar, Effect::LoadRows(state.scope.clone())];
         }
-        Action::Loaded { projects, colored, duplicate_pairs } => {
+        Action::Loaded { projects, colored, duplicate_pairs, saved } => {
             state.projects = projects;
             state.colored = colored;
             state.duplicate_pairs = duplicate_pairs;
+            state.saved = saved;
             state.scope_index = state.scope_index.min(state.scope_count() - 1);
         }
         Action::Rows(rows) => {
@@ -286,6 +355,8 @@ pub fn update(state: &mut State, action: Action) -> Vec<Effect> {
         Action::Read
         | Action::Reader(_)
         | Action::TextLoaded { .. }
+        | Action::FigureLoaded { .. }
+        | Action::GraphicsDetected(_)
         | Action::Saved
         | Action::Annotations { .. }
         | Action::JobFinished(_) => {
@@ -468,6 +539,31 @@ mod tests {
         update(&mut state, Action::Escape);
         assert!(!state.show_jobs);
         assert!(matches!(update(&mut state, Action::Edit).as_slice(), [Effect::Edit(_)]));
+    }
+
+    #[test]
+    fn copy_key() {
+        let mut state = loaded();
+        let key = state.current().unwrap().reference.cite_key.to_string();
+        let effects = update(&mut state, Action::CopyKey);
+        assert!(matches!(effects.as_slice(), [Effect::Clipboard { text, .. }] if *text == key));
+    }
+
+    #[test]
+    fn reading_status_cycles_and_searches_save() {
+        let mut state = loaded();
+        let id = state.current().unwrap().reference.id;
+        let effects = update(&mut state, Action::CycleReading);
+        assert_eq!(effects, [Effect::SetReading { reference: id, status: ReadingStatus::Reading }]);
+        update(&mut state, Action::StartPrompt(Prompt::SaveSearch));
+        assert_eq!(state.prompt, None, "only in a search");
+        state.scope = Scope::Search("status:unread".into());
+        update(&mut state, Action::StartPrompt(Prompt::SaveSearch));
+        for c in "queue".chars() {
+            update(&mut state, Action::Type(c));
+        }
+        let effects = update(&mut state, Action::Submit);
+        assert_eq!(effects, [Effect::SaveSearch { name: "queue".into(), query: "status:unread".into() }]);
     }
 
     #[test]
