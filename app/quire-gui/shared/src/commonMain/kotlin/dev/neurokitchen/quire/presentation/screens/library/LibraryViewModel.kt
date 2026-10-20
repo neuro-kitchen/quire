@@ -166,6 +166,7 @@ class LibraryViewModel(
                 notice = view.notice,
                 searchError = failure?.let { it.message ?: it.toString() },
                 savedSearches = saved.map { SavedSearchState(it.name, it.query, isActive = it.query == query.text) },
+                isQuickLookOpen = view.isQuickLookOpen,
             )
         }.catch { emit(LibraryState(isLoading = false, error = it.message ?: it.toString())) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryState())
@@ -422,6 +423,7 @@ class LibraryViewModel(
                 null
             }
             LibraryEvent.OnToggleSidebar -> view.update { it.copy(isSidebarCollapsed = !it.isSidebarCollapsed) }
+            is LibraryEvent.OnToggleQuickLook -> view.update { it.copy(isQuickLookOpen = event.open ?: !it.isQuickLookOpen) }
         }
     }
 
@@ -498,6 +500,7 @@ class LibraryViewModel(
         val tagDraft: String = "",
         val noteDraft: String = "",
         val pageToOpen: String? = null,
+        val isQuickLookOpen: Boolean = false,
     )
 
     private data class Extras(

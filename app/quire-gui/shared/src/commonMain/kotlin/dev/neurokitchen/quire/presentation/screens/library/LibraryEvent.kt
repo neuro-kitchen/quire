@@ -73,4 +73,5 @@ sealed interface LibraryEvent {
     data class OnTagColor(val name: String, val color: String?) : LibraryEvent
     data object OnToggleSidebar : LibraryEvent
     data object OnToggleInspector : LibraryEvent
+    data class OnToggleQuickLook(val open: Boolean? = null) : LibraryEvent
 }
