@@ -2,16 +2,21 @@ package dev.neurokitchen.quire.presentation.desktop
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.neurokitchen.quire.data.repository.SampleLibraryRepository
 import dev.neurokitchen.quire.data.repository.SamplePreferencesRepository
+import dev.neurokitchen.quire.domain.model.LibraryQuery
+import dev.neurokitchen.quire.domain.repository.LibraryRepository
 import dev.neurokitchen.quire.domain.repository.PreferencesRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class DesktopViewModel(
     private val preferencesRepository: PreferencesRepository = SamplePreferencesRepository(),
+    private val libraryRepository: LibraryRepository = SampleLibraryRepository(),
 ) : ViewModel() {
     private val _state = MutableStateFlow(DesktopState(appTheme = preferencesRepository.preferences.value.appTheme))
     val state: StateFlow<DesktopState> = _state.asStateFlow()
@@ -21,6 +26,13 @@ class DesktopViewModel(
             preferencesRepository.preferences.collect { prefs ->
                 _state.update { it.copy(appTheme = prefs.appTheme) }
             }
+        }
+        viewModelScope.launch {
+            libraryRepository.references(LibraryQuery())
+                .catch { /* sample or empty fallback */ }
+                .collect { refs ->
+                    _state.update { it.copy(allReferences = refs) }
+                }
         }
     }
 
@@ -42,6 +54,7 @@ class DesktopViewModel(
                 _state.update { it.copy(appTheme = event.theme) }
                 viewModelScope.launch { preferencesRepository.setAppTheme(event.theme) }
             }
+            is DesktopEvent.OnToggleCommandPalette -> _state.update { it.copy(isCommandPaletteOpen = event.open) }
         }
     }
 }
