@@ -22,6 +22,12 @@ interface LibraryRepository {
 
     /** Opens the library again, e.g. after its settings changed; open flows switch to it. */
     suspend fun reopen()
+
+    suspend fun addReference(reference: Reference): Unit = Unit
+    suspend fun updateReference(reference: Reference): Unit = Unit
+    suspend fun deleteReference(id: String): Unit = Unit
+    suspend fun createProject(name: String, parentPath: String? = null): Unit = Unit
+    suspend fun deleteProject(path: String): Unit = Unit
 }
 
 data class LibraryDescription(val name: String, val path: String, val configFile: String)

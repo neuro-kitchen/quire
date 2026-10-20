@@ -62,7 +62,26 @@ fun ProjectsPane(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().height(Dimens.ToolbarHeight).padding(horizontal = Dimens.SpaceXs),
         ) {
-            ToolbarIconButton(Res.drawable.ic_create_new_folder, stringResource(Res.string.library_new_project), onClick = {})
+            ToolbarIconButton(
+                Res.drawable.ic_create_new_folder,
+                stringResource(Res.string.library_new_project),
+                onClick = { onEvent(LibraryEvent.OnShowAddProjectDialog(true)) },
+            )
+            Spacer(Modifier.weight(1f))
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(Dimens.ToolbarButton)
+                    .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                    .clickable { onEvent(LibraryEvent.OnToggleSidebar) },
+            ) {
+                Icon(
+                    painterResource(Res.drawable.ic_chevron_right),
+                    contentDescription = stringResource(Res.string.library_collapse) + " (Ctrl+B)",
+                    tint = QuireTheme.colors.fillSecondary,
+                    modifier = Modifier.size(16.dp).rotate(180f),
+                )
+            }
         }
         LazyColumn(Modifier.weight(1f).padding(horizontal = Dimens.SpaceXs)) {
             item(key = "all") {
@@ -72,6 +91,7 @@ fun ProjectsPane(
                     depth = 0,
                     isSelected = state.source == LibrarySource.All,
                     onClick = { onEvent(LibraryEvent.OnSourceClick(LibrarySource.All)) },
+                    count = state.references.size,
                     twisty = { Spacer(Modifier.width(TwistyWidth)) },
                 )
             }
@@ -82,6 +102,7 @@ fun ProjectsPane(
                     depth = project.depth + 1,
                     isSelected = project.isSelected,
                     onClick = { onEvent(LibraryEvent.OnSourceClick(LibrarySource.InProject(project.id))) },
+                    count = project.referenceCount,
                     twisty = {
                         if (project.hasChildren) {
                             Twisty(
@@ -136,6 +157,7 @@ private fun SourceRow(
     depth: Int,
     isSelected: Boolean,
     onClick: () -> Unit,
+    count: Int? = null,
     twisty: @Composable () -> Unit,
 ) {
     val colors = QuireTheme.colors
@@ -156,7 +178,22 @@ private fun SourceRow(
             tint = if (isSelected) colors.onAccent else colors.accent,
             modifier = Modifier.padding(horizontal = Dimens.SpaceMin).size(Dimens.Icon),
         )
-        Text(name, style = MaterialTheme.typography.bodyMedium, color = content, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(name, style = MaterialTheme.typography.bodyMedium, color = content, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        if (count != null && count > 0) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(Dimens.RadiusFull))
+                    .background(if (isSelected) colors.onAccent.copy(alpha = 0.2f) else colors.fillQuinary)
+                    .padding(horizontal = 6.dp, vertical = 1.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = count.toString(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isSelected) colors.onAccent else colors.fillSecondary,
+                )
+            }
+        }
     }
 }
 

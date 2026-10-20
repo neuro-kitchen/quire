@@ -48,6 +48,27 @@ class SampleLibraryRepository(
 
     override suspend fun reopen() = Unit
 
+    override suspend fun addReference(reference: Reference) {
+        references.value = listOf(reference) + references.value
+    }
+
+    override suspend fun updateReference(reference: Reference) {
+        references.value = references.value.map { if (it.id == reference.id) reference else it }
+    }
+
+    override suspend fun deleteReference(id: String) {
+        references.value = references.value.filter { it.id != id }
+    }
+
+    override suspend fun createProject(name: String, parentPath: String?) {
+        val path = if (parentPath != null) "$parentPath/${name.lowercase().replace(' ', '-')}" else name.lowercase().replace(' ', '-')
+        projects.value += Project(path, name, parentPath = parentPath, referenceCount = 0)
+    }
+
+    override suspend fun deleteProject(path: String) {
+        projects.value = projects.value.filter { it.path != path && it.parentPath != path }
+    }
+
     private fun comparator(column: SortColumn, ascending: Boolean): Comparator<Reference> {
         val byColumn: Comparator<Reference> = when (column) {
             SortColumn.Title -> compareBy { it.title.lowercase() }
@@ -148,6 +169,53 @@ class SampleLibraryRepository(
                 publisher = "Oxford University Press",
                 doi = "10.1093/acprof:oso/9780195301069.001.0001",
                 tags = listOf("oscillations", "textbook"), dateAdded = "2026-10-18",
+            ),
+        )
+
+        val EXTENDED_REFERENCES = listOf(
+            Reference(
+                "11", "jumper2021", "article-journal",
+                "Highly accurate protein structure prediction with AlphaFold",
+                listOf(person("Jumper", "J."), person("Evans", "R."), person("Pritzel", "A."), person("Green", "T."), person("Figurnov", "M."), person("Hassabis", "D.")), 2021,
+                containerTitle = "Nature", volume = "596", issue = "7873", pages = "583–589",
+                doi = "10.1038/s41586-021-03819-2",
+                abstract = "Predicting a protein's 3D structure from its amino acid sequence using neural networks with evolutionary constraints.",
+                tags = listOf("structural-biology", "deep learning", "proteins"), projects = listOf("deep-learning", "reading-group"), hasPdf = true, reading = ReadingStatus.Read, dateAdded = "2026-10-18",
+            ),
+            Reference(
+                "12", "doudna2014", "article-journal",
+                "The new frontier of genome engineering with CRISPR-Cas9",
+                listOf(person("Doudna", "J. A."), person("Charpentier", "E.")), 2014,
+                containerTitle = "Science", volume = "346", issue = "6213", pages = "1258096",
+                doi = "10.1126/science.1258096",
+                abstract = "A review of the RNA-guided CRISPR-Cas9 system for site-specific genomic engineering across cellular organisms.",
+                tags = listOf("genetics", "crispr", "molecular-biology"), projects = listOf("thesis"), hasPdf = true, reading = ReadingStatus.Reading, dateAdded = "2026-10-19",
+            ),
+            Reference(
+                "13", "ho2020", "paper-conference",
+                "Denoising Diffusion Probabilistic Models",
+                listOf(person("Ho", "J."), person("Jain", "A."), person("Abbeel", "P.")), 2020,
+                containerTitle = "Advances in Neural Information Processing Systems 33", pages = "6840–6851",
+                abstract = "High quality image synthesis results using diffusion probabilistic models with non-equilibrium thermodynamics connections.",
+                tags = listOf("diffusion", "generative-ai", "deep learning"), projects = listOf("deep-learning"), hasPdf = true, dateAdded = "2026-10-19",
+            ),
+            Reference(
+                "14", "dao2022", "paper-conference",
+                "FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness",
+                listOf(person("Dao", "T."), person("Fu", "D. Y."), person("Ermon", "S."), person("Rudra", "A."), person("Ré", "C.")), 2022,
+                containerTitle = "Advances in Neural Information Processing Systems 35", pages = "16344–16359",
+                doi = "10.48550/arXiv.2205.14135",
+                abstract = "An exact attention algorithm that reduces memory reads/writes between GPU SRAM and HBM to accelerate Transformers.",
+                tags = listOf("transformers", "gpu", "systems"), projects = listOf("deep-learning"), hasPdf = true, reading = ReadingStatus.Reading, dateAdded = "2026-10-20",
+            ),
+            Reference(
+                "15", "shannon1948", "article-journal",
+                "A Mathematical Theory of Communication",
+                listOf(person("Shannon", "C. E.")), 1948,
+                containerTitle = "The Bell System Technical Journal", volume = "27", issue = "3", pages = "379–423",
+                doi = "10.1002/j.1538-7305.1948.tb01338.x",
+                abstract = "The foundation of information theory: entropy, channel capacity, and noiseless coding theorems.",
+                tags = listOf("information-theory", "mathematics", "classic"), projects = listOf("thesis"), hasPdf = true, reading = ReadingStatus.Read, dateAdded = "2026-10-20",
             ),
         )
     }
