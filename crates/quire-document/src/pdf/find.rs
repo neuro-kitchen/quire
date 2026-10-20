@@ -8,7 +8,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use super::cache::DocumentCache;
-use super::types::{PageRect, PageText, QuoteMatch};
+use super::types::{PageRect, PageText, QuoteMatch, TextMatch};
 use crate::error::DocumentError;
 
 /// Words of the fallback search, for quotes split across a page or a figure.
@@ -54,6 +54,36 @@ pub(crate) fn locate_in(
 }
 
 /// A word of the page as compared: its normalized text and its glyph range.
+/// Every place `query` appears, in page order, at most `limit`: its words in order, ignoring case
+/// and punctuation, the last one as the start of a word (so a word being typed already matches).
+pub(crate) fn search_in(
+    pages: u32,
+    page_text: impl Fn(u32) -> Result<Arc<PageText>, DocumentError>,
+    query: &str,
+    limit: usize,
+) -> Result<Vec<TextMatch>, DocumentError> {
+    let words: Vec<String> = query.split_whitespace().map(normalize).filter(|w| !w.is_empty()).collect();
+    let mut found = Vec::new();
+    let Some((last, before)) = words.split_last() else { return Ok(found) };
+    for page in 0..pages {
+        let text = page_text(page)?;
+        let tokens = tokenize(&text);
+        for window in tokens.windows(words.len()) {
+            let whole = window.iter().zip(before).all(|(t, w)| t.text == *w);
+            if whole && window[before.len()].text.starts_with(last.as_str()) {
+                let (_, rects) = text.range_rects(window[0].glyph_start, window[before.len()].glyph_end);
+                if !rects.is_empty() {
+                    found.push(TextMatch { page, rects });
+                    if found.len() == limit {
+                        return Ok(found);
+                    }
+                }
+            }
+        }
+    }
+    Ok(found)
+}
+
 #[derive(Debug, Clone)]
 struct Token {
     text: String,
@@ -89,6 +119,24 @@ fn find(page: &PageText, tokens: &[Token], words: &[String]) -> Option<Vec<PageR
     (!rects.is_empty()).then_some(rects)
 }
 
+/// How much two texts share their words (F1 of the two bags of normalized words, 0–1).
+pub(crate) fn word_agreement(a: &str, b: &str) -> f64 {
+    let bag = |text: &str| {
+        let mut counts = std::collections::HashMap::<String, i64>::new();
+        for word in text.split_whitespace().map(normalize).filter(|w| !w.is_empty()) {
+            *counts.entry(word).or_default() += 1;
+        }
+        counts
+    };
+    let (a, b) = (bag(a), bag(b));
+    let (total_a, total_b): (i64, i64) = (a.values().sum(), b.values().sum());
+    let common: i64 = a.iter().map(|(word, n)| (*n).min(b.get(word).copied().unwrap_or(0))).sum();
+    if common == 0 {
+        return 0.0;
+    }
+    2.0 * common as f64 / (total_a + total_b) as f64
+}
+
 fn normalize(word: &str) -> String {
     word.chars().filter(|c| c.is_alphanumeric()).flat_map(char::to_lowercase).collect()
 }
@@ -117,6 +165,30 @@ mod tests {
     fn locate(pages: &[Arc<PageText>], quote: &str) -> Option<u32> {
         let found = locate_in(pages.len() as u32, |p| Ok(pages[p as usize].clone()), &[quote.to_string()]).unwrap();
         found.first().map(|m| m.page)
+    }
+
+    fn search(pages: &[Arc<PageText>], query: &str) -> Vec<u32> {
+        let found = search_in(pages.len() as u32, |p| Ok(pages[p as usize].clone()), query, 100).unwrap();
+        found.iter().map(|m| m.page).collect()
+    }
+
+    #[test]
+    fn search_finds_every_place_and_a_word_being_typed() {
+        let pages =
+            [page(&["place cells and grid cells", "the cells fire"]), page(&["no match here"]), page(&["Cells!"])];
+        assert_eq!(search(&pages, "cells"), vec![0, 0, 0, 2]);
+        assert_eq!(search(&pages, "grid ce"), vec![0], "the last word is a prefix");
+        assert_eq!(search(&pages, "gri cells"), Vec::<u32>::new(), "earlier words are whole");
+        assert_eq!(search(&pages, "  "), Vec::<u32>::new());
+        let limited = search_in(3, |p| Ok(pages[p as usize].clone()), "cells", 2).unwrap();
+        assert_eq!(limited.len(), 2);
+    }
+
+    #[test]
+    fn word_agreement_is_the_f1_of_the_word_bags() {
+        assert_eq!(word_agreement("Place cells fire.", "place CELLS fire"), 1.0);
+        assert_eq!(word_agreement("a b c d", "a b"), 2.0 * 2.0 / 6.0);
+        assert_eq!(word_agreement("a b", ""), 0.0);
     }
 
     #[test]

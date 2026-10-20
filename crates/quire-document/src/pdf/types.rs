@@ -168,6 +168,13 @@ impl PageText {
     }
 }
 
+/// One place a search found: its page and line boxes.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TextMatch {
+    pub page: u32,
+    pub rects: Vec<PageRect>,
+}
+
 /// Where one searched quote appears on a page.
 #[derive(Debug, Clone, PartialEq)]
 pub struct QuoteMatch {

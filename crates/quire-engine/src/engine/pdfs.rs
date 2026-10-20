@@ -77,6 +77,7 @@ impl Engine {
                     lib.set_pdf_attempt(id, Some((outcome, &detail)))
                 })
                 .await?;
+                self.mark_changed();
                 return Err(error.into());
             }
         };
@@ -86,6 +87,7 @@ impl Engine {
             Err(error @ EngineError::NotThisPaper(_)) => {
                 let (id, detail) = (reference.id, format!("{url}: {error}"));
                 self.run(move |lib| lib.set_pdf_attempt(id, Some((PdfAttempt::NotFound, &detail)))).await?;
+                self.mark_changed();
                 return Err(error);
             }
             Err(error) => return Err(error),

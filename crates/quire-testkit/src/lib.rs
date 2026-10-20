@@ -1,6 +1,7 @@
 //! Test fixtures shared by quire's crates; used only as a dev-dependency.
 //!
-//! - [`tiny_pdf`]: a one-page PDF showing a line of text; [`pdf_page`]: one drawing any content.
+//! - [`tiny_pdf`]: a one-page PDF showing a line of text; [`pdf_page`]: one drawing any content;
+//!   [`pdf_pages`]: several.
 //! - [`tiny_epub`]: an EPUB 3 of a few XHTML chapters.
 //! - [`fixture`]: a metadata service's recorded response (`fixtures/`, saved 2026-10-19: doi.org,
 //!   Crossref, arXiv, PubMed, Europe PMC, OpenAlex, Unpaywall, publisher pages, challenge pages).
@@ -14,16 +15,30 @@ pub fn tiny_pdf(text: &str) -> Vec<u8> {
 /// its page dictionary (e.g. `/Rotate 90`). Fonts: `/F1` Helvetica; `/F2` Helvetica whose code 1
 /// is the `fi` ligature glyph.
 pub fn pdf_page(content: &str, page_attributes: &str) -> Vec<u8> {
-    let objects = [
+    build(&[(content, page_attributes)])
+}
+
+/// A US Letter PDF of one page per content stream in `contents`, with the fonts of [`pdf_page`].
+pub fn pdf_pages(contents: &[&str]) -> Vec<u8> {
+    build(&contents.iter().map(|c| (*c, "")).collect::<Vec<_>>())
+}
+
+/// Objects: 1 catalog, 2 page tree, 3 and 4 fonts, then each page and its content stream.
+fn build(pages: &[(&str, &str)]) -> Vec<u8> {
+    let kids: Vec<String> = (0..pages.len()).map(|i| format!("{} 0 R", 5 + 2 * i)).collect();
+    let mut objects = vec![
         "<< /Type /Catalog /Pages 2 0 R >>".to_string(),
-        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_string(),
-        format!(
-            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] {page_attributes} /Contents 4 0 R /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> >>"
-        ),
-        format!("<< /Length {} >>\nstream\n{content}\nendstream", content.len()),
+        format!("<< /Type /Pages /Kids [{}] /Count {} >>", kids.join(" "), pages.len()),
         "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_string(),
         "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding << /Type /Encoding /BaseEncoding /WinAnsiEncoding /Differences [1 /fi] >> >>".to_string(),
     ];
+    for (i, (content, page_attributes)) in pages.iter().enumerate() {
+        objects.push(format!(
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] {page_attributes} /Contents {} 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> >>",
+            6 + 2 * i
+        ));
+        objects.push(format!("<< /Length {} >>\nstream\n{content}\nendstream", content.len()));
+    }
     let mut pdf = String::from("%PDF-1.4\n");
     let mut offsets = Vec::new();
     for (i, body) in objects.iter().enumerate() {

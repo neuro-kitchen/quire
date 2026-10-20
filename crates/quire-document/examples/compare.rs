@@ -6,7 +6,8 @@
 //! Prints one tab-separated line: file, pages; for the Text view's Markdown (`pdf::to_markdown`:
 //! pdf-inspector plus quire's cleanup) its time, word F1, word-pair F1, headings and whether it
 //! found a references heading; then the same scores and time for the text layer (`page_text` on
-//! every page); then a status.
+//! every page) and for the layer's own reader Markdown (`pdf::layer_to_markdown`: words, pairs,
+//! headings, references); how much the two Markdowns agree (words, pairs); then a status.
 
 use std::path::Path;
 use std::process::Command;
@@ -18,7 +19,7 @@ use quire_document::pdf;
 mod common;
 use common::{f1, pairs, words};
 
-const HEADER: &str = "file\tpages\tmd_ms\tmd_word_f1\tmd_pair_f1\tmd_headings\tmd_references\tlayer_ms\tlayer_word_f1\tlayer_pair_f1\tstatus";
+const HEADER: &str = "file\tpages\tmd_ms\tmd_word_f1\tmd_pair_f1\tmd_headings\tmd_references\tlayer_ms\tlayer_word_f1\tlayer_pair_f1\tlmd_word_f1\tlmd_pair_f1\tlmd_headings\tlmd_references\tagree_word\tagree_pair\tstatus";
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -33,7 +34,7 @@ fn main() {
     let name = path.file_stem().unwrap_or_default().to_string_lossy().to_string();
     let row = std::panic::catch_unwind(|| compare(path))
         .unwrap_or_else(|_| Err("panic".into()))
-        .unwrap_or_else(|e| format!("\t\t\t\t\t\t\t\t\t{}", e.replace(['\t', '\n'], " ")));
+        .unwrap_or_else(|e| format!("\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t{}", e.replace(['\t', '\n'], " ")));
     println!("{name}\t{row}");
 }
 
@@ -47,9 +48,9 @@ fn compare(path: &Path) -> Result<String, String> {
     let start = Instant::now();
     let markdown = pdf::to_markdown(&bytes).unwrap_or_default();
     let md_ms = start.elapsed().as_secs_f64() * 1000.0;
-    let headings: Vec<&str> =
-        markdown.lines().filter_map(|l| l.strip_prefix('#')).map(|h| h.trim_start_matches('#').trim()).collect();
-    let references = headings.iter().any(|h| is_references_title(h));
+    let (headings, references) = structure(&markdown);
+    let layer_markdown = pdf::layer_to_markdown(&bytes).unwrap_or_default();
+    let (layer_headings, layer_references) = structure(&layer_markdown);
 
     let pages = pdf::page_sizes(path).map_err(|e| e.to_string())?.len() as u32;
     let start = Instant::now();
@@ -60,11 +61,21 @@ fn compare(path: &Path) -> Result<String, String> {
     let layer_ms = start.elapsed().as_secs_f64() * 1000.0;
 
     Ok(format!(
-        "{pages}\t{md_ms:.0}\t{:.3}\t{:.3}\t{}\t{references}\t{layer_ms:.0}\t{:.3}\t{:.3}\tok",
+        "{pages}\t{md_ms:.0}\t{:.3}\t{:.3}\t{headings}\t{references}\t{layer_ms:.0}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{layer_headings}\t{layer_references}\t{:.3}\t{:.3}\tok",
         f1(&words(&markdown), &ref_words),
         f1(&pairs(&markdown), &ref_pairs),
-        headings.len(),
         f1(&words(&layer), &ref_words),
         f1(&pairs(&layer), &ref_pairs),
+        f1(&words(&layer_markdown), &ref_words),
+        f1(&pairs(&layer_markdown), &ref_pairs),
+        f1(&words(&markdown), &words(&layer_markdown)),
+        f1(&pairs(&markdown), &pairs(&layer_markdown)),
     ))
+}
+
+/// How many headings Markdown has, and whether one is a References heading.
+fn structure(markdown: &str) -> (usize, bool) {
+    let headings: Vec<&str> =
+        markdown.lines().filter_map(|l| l.strip_prefix('#')).map(|h| h.trim_start_matches('#').trim()).collect();
+    (headings.len(), headings.iter().any(|h| is_references_title(h)))
 }
