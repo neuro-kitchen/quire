@@ -8,14 +8,16 @@
 //! bibliography as `<li class="ltx_bibitem">`.
 
 use scraper::{ElementRef, Html, Node};
+use url::Url;
 
 use super::Writer;
-use quire_io::paper_markdown::normalize_label;
+use quire_io::paper_markdown::{image_paragraph, normalize_label};
 
-/// The paper's sections and references as reader Markdown.
-pub fn to_markdown(html: &str) -> String {
+/// The paper's sections and references as reader Markdown; figure images (`<img src>`) as URLs
+/// resolved against the page's `url`.
+pub fn to_markdown(html: &str, url: &Url) -> String {
     let document = Html::parse_document(html);
-    let mut out = Writer::default();
+    let mut out = Writer { base: Some(url.clone()), ..Writer::default() };
     let selector = scraper::Selector::parse("article.ltx_document").expect("valid selector");
     if let Some(article) = document.select(&selector).next() {
         blocks(article, &mut out);
@@ -77,6 +79,11 @@ fn caption(figure: ElementRef) -> String {
 }
 
 fn figure(element: ElementRef, out: &mut Writer) {
+    let selector = scraper::Selector::parse("img").expect("valid selector");
+    let image = element.select(&selector).find_map(|img| img.value().attr("src"));
+    if let Some(url) = image.and_then(|src| out.base.as_ref()?.join(src).ok()) {
+        out.paragraph(&image_paragraph(url.as_str()));
+    }
     let caption = caption(element);
     out.paragraph(&normalize_caption(&caption, "Figure"));
 }
@@ -175,7 +182,12 @@ mod tests {
 
     #[test]
     fn transformer_paper() {
-        let md = to_markdown(include_str!("../../tests/fixtures/arxiv-html-1706.03762v7.html"));
+        let page = Url::parse("https://arxiv.org/html/1706.03762").unwrap();
+        let md = to_markdown(include_str!("../../tests/fixtures/arxiv-html-1706.03762v7.html"), &page);
+        assert!(
+            md.contains("![Figure](https://arxiv.org/html/1706.03762v7/Figures/ModalNet-21.png)\n\nFigure 1:"),
+            "the image just before its caption"
+        );
         assert!(!md.contains("Ashish Vaswani"), "authors left out");
         assert!(md.contains("## 1 Introduction\n\nRecurrent neural networks, long short-term memory [13]"));
         assert!(md.contains(r"$$\mathrm{Attention}(Q,K,V)=\mathrm{softmax}(\frac{QK^{T}}{\sqrt{d_{k}}})V$$ (1)"));

@@ -15,11 +15,11 @@ use url::Url;
 use crate::challenge;
 use crate::error::{FetchError, Result};
 
-/// Minimum time between requests to one host. Crossref polite pool: 10/s; NCBI: 3/s; arXiv:
-/// one every 3 s; anyone else (publisher pages): 1/s.
+/// Minimum time between requests to one host. Crossref polite pool: 10/s; OpenAlex without a key:
+/// 10/s; NCBI: 3/s; arXiv: one every 3 s; anyone else (publisher pages): 1/s.
 fn interval(host: &str) -> Duration {
     match host {
-        "doi.org" | "api.crossref.org" | "data.crosscite.org" => Duration::from_millis(100),
+        "doi.org" | "api.crossref.org" | "data.crosscite.org" | "api.openalex.org" => Duration::from_millis(100),
         h if h.ends_with("ncbi.nlm.nih.gov") => Duration::from_millis(334),
         "export.arxiv.org" => Duration::from_secs(3),
         _ => Duration::from_secs(1),
@@ -27,6 +27,9 @@ fn interval(host: &str) -> Duration {
 }
 
 const TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Largest figure image downloaded.
+const MAX_IMAGE_BYTES: u64 = 20_000_000;
 
 /// Largest PDF downloaded.
 const MAX_PDF_BYTES: u64 = 200_000_000;
@@ -83,6 +86,28 @@ impl Http {
             }
             status if status.is_success() => Ok(body),
             StatusCode::NOT_FOUND if cf_mitigated.is_some() => Err(blocked()),
+            StatusCode::NOT_FOUND => Err(FetchError::NotFound(shown(url))),
+            status => Err(FetchError::Status { url: shown(url), status: status.as_u16() }),
+        }
+    }
+
+    /// GET `url` expecting an image (a figure): its bytes. Anything else (an HTML page, a
+    /// challenge) is [`FetchError::NotFound`] or [`FetchError::Blocked`].
+    pub async fn get_image(&self, url: &Url) -> Result<Vec<u8>> {
+        let response = self.get(url, "image/*").await?;
+        let status = response.status();
+        let is_image = response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .is_some_and(|t| t.starts_with("image/"));
+        if response.content_length().is_some_and(|n| n > MAX_IMAGE_BYTES) {
+            return Err(FetchError::NotFound(format!("{} (larger than 20 MB)", shown(url))));
+        }
+        match status {
+            status if status.is_success() && is_image => Ok(response.bytes().await.map_err(network(url))?.to_vec()),
+            StatusCode::FORBIDDEN => Err(FetchError::Blocked { url: shown(url) }),
+            status if status.is_success() => Err(FetchError::NotFound(format!("{} (not an image)", shown(url)))),
             StatusCode::NOT_FOUND => Err(FetchError::NotFound(shown(url))),
             status => Err(FetchError::Status { url: shown(url), status: status.as_u16() }),
         }

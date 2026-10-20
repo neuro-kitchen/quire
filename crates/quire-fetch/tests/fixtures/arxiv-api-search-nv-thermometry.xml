@@ -1,0 +1,96 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/xg29LdcsMKNQqv92LBSKGh7v+wc</id>
+  <title>arXiv Query: search_query=all:"nitrogen-vacancy" AND all:thermometry&amp;id_list=&amp;start=0&amp;max_results=3</title>
+  <updated>2026-10-20T12:43:14Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=all:%22nitrogen-vacancy%22+AND+all:thermometry&amp;start=0&amp;max_results=3&amp;id_list=" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>3</opensearch:itemsPerPage>
+  <opensearch:totalResults>35</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/2609.22661v1</id>
+    <title>Thermometry in Near-Degenerate Nitrogen-Vacancy Ensembles Enabled by Bright-Dark-State Mixing</title>
+    <updated>2026-09-19T00:27:29Z</updated>
+    <link href="https://arxiv.org/abs/2609.22661v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2609.22661v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Nitrogen-vacancy (NV) centers have emerged as a highly sensitive platform for spatially resolved temperature measurements. When the $\lvert0\rangle\to\lvert+1\rangle$ and $\lvert0\rangle\to\lvert-1\rangle$ transitions are nearly degenerate and the Rabi frequency is comparable to the transition splitting, the spin dynamics encountered during pulsed protocols for temperature measurement can significantly alter the intended accumulation of temperature-dependent phase. We investigate these triplet ($\lvert0\rangle$, $\lvert\pm1\rangle$) spin dynamics and their effect on pulsed thermometry protocols under these conditions. We find that the conventional thermal-echo timing produces negligible temperature-sensitive signal amplitudes at the common-mode detuning. However, we find that the nominal spin-echo timing produces resolvable oscillations at the common-mode detuning, leading to a strong temperature-sensitive carrier signal. This departure from the expected protocol behavior is qualitatively captured by an ensemble model of the triplet dynamics, which supports significant dark-state leakage as a plausible mechanism for the temperature-sensitive response. This mixing-enabled thermal echo uses a four-phase quadrature readout that resolves the signed oscillation frequency and is validated using independent sweeps of the microwave carrier frequency and fluid temperature. We further assess the ability of a four-refocusing-pulse (LDD4B) low-field dynamical-decoupling sequence to extend the NV coherence and find that while the echo retains a sensitivity to common-mode detuning, the effective phase-accumulation interval corresponds to approximately half the total evolution time. These findings could support the use of pulsed NV thermometry in biological or mobile applications where applying magnetic bias fields is impractical and microwave power may be limited.</summary>
+    <category term="quant-ph" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-09-19T00:27:29Z</published>
+    <arxiv:comment>25 pages, 7 figures, 3 tables; includes two appendices</arxiv:comment>
+    <arxiv:primary_category term="quant-ph"/>
+    <author>
+      <name>Matt K. Fu</name>
+    </author>
+    <author>
+      <name>John O. Dabiri</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2609.21501v1</id>
+    <title>Optimal control for duty-cycle-limited interferometry with single-NV centers</title>
+    <updated>2026-09-18T08:50:42Z</updated>
+    <link href="https://arxiv.org/abs/2609.21501v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2609.21501v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Stimulus-responsive hydrogels convert temperature changes into magnetic-field shifts detectable by nitrogen-vacancy (NV) centers, enabling nanoscale thermometry in soft and biological environments. Existing hydrogel-nanodiamond demonstrations rely on NV ensembles, whose high photon throughput is accompanied by gradient-induced inhomogeneous broadening, while idealized single-NV projections assume high-fluence fluorescence/ODMR readout. Here we study a pulsed single-NV route for the same class of sensors and ask whether decoherence-aware coherent control can improve thermometric performance over optimized Ramsey interrogation at equal detected-photon budget. Using a sigmoidal volume-phase-transition model, dipolar magnetic transduction, and Lindblad master-equation simulations, we find a reproducible 25-27% per-shot sensitivity gain over optimized Ramsey, i.e., a 57-60% gain in Fisher information (1.57-1.60). The same gain carries over to the photon-normalized Fisher information. The rate gain is governed by the measurement duty cycle, the fraction of the experimental cycle spent accumulating signal rather than initializing, reading out or waiting, and becomes largest when the overhead or optical-dose constraint dominates the cycle time. The optimized trajectories reveal a response-shaping mechanism in which phase accumulation is concentrated near the end of the sequence, and a closed-form depth-two solution reproduces the numerical optimum and exhibits that mechanism analytically. The advantage is most pronounced when the dephasing time is short compared with the measurement overhead or dose-limited waiting time, which is the operating regime targeted by hydrogel-transduced single-spin biosensing.</summary>
+    <category term="quant-ph" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-09-18T08:50:42Z</published>
+    <arxiv:comment>24 pages, 12 figures, 4 tables</arxiv:comment>
+    <arxiv:primary_category term="quant-ph"/>
+    <author>
+      <name>Ugur Tamer</name>
+    </author>
+    <author>
+      <name>Sina Zeytinoglu</name>
+    </author>
+    <author>
+      <name>Ozgur E. Mustecaplioglu</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2609.04907v1</id>
+    <title>Microkelvin resolution thermometry at the nanometre scale</title>
+    <updated>2026-09-04T09:09:42Z</updated>
+    <link href="https://arxiv.org/abs/2609.04907v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2609.04907v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Accurate temperature readings of transient events at the nanometer scale are challenging due to the low sensitivity of available sensors. Nanodiamonds containing nitrogen-vacancy (NV) centers have been used for nanoscale thermometry in complex environments, including inside living cells. However, their performance has been limited by short coherence times and low photon counts. In this work, we use isotopically-purified dual-NV nanodiamonds and a bespoke quantum sensing chip to showcase an order of magnitude improvement in temperature measurement sensitivity compared with previous reports. We demonstrate robust temperature measurements with an error of 682 $μ$K, experimental sensitivities below 50 mK/$\surd \text{Hz}$ and a shot-noise limited sensitivity of 9.6 mK/$\surd \text{Hz}$. To confirm the utility of these high-performance nanothermometers, we quantify the temperature change induced by the thermometry measurement itself, specifically the optical excitation laser used to probe the NV spin state. In addition, we observe directly at the nanometre scale the transient heating caused by the exothermic mixing of dimethyl sulfoxide in water. Sub-millikelvin resolution and millikelvin sensitivity thermometry unlock the possibility of monitoring minute thermal fluctuations in living systems and assessing catalyst performance at the nanometre scale.</summary>
+    <category term="quant-ph" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="physics.app-ph" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="physics.ins-det" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-09-04T09:09:42Z</published>
+    <arxiv:comment>8 pages, 3 figures</arxiv:comment>
+    <arxiv:primary_category term="quant-ph"/>
+    <author>
+      <name>Jack W. Hart</name>
+    </author>
+    <author>
+      <name>Soham Pal</name>
+    </author>
+    <author>
+      <name>Julien R. E. Roth</name>
+    </author>
+    <author>
+      <name>Katie Ninham</name>
+    </author>
+    <author>
+      <name>Abbie H. Aleksandrova</name>
+    </author>
+    <author>
+      <name>Xander Peetroons</name>
+    </author>
+    <author>
+      <name>Soumen Mandal</name>
+    </author>
+    <author>
+      <name>Oliver A. Williams</name>
+    </author>
+    <author>
+      <name>Gavin W. Morley</name>
+    </author>
+    <author>
+      <name>Mete Atature</name>
+    </author>
+    <author>
+      <name>Helena S. Knowles</name>
+    </author>
+  </entry>
+</feed>
