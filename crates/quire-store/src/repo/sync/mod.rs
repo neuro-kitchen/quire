@@ -3,6 +3,7 @@
 
 mod merge;
 mod rows;
+mod share;
 
 use quire_core::Result;
 use quire_core::sync::{Merged, Row};
@@ -100,8 +101,8 @@ impl SqliteLibrary<'_> {
         conn.execute("INSERT OR REPLACE INTO sync_state (key, value) VALUES ('merging_from', ?1)", [from]).or_core()?;
         let result = merge::merge(conn, self.device, rows);
         conn.execute("DELETE FROM sync_state WHERE key = 'merging_from'", []).or_core()?;
-        let (merged, renamed) = result?;
-        for id in renamed {
+        let (merged, relog) = result?;
+        for id in relog {
             conn.execute(
                 "UPDATE change_log SET origin = NULL WHERE tbl = 'reference' AND k1 = ?1",
                 [crate::repo::codec::id_blob(id)],
@@ -114,8 +115,9 @@ impl SqliteLibrary<'_> {
 
 #[cfg(test)]
 mod tests {
+    use quire_core::AddRequest;
     use quire_core::library::{projects, references, tags};
-    use quire_core::{AddRequest, Library};
+    use quire_core::prelude::*;
     use quire_model::{EntryKind, Identifier, Origin, ReferenceData, TagKind, TextField};
     use rusqlite::Connection;
 
@@ -206,12 +208,17 @@ mod tests {
         assert_eq!(on_a.cite_key, on_b.cite_key);
         tags::add(&mut a, on_a.cite_key.as_str(), "to-read", TagKind::Manual).unwrap();
         tags::add(&mut b, on_b.cite_key.as_str(), "to-read", TagKind::Manual).unwrap();
-        references::add(&mut a, paper("Another paper on attention", Some("10.1/same"))).unwrap();
-        references::add(&mut b, paper("Different study of transformers", Some("10.1/same"))).unwrap();
+        let doi_on_a = references::add(&mut a, paper("Another paper on attention", Some("10.1/same"))).unwrap();
+        let doi_on_b = references::add(&mut b, paper("Different study of transformers", Some("10.1/same"))).unwrap();
 
         let merged = sync(&a, &mut b);
         assert_eq!(merged.renamed.len(), 1, "{merged:?}");
-        assert_eq!(merged.dropped_identifiers, [("vaswaniAnotherPaperAttention2017".into(), "doi:10.1/same".into())]);
+        assert!(merged.dropped_identifiers.is_empty(), "{merged:?}");
+        // The same DOI: one reference on B (A's ID is an alias of B's), merged part by part.
+        let doi = Identifier::parse("10.1/same").unwrap();
+        let same = b.reference_by_identifier(&doi).unwrap().unwrap();
+        assert_eq!(same.id, doi_on_b.reference().id);
+        assert!(b.reference(doi_on_a.reference().id).unwrap().is_none());
         assert_eq!(projects::tree(&b).unwrap().len(), 1, "one Thesis");
         assert_eq!(b.tags().unwrap().len(), 1, "one to-read tag");
         // Both papers kept, under different keys; tags follow B's to-read tag (alias).
@@ -224,5 +231,100 @@ mod tests {
         for id in [on_a.id, on_b.id] {
             assert_eq!(a.reference(id).unwrap().unwrap().cite_key, b.reference(id).unwrap().unwrap().cite_key);
         }
+        // Each device keeps its own ID for the DOI's paper; the data is the same on both.
+        let (on_a_doi, on_b_doi) =
+            (a.reference_by_identifier(&doi).unwrap().unwrap(), b.reference_by_identifier(&doi).unwrap().unwrap());
+        assert_eq!(on_a_doi.data, on_b_doi.data);
+        assert_eq!(on_a_doi.cite_key, on_b_doi.cite_key);
+    }
+
+    #[test]
+    fn personal_records_travel() {
+        use quire_core::library::{reading, saved};
+        let (a_conn, b_conn) = (crate::open_in_memory().unwrap(), crate::open_in_memory().unwrap());
+        let (mut a, mut b) = (device(&a_conn), device(&b_conn));
+        b.adopt_library_id(&a.library_id().unwrap()).unwrap();
+        let key =
+            references::add(&mut a, paper("Attention is all you need", None)).unwrap().reference().cite_key.to_string();
+        reading::set(&mut a, &key, quire_model::ReadingStatus::Read).unwrap();
+        saved::save(&mut a, "Queue", "status:unread").unwrap();
+        saved::save(&mut b, "queue", "pdf:no").unwrap();
+
+        sync(&a, &mut b);
+        let on_b = b.reference_by_cite_key(&key.parse().unwrap()).unwrap().unwrap();
+        assert_eq!(b.reading(on_b.id).unwrap().unwrap().status, quire_model::ReadingStatus::Read);
+        let names: Vec<String> = b.saved_searches().unwrap().into_iter().map(|s| s.name).collect();
+        assert_eq!(names.len(), 2, "both kept, one renamed: {names:?}");
+    }
+
+    /// Upserts on synced tables (reading status set twice; a membership changed on the other
+    /// device) must not break the change log (migration 013).
+    #[test]
+    fn upserts_keep_the_change_log() {
+        use quire_core::library::reading;
+        let (a_conn, b_conn) = (crate::open_in_memory().unwrap(), crate::open_in_memory().unwrap());
+        let (mut a, mut b) = (device(&a_conn), device(&b_conn));
+        b.adopt_library_id(&a.library_id().unwrap()).unwrap();
+        let key =
+            references::add(&mut a, paper("Attention is all you need", None)).unwrap().reference().cite_key.to_string();
+        reading::set(&mut a, &key, quire_model::ReadingStatus::Reading).unwrap();
+        reading::set(&mut a, &key, quire_model::ReadingStatus::Read).unwrap();
+        projects::create(&mut a, "Thesis", None).unwrap();
+        projects::link(&mut a, &key, &"thesis".parse().unwrap()).unwrap();
+        sync(&a, &mut b);
+        // A unlinks: B's existing membership row is updated by the merge (an upsert).
+        projects::unlink(&mut a, &key, &"thesis".parse().unwrap()).unwrap();
+        let merged = sync(&a, &mut b);
+        assert_eq!(merged.applied, 1, "{merged:?}");
+        let on_b = b.reference_by_cite_key(&key.parse().unwrap()).unwrap().unwrap();
+        assert!(b.projects_of(on_b.id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_broken_clock_cannot_win() {
+        let (a_conn, b_conn) = (crate::open_in_memory().unwrap(), crate::open_in_memory().unwrap());
+        let (mut a, mut b) = (device(&a_conn), device(&b_conn));
+        b.adopt_library_id(&a.library_id().unwrap()).unwrap();
+        let added = references::add(&mut a, paper("Attention is all you need", None)).unwrap();
+        let mut future = added.reference().clone();
+        future.meta.updated_at = quire_model::Timestamp::from_millis(
+            quire_model::Timestamp::now().as_millis() + 2 * quire_model::record::MAX_DRIFT_MILLIS,
+        );
+        let merged = b.merge(vec![Row::Reference(future)], &a.device.to_string()).unwrap();
+        assert_eq!((merged.applied, merged.refused), (0, 1));
+        // An ordinary stamp from the other device moves this clock past it.
+        let mut ahead = added.reference().clone();
+        ahead.meta.updated_at = quire_model::Timestamp::from_millis(quire_model::Timestamp::now().as_millis() + 5_000);
+        let stamp = ahead.meta.updated_at;
+        b.merge(vec![Row::Reference(ahead)], &a.device.to_string()).unwrap();
+        assert!(quire_model::Timestamp::now() > stamp);
+    }
+
+    #[test]
+    fn edits_of_different_fields_meet() {
+        let (a_conn, b_conn) = (crate::open_in_memory().unwrap(), crate::open_in_memory().unwrap());
+        let (mut a, mut b) = (device(&a_conn), device(&b_conn));
+        b.adopt_library_id(&a.library_id().unwrap()).unwrap();
+        let key = references::add(&mut a, paper("attention is all you need", Some("10.1/x"))).unwrap();
+        let id = key.reference().id;
+        sync(&a, &mut b);
+        // A fixes the title, B adds a volume, neither having seen the other.
+        let mut on_a = a.reference(id).unwrap().unwrap();
+        on_a.data.set(TextField::Title, "Attention Is All You Need");
+        on_a.meta.touch(a.device);
+        references::save(&mut a, &mut on_a).unwrap();
+        let mut on_b = b.reference(id).unwrap().unwrap();
+        on_b.data.set(TextField::Volume, "30");
+        on_b.meta.touch(b.device);
+        references::save(&mut b, &mut on_b).unwrap();
+        sync(&a, &mut b);
+        sync(&b, &mut a);
+        for side in [&a, &b] {
+            let r = side.reference(id).unwrap().unwrap();
+            assert_eq!(r.data.title(), Some("Attention Is All You Need"));
+            assert_eq!(r.data.get(TextField::Volume), Some("30"));
+        }
+        // Settled: nothing more to send either way.
+        assert_eq!(sync(&a, &mut b).applied + sync(&b, &mut a).applied, 0);
     }
 }

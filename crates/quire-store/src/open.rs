@@ -31,6 +31,33 @@ pub fn prepare(mut conn: Connection) -> Result<Connection> {
 pub fn prepare_in_place(conn: &mut Connection) -> Result<()> {
     configure(conn)?;
     migrations().to_latest(conn)?;
+    seed_clock(conn)
+}
+
+/// Tables whose rows carry `updated_at` (every synced record).
+const STAMPED: &[&str] = &[
+    "reference",
+    "project",
+    "project_reference",
+    "tag",
+    "reference_tag",
+    "note",
+    "highlight",
+    "reference_relation",
+    "attachment",
+    "reading",
+    "saved_search",
+];
+
+/// Starts the clock after the newest stamp stored (`Timestamp` is a hybrid logical clock): if
+/// this device's time went back, or a peer's stamps were ahead, new changes still sort after.
+fn seed_clock(conn: &Connection) -> Result<()> {
+    let parts: Vec<String> = STAMPED.iter().map(|t| format!("SELECT max(updated_at) AS m FROM {t}")).collect();
+    let sql = format!("SELECT max(m) FROM ({})", parts.join(" UNION ALL "));
+    let newest: Option<i64> = conn.query_row(&sql, [], |row| row.get(0))?;
+    if let Some(millis) = newest {
+        quire_model::Timestamp::from_millis(millis).observe();
+    }
     Ok(())
 }
 
