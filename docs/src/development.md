@@ -7,32 +7,34 @@ terminal interface, the local server and the apps are thin front ends over one f
 | Crate | Purpose |
 |---|---|
 | `quire-model` | domain types, no I/O: IDs, identifiers, references, creators, dates, projects |
-| `quire-io` | formats: CSL-JSON, BibTeX/BibLaTeX, Hayagriva, the edit format; PDF checks and text |
+| `quire-io` | bibliographic formats: CSL-JSON, BibTeX/BibLaTeX, Hayagriva, Zotero, the edit format |
 | `quire-core` | use cases (adding, duplicates, search queries, sync rows) and the `Library` port |
 | `quire-store` | SQLite: schema, migrations, the `Library` implementation, full-text index, change log |
-| `quire-fetch` | metadata, PDF and full-text lookup: doi.org, Crossref, arXiv, NCBI, Europe PMC, Unpaywall |
+| `quire-fetch` | the network: metadata, PDF and full-text lookup (doi.org, Crossref, arXiv, NCBI, Europe PMC, Unpaywall) |
 | `quire-engine` | the facade: config, libraries, file store, exports, jobs; async API |
 | `quire-sync` | sync sessions and the iroh (QUIC) transport |
 | `quire-server` | `quire serve`, the endpoint for the browser extension |
-| `quire-tui` | `quire tui` (ratatui) |
-| `quire-cli` | the `quire` binary |
-| `quire-ffi` | the engine for the Kotlin apps (UniFFI): flat records, `suspend` functions, PDF pages (PDFium) |
+| `quire-document` | a paper's content in any format: PDF checks, rendering and text layer (hayro); PDF, arXiv HTML and JATS → the reader's Markdown; the reading model |
+| `quire-ffi` | the engine for the Kotlin apps (UniFFI): flat records, `suspend` functions, PDF pages |
+| `quire-testkit` | test fixtures (a tiny PDF, the services' recorded responses); dev-dependency only |
 | `uniffi-bindgen` | generates `quire-ffi`'s Kotlin API (run by the app's Gradle build) |
-| `quire_py` | Python bindings (PyO3, built with maturin) |
+| `app/quire-cli` | the `quire` binary |
+| `app/quire-tui` | `quire tui` (ratatui) |
+| `app/quire-gui` | desktop app (Compose Multiplatform); Android and iOS later |
 
-Dependencies point one way: `model ← core ← {store, io, fetch} ← engine ← {cli, tui, server, ffi}`.
+Dependencies point one way: `model ← core ← {store, io, document, fetch, sync} ← engine ← {cli, tui, server, ffi}`.
 The core defines what it needs from storage as a trait, so use cases are tested without a
 database, and the store can change without touching them.
 
 How a paper's text is read (blocks, tabs for figures, tables, equations, references) lives in
-`quire_io::reading`, shared by the terminal reader and the apps.
+`quire_document::reading`, shared by the terminal reader and the apps.
 
 ## The apps (`app/`)
 
 A Kotlin Compose Multiplatform project: one UI for the desktop now, Android and iOS later. The
 Gradle build compiles `quire-ffi`, generates its Kotlin API with `uniffi-bindgen`, and puts the
-native library in the app (JNA loads it). PDFium, for the reader's pages, is downloaded from
-bblanchon/pdfium-binaries and checked against pinned SHA-256 sums.
+native library in the app (JNA loads it). PDF pages and text layer are powered by pure-Rust hayro
+(`crates/quire-document`), requiring no external binary downloads.
 
 ```
 app/
@@ -48,7 +50,7 @@ several screens have a folder each. Rules stay in Rust: ViewModels call reposito
 the engine.
 
 ```bash
-cd app
+cd app/quire-gui
 ./gradlew :shared:desktopTest    # unit and engine tests; screenshots in shared/build/screenshots
 ./gradlew :desktopApp:run
 ```

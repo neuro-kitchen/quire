@@ -6,7 +6,7 @@ quire is built from source for now (release binaries will follow). It needs Rust
 ```bash
 git clone https://github.com/neuro-kitchen/quire
 cd quire
-cargo install --path crates/quire-cli     # installs `quire` into ~/.cargo/bin
+cargo install --path app/quire-cli        # installs `quire` into ~/.cargo/bin
 ```
 
 SQLite is built in; there are no system libraries to install. Optional programs:
@@ -21,7 +21,7 @@ SQLite is built in; there are no system libraries to install. Optional programs:
 The desktop app (`app/`) also builds from source: it needs, besides Rust, a JDK 21 or newer.
 
 ```bash
-cd app
+cd app/quire-gui
 ./gradlew :desktopApp:run                                   # build and open it
 ./gradlew :desktopApp:createDistributable -Pquire.release   # a self-contained app folder, with its own Java
 ```
