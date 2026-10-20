@@ -52,6 +52,9 @@ import dev.neurokitchen.quire.domain.model.PaperTabKind
 import dev.neurokitchen.quire.domain.model.TextBlock
 import dev.neurokitchen.quire.presentation.designsystem.Dimens
 import dev.neurokitchen.quire.presentation.designsystem.QuireTheme
+import dev.neurokitchen.quire.presentation.designsystem.ReaderFont
+import dev.neurokitchen.quire.presentation.designsystem.ReaderTheme
+import dev.neurokitchen.quire.presentation.designsystem.readerColors
 import dev.neurokitchen.quire.presentation.mapping.loadImageFile
 import dev.neurokitchen.quire.resources.Res
 import dev.neurokitchen.quire.resources.tab_abstract
@@ -66,8 +69,8 @@ import org.jetbrains.compose.resources.stringResource
 
 /**
  * The paper's text, one tab at a time (abstract, paper, figures, …), in a readable column.
- * Text can be selected within a block; `onSelection` reports it (quote and the text before it),
- * or `null` when nothing is selected. Highlights are marked in yellow.
+ * Supports font selection (Serif, Sans, Mono), font sizing, 6 reader themes,
+ * and bottom floating highlight palette.
  */
 @Composable
 fun TextReaderView(
@@ -79,16 +82,31 @@ fun TextReaderView(
     onSelection: (Pair<String, String>?) -> Unit,
     loadFigure: suspend (String) -> String?,
     modifier: Modifier = Modifier,
+    readerTheme: ReaderTheme = ReaderTheme.Dark,
+    readerFont: ReaderFont = ReaderFont.Serif,
+    fontSizeSp: Int = 16,
+    onHighlight: (quote: String, prefix: String, color: String) -> Unit = { _, _, _ -> },
+    onAddNote: (body: String) -> Unit = {},
 ) {
     val tab = tabs.getOrNull(selectedTab) ?: return
     val list = rememberLazyListState()
     val focusedQuote = highlights.firstOrNull { it.id == focused }?.quote
+    val themeColors = readerColors(readerTheme)
+    var localSelection by remember(selectedTab) { mutableStateOf<Pair<String, String>?>(null) }
+
     LaunchedEffect(focusedQuote, selectedTab) {
         val index = focusedQuote?.let { q -> tab.blocks.indexOfFirst { q in it.text } } ?: -1
         if (index >= 0) list.animateScrollToItem(index)
     }
-    Column(modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(Dimens.SpaceXs), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+
+    Column(modifier.fillMaxSize().background(themeColors.background)) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .background(themeColors.surface)
+                .padding(Dimens.SpaceXs),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             tabs.forEachIndexed { index, t ->
                 val label = stringResource(t.kind.label) + (t.count?.let { " ($it)" } ?: "")
                 TabChip(label, selected = index == selectedTab) { onTabClick(index) }
@@ -104,9 +122,47 @@ fun TextReaderView(
                 itemsIndexed(tab.blocks) { _, block ->
                     when (val kind = block.kind) {
                         is BlockKind.Image -> Figure(kind.url, loadFigure)
-                        else -> SelectableBlock(block, highlights, onSelection)
+                        else -> SelectableBlock(
+                            block = block,
+                            highlights = highlights,
+                            readerFont = readerFont,
+                            fontSizeSp = fontSizeSp,
+                            textColor = themeColors.text,
+                            onSelection = {
+                                localSelection = it
+                                onSelection(it)
+                            },
+                        )
                     }
                 }
+            }
+
+            // Bottom-anchored Floating Highlight Action Palette
+            localSelection?.let { sel ->
+                SelectionActionPalette(
+                    visible = true,
+                    onHighlight = { colorName ->
+                        onHighlight(sel.first, sel.second, colorName)
+                        localSelection = null
+                        onSelection(null)
+                    },
+                    onAddNote = {
+                        onAddNote(sel.first)
+                        localSelection = null
+                        onSelection(null)
+                    },
+                    onCopy = {
+                        localSelection = null
+                        onSelection(null)
+                    },
+                    onCopyCitation = {
+                        localSelection = null
+                        onSelection(null)
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = Dimens.SpaceLg),
+                )
             }
         }
     }
@@ -116,17 +172,21 @@ fun TextReaderView(
 private val ReadingWidth = 760.dp
 
 @Composable
-private fun SelectableBlock(block: TextBlock, highlights: List<Highlight>, onSelection: (Pair<String, String>?) -> Unit) {
+private fun SelectableBlock(
+    block: TextBlock,
+    highlights: List<Highlight>,
+    readerFont: ReaderFont,
+    fontSizeSp: Int,
+    textColor: Color,
+    onSelection: (Pair<String, String>?) -> Unit,
+) {
     val colors = QuireTheme.colors
-    val text = remember(block, highlights, colors.accent) { annotate(block, highlights, mention = colors.accent) }
-    // Plain text in the field, styles (emphasis, highlights) drawn by the transformation: a
-    // field's own spans are not reliably kept.
+    val text = remember(block, highlights, colors.accent) { annotate(block, highlights, colors) }
     var value by remember(text) { mutableStateOf(TextFieldValue(text.text)) }
     BasicTextField(
         value = value,
         visualTransformation = { TransformedText(text, OffsetMapping.Identity) },
         onValueChange = { next ->
-            // Read-only: only the selection changes.
             value = value.copy(selection = next.selection)
             val range = next.selection
             onSelection(
@@ -135,28 +195,37 @@ private fun SelectableBlock(block: TextBlock, highlights: List<Highlight>, onSel
             )
         },
         readOnly = true,
-        textStyle = style(block.kind).copy(color = colors.fillPrimary),
+        textStyle = style(block.kind, readerFont, fontSizeSp).copy(color = textColor),
         cursorBrush = SolidColor(colors.accent),
         modifier = Modifier.fillMaxWidth().padding(start = if (block.kind == BlockKind.ListItem) Dimens.SpaceMd else 0.dp),
     )
 }
 
 @Composable
-private fun style(kind: BlockKind): TextStyle {
-    val base = TextStyle(fontSize = 16.sp, lineHeight = 26.sp)
+private fun style(kind: BlockKind, font: ReaderFont, fontSizeSp: Int): TextStyle {
+    val fontFamily = when (font) {
+        ReaderFont.Serif -> FontFamily.Serif
+        ReaderFont.Sans -> FontFamily.Default
+        ReaderFont.Mono -> FontFamily.Monospace
+    }
+    val base = TextStyle(
+        fontFamily = fontFamily,
+        fontSize = fontSizeSp.sp,
+        lineHeight = (fontSizeSp * 1.6f).sp,
+    )
     return when (kind) {
         is BlockKind.Heading -> when (kind.level) {
-            1 -> base.copy(fontSize = 24.sp, lineHeight = 32.sp, fontWeight = FontWeight.SemiBold)
-            2 -> base.copy(fontSize = 20.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold)
-            else -> base.copy(fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+            1 -> base.copy(fontSize = (fontSizeSp * 1.5f).sp, lineHeight = (fontSizeSp * 2.0f).sp, fontWeight = FontWeight.SemiBold)
+            2 -> base.copy(fontSize = (fontSizeSp * 1.25f).sp, lineHeight = (fontSizeSp * 1.75f).sp, fontWeight = FontWeight.SemiBold)
+            else -> base.copy(fontSize = (fontSizeSp * 1.1f).sp, fontWeight = FontWeight.SemiBold)
         }
-        BlockKind.TableRow, BlockKind.Equation -> base.copy(fontFamily = FontFamily.Monospace, fontSize = 14.sp, lineHeight = 22.sp)
+        BlockKind.TableRow, BlockKind.Equation -> base.copy(fontFamily = FontFamily.Monospace, fontSize = (fontSizeSp * 0.9f).sp)
         else -> base
     }
 }
 
-/** The block's words with their emphasis, highlights in yellow, mentions in the accent color. */
-private fun annotate(block: TextBlock, highlights: List<Highlight>, mention: Color): AnnotatedString = buildAnnotatedString {
+/** The block's words with their emphasis, highlights in respective colors, mentions in accent. */
+private fun annotate(block: TextBlock, highlights: List<Highlight>, colors: dev.neurokitchen.quire.presentation.designsystem.QuireColors): AnnotatedString = buildAnnotatedString {
     val prefix = if (block.kind == BlockKind.ListItem) "• " else ""
     append(prefix)
     block.words.forEachIndexed { i, word ->
@@ -164,18 +233,24 @@ private fun annotate(block: TextBlock, highlights: List<Highlight>, mention: Col
         val style = SpanStyle(
             fontWeight = if (word.bold) FontWeight.Bold else null,
             fontStyle = if (word.italic) FontStyle.Italic else null,
-            color = if (word.mention) mention else Color.Unspecified,
+            color = if (word.mention) colors.accent else Color.Unspecified,
         )
         pushStyle(style)
         append(word.text)
         pop()
     }
-    // The builder's own `toString()` is not its text: build that separately.
     val text = prefix + block.words.joinToString(" ") { it.text }
     for (highlight in highlights) {
+        val hlColor = when (highlight.color.lowercase()) {
+            "green" -> colors.highlightGreen
+            "blue" -> colors.highlightBlue
+            "purple" -> colors.highlightPurple
+            "red" -> colors.highlightRed
+            else -> colors.highlightYellow
+        }
         var from = text.indexOf(highlight.quote)
         while (from >= 0) {
-            addStyle(SpanStyle(background = HighlightYellow.copy(alpha = 0.45f)), from, from + highlight.quote.length)
+            addStyle(SpanStyle(background = hlColor.copy(alpha = 0.45f)), from, from + highlight.quote.length)
             from = text.indexOf(highlight.quote, from + highlight.quote.length)
         }
     }

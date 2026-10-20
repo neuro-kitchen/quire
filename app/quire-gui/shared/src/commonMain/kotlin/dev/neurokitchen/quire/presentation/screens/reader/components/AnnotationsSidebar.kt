@@ -37,7 +37,14 @@ import dev.neurokitchen.quire.resources.reader_no_annotations
 import dev.neurokitchen.quire.resources.reader_not_found_in_pdf
 import dev.neurokitchen.quire.resources.reader_remove
 import dev.neurokitchen.quire.resources.reader_save_comment
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import dev.neurokitchen.quire.resources.ic_close
 
 /** The paper's highlights, like Zotero's annotation sidebar: click one to bring it into view. */
 @Composable
@@ -50,15 +57,31 @@ fun AnnotationsSidebar(
     onComment: (String, String) -> Unit,
     onRemove: (String) -> Unit,
     modifier: Modifier = Modifier,
+    onCollapse: (() -> Unit)? = null,
 ) {
     val colors = QuireTheme.colors
     Column(modifier.fillMaxHeight().background(colors.sidepane)) {
-        Text(
-            stringResource(Res.string.reader_annotations),
-            style = MaterialTheme.typography.titleMedium,
-            color = colors.fillPrimary,
-            modifier = Modifier.padding(Dimens.SpaceSm),
-        )
+        Row(
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.SpaceSm, vertical = 6.dp),
+        ) {
+            Text(
+                stringResource(Res.string.reader_annotations),
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.fillPrimary,
+            )
+            Spacer(Modifier.weight(1f))
+            if (onCollapse != null) {
+                IconButton(onClick = onCollapse, modifier = Modifier.size(24.dp)) {
+                    Icon(
+                        painterResource(Res.drawable.ic_close),
+                        contentDescription = "Collapse Annotations",
+                        tint = colors.fillSecondary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+        }
         if (highlights.isEmpty()) {
             Text(
                 stringResource(Res.string.reader_no_annotations),
@@ -96,7 +119,14 @@ private fun Annotation(
 ) {
     val colors = QuireTheme.colors
     var draft by remember(highlight.id, highlight.comment) { mutableStateOf(highlight.comment.orEmpty()) }
-    val shape = RoundedCornerShape(Dimens.RadiusLarge)
+    val barColor = when (highlight.color.lowercase()) {
+        "green" -> colors.highlightGreen
+        "blue" -> colors.highlightBlue
+        "purple" -> colors.highlightPurple
+        "red" -> colors.highlightRed
+        else -> colors.highlightYellow
+    }
+    val shape = RoundedCornerShape(Dimens.RadiusBase)
     Column(
         Modifier
             .padding(vertical = 4.dp)
@@ -107,7 +137,7 @@ private fun Annotation(
             .padding(Dimens.SpaceXs),
     ) {
         Row {
-            Box(Modifier.width(3.dp).height(36.dp).background(HighlightYellow))
+            Box(Modifier.width(4.dp).height(36.dp).background(barColor, RoundedCornerShape(2.dp)))
             Text(
                 highlight.quote,
                 style = MaterialTheme.typography.bodyMedium,
