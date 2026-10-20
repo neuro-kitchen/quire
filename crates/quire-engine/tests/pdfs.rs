@@ -117,7 +117,7 @@ async fn blocked_download_is_recorded() {
     assert!(error.is_blocked(), "{error}");
     let codes: Vec<IssueCode> = engine.issues(&reference).await.unwrap().iter().map(|i| i.code).collect();
     assert!(codes.contains(&IssueCode::Blocked), "{codes:?}");
-    assert_eq!(engine.browser_page(&reference, true).unwrap().as_str(), format!("{}/articles/1", server.uri()));
+    assert_eq!(engine.browser_page(&reference).unwrap().as_str(), format!("{}/articles/1", server.uri()));
 
     // Fetched by hand in the browser and attached: the blocked issue goes away.
     let file = dir.path().join("downloaded.pdf");

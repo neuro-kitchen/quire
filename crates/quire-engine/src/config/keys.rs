@@ -42,7 +42,6 @@ pub const KEYS: &[KeySpec] = &[
     key("library.default", ValueKind::LibraryName, "library used when none is chosen"),
     key("libraries.*.path", ValueKind::Path, "folder of a registered library (see `quire library new`)"),
     key("peers.*.id", ValueKind::Text, "a device to sync with: its ID (`quire sync id` on it)"),
-    key("access.proxy", ValueKind::Text, "institutional proxy prefix, for opening publisher pages in your browser"),
     key("access.downloads", ValueKind::Path, "folder your browser saves downloads to (default: ~/Downloads)"),
     key(
         "export.*.format",

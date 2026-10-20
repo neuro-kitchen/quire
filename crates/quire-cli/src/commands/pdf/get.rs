@@ -1,8 +1,7 @@
 //! `pdf get`: find and download PDFs (page link, arXiv, Unpaywall, publisher page). Every
 //! reference is first downloaded directly, also with `--browser` and also when an earlier run
-//! found it blocked; only if that fails does `--browser` open its page in your browser (through
-//! `access.proxy` if set, where you log in yourself: quire never handles your login), and the PDF
-//! you download there is attached.
+//! found it blocked; only if that fails does `--browser` open its page in your browser (where you
+//! log in yourself: quire never handles your login), and the PDF you download there is attached.
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -39,10 +38,6 @@ pub struct GetArgs {
     /// PDF you download there
     #[arg(long)]
     browser: bool,
-    /// With --browser: open publishers' pages directly, not through the proxy (for Cloudflare
-    /// checks that fail on the proxy, e.g. Wiley; use the publisher's institutional login or a VPN)
-    #[arg(long, requires = "browser")]
-    direct: bool,
     /// With --browser: minutes to wait for each download
     #[arg(long, default_value_t = 5)]
     wait: u64,
@@ -51,7 +46,6 @@ pub struct GetArgs {
 /// The browser half of `--browser`: where downloads land, and Enter to skip.
 struct Session {
     downloads: PathBuf,
-    via_proxy: bool,
     enter: mpsc::Receiver<()>,
     wait: Duration,
 }
@@ -63,7 +57,7 @@ pub async fn run(context: &Context, args: &GetArgs) -> anyhow::Result<ExitCode> 
         output::hint("Nothing to do: every reference already has a PDF.");
         return Ok(ExitCode::SUCCESS);
     }
-    let session = if args.browser { Some(session(engine, args.wait, !args.direct)?) } else { None };
+    let session = if args.browser { Some(session(engine, args.wait)?) } else { None };
     let total = queries.len();
     let mut missing: Vec<String> = Vec::new();
     for (index, query) in queries.iter().enumerate() {
@@ -94,9 +88,8 @@ pub async fn run(context: &Context, args: &GetArgs) -> anyhow::Result<ExitCode> 
         }
     }
     if !missing.is_empty() && session.is_none() {
-        let proxy = if engine.config().access.proxy.is_some() { " (through your proxy)" } else { "" };
         output::hint(format!(
-            "{} without a PDF. Get them in your browser{proxy}: `quire pdf get {} --browser`",
+            "{} without a PDF. Get them in your browser: `quire pdf get {} --browser`",
             missing.len(),
             selection(args, &missing)
         ));
@@ -135,12 +128,12 @@ async fn targets(context: &Context, engine: &Engine, args: &GetArgs) -> anyhow::
     Ok(references.into_iter().filter(|r| !with_pdf.contains(&r.id)).map(|r| r.cite_key.to_string()).collect())
 }
 
-fn session(engine: &Engine, minutes: u64, via_proxy: bool) -> anyhow::Result<Session> {
+fn session(engine: &Engine, minutes: u64) -> anyhow::Result<Session> {
     let downloads = engine.downloads_dir().filter(|d| d.is_dir()).ok_or_else(|| {
         anyhow::anyhow!("no downloads folder found; set it with `quire config set access.downloads <folder>`")
     })?;
     output::hint(format!("PDFs you download are picked up from {}. Enter skips one.", downloads.display()));
-    Ok(Session { downloads, via_proxy, enter: browser::enter_presses(), wait: Duration::from_secs(minutes * 60) })
+    Ok(Session { downloads, enter: browser::enter_presses(), wait: Duration::from_secs(minutes * 60) })
 }
 
 /// Opens `reference`'s page and waits for its PDF in the downloads folder; `true` if attached.
@@ -148,7 +141,7 @@ fn session(engine: &Engine, minutes: u64, via_proxy: bool) -> anyhow::Result<Ses
 /// goes on for the right one.
 async fn in_browser(engine: &Engine, session: &Session, reference: &Reference) -> anyhow::Result<bool> {
     let key = style::paint(style::KEY, &reference.cite_key);
-    let Some(page) = engine.browser_page(reference, session.via_proxy) else {
+    let Some(page) = engine.browser_page(reference) else {
         output::note(
             Tone::Error,
             "no page",

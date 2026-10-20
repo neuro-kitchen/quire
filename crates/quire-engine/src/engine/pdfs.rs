@@ -297,14 +297,11 @@ impl Engine {
         Ok(self.run(|lib| lib.references_with_attachments()).await?.into_iter().collect())
     }
 
-    /// The page to open in a browser to get the PDF by hand: the DOI's landing page (else the
-    /// reference's URL, else its arXiv page), through the institutional proxy if one is set and
-    /// `via_proxy` (Cloudflare checks, e.g. Wiley's, cannot complete on a proxy's rewritten
-    /// address; opened directly, the user logs in with the publisher's institutional login).
-    pub fn browser_page(&self, reference: &Reference, via_proxy: bool) -> Option<Url> {
+    /// The page to open in a browser to get the PDF by hand: the DOI's landing page, else the
+    /// reference's URL, else its arXiv page. The user logs in there with the publisher.
+    pub fn browser_page(&self, reference: &Reference) -> Option<Url> {
         let data = &reference.data;
-        let page = data
-            .identifiers
+        data.identifiers
             .iter()
             .find_map(|id| match id {
                 Identifier::Doi(doi) => Url::parse(&format!("https://doi.org/{}", doi.as_str())).ok(),
@@ -321,14 +318,7 @@ impl Engine {
                     Identifier::Arxiv(a) => Url::parse(&format!("https://arxiv.org/abs/{}", a.id())).ok(),
                     _ => None,
                 })
-            })?;
-        match self.config.access.proxy.as_ref().filter(|_| via_proxy) {
-            Some(prefix) => Url::parse(&format!("{prefix}{page}"))
-                .ok()
-                .filter(|u| matches!(u.scheme(), "http" | "https"))
-                .or(Some(page)),
-            None => Some(page),
-        }
+            })
     }
 
     /// The folder the browser saves downloads to: `access.downloads`, else the XDG download

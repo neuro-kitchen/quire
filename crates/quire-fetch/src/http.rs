@@ -55,8 +55,8 @@ impl Http {
         Ok(Self { client, last_request: Mutex::new(HashMap::new()) })
     }
 
-    /// GET `url` as a page: the body and the final URL after redirects (a proxy redirects to the
-    /// publisher's proxied host, or to its login).
+    /// GET `url` as a page: the body and the final URL after redirects (a DOI redirects to the
+    /// publisher's page).
     pub async fn get_page(&self, url: &Url) -> Result<(String, Url)> {
         let response = self.get(url, "text/html,application/xhtml+xml").await?;
         let status = response.status();

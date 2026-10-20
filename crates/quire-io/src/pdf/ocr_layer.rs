@@ -1,7 +1,8 @@
 //! Scanned papers with an OCR text layer: the words are drawn invisibly (text rendering mode 3)
 //! behind the page image. `pdf-inspector` reads that layer only when a page has no visible text
-//! at all, but a proxy or publisher stamps every downloaded page with a visible line ("Authorized
-//! licensed use limited to: University of Florida…", "Downloaded from journals.physiology.org…"),
+//! at all, but an institution or publisher stamps every downloaded page with a visible line
+//! ("Authorized licensed use limited to: University of Florida…", "Downloaded from
+//! journals.physiology.org…"),
 //! so the paper came out as that line alone (5 of 21 papers, 2026-10-19). Here the layer is made
 //! visible (mode 3 → 0) in a copy of the PDF, which is then read like any other.
 
