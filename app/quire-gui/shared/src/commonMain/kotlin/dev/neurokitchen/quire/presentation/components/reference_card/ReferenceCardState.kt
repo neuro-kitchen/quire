@@ -1,6 +1,7 @@
 package dev.neurokitchen.quire.presentation.components.reference_card
 
 import androidx.compose.runtime.Immutable
+import dev.neurokitchen.quire.domain.model.ReadingStatus
 import dev.neurokitchen.quire.domain.model.Reference
 
 /** One reference in a list or table row. */
@@ -17,6 +18,7 @@ data class ReferenceCardState(
     val dateAdded: String,
     val hasPdf: Boolean,
     val isSelected: Boolean = false,
+    val reading: ReadingStatus = ReadingStatus.Unread,
 ) {
     companion object {
         fun from(reference: Reference, isSelected: Boolean = false) = ReferenceCardState(
@@ -29,6 +31,7 @@ data class ReferenceCardState(
             dateAdded = reference.dateAdded,
             hasPdf = reference.hasPdf,
             isSelected = isSelected,
+            reading = reference.reading,
         )
 
         fun creatorLabel(reference: Reference): String = reference.creators.let { creators ->
