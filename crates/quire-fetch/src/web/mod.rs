@@ -59,7 +59,7 @@ pub fn read(html: &str, url: &Url) -> Result<PageResult> {
 
 /// Where a redirect page sends the browser: Elsevier's linkinghub keeps the target in a hidden
 /// `redirectURL` field (and a delayed meta refresh); other pages use `<meta http-equiv=refresh>`.
-pub fn html_redirect(html: &str, page: &Url) -> Option<Url> {
+pub(crate) fn html_redirect(html: &str, page: &Url) -> Option<Url> {
     let document = scraper::Html::parse_document(html);
     let hidden = scraper::Selector::parse(r#"input[name="redirectURL"]"#).expect("valid selector");
     if let Some(value) = document.select(&hidden).next().and_then(|input| input.value().attr("value")) {
