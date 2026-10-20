@@ -16,6 +16,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import dev.neurokitchen.quire.di.initKoin
+import dev.neurokitchen.quire.data.engine.engineDataModule
 import dev.neurokitchen.quire.di.sampleDataModule
 import dev.neurokitchen.quire.domain.repository.LibraryRepository
 import dev.neurokitchen.quire.presentation.desktop.DesktopApp
@@ -27,7 +28,9 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.core.context.GlobalContext
 
 fun main() {
-    initKoin(data = sampleDataModule)
+    // The real library through the engine; QUIRE_SAMPLE_DATA=1 shows the fixed sample library
+    // instead (designing screens without a library).
+    initKoin(data = if (System.getenv("QUIRE_SAMPLE_DATA") == "1") sampleDataModule else engineDataModule)
     application {
         var settingsOpen by remember { mutableStateOf(false) }
         val scope = rememberCoroutineScope()

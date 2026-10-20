@@ -1,16 +1,19 @@
 package dev.neurokitchen.quire.data.repository
 
 import dev.neurokitchen.quire.domain.model.Creator
+import dev.neurokitchen.quire.domain.model.AddOutcome
 import dev.neurokitchen.quire.domain.model.LibraryQuery
 import dev.neurokitchen.quire.domain.model.LibrarySource
 import dev.neurokitchen.quire.domain.model.Project
 import dev.neurokitchen.quire.domain.model.ReadingStatus
 import dev.neurokitchen.quire.domain.model.Reference
 import dev.neurokitchen.quire.domain.model.SortColumn
+import dev.neurokitchen.quire.domain.model.Tag
 import dev.neurokitchen.quire.domain.repository.LibraryDescription
 import dev.neurokitchen.quire.domain.repository.LibraryRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 
 /**
@@ -48,8 +51,9 @@ class SampleLibraryRepository(
 
     override suspend fun reopen() = Unit
 
-    override suspend fun addReference(reference: Reference) {
+    override suspend fun addReference(reference: Reference): AddOutcome {
         references.value = listOf(reference) + references.value
+        return AddOutcome(isNew = true, reference = reference)
     }
 
     override suspend fun updateReference(reference: Reference) {
@@ -60,13 +64,65 @@ class SampleLibraryRepository(
         references.value = references.value.filter { it.id != id }
     }
 
-    override suspend fun createProject(name: String, parentPath: String?) {
+    override suspend fun createProject(name: String, parentPath: String?): String {
         val path = if (parentPath != null) "$parentPath/${name.lowercase().replace(' ', '-')}" else name.lowercase().replace(' ', '-')
         projects.value += Project(path, name, parentPath = parentPath, referenceCount = 0)
+        return path
+    }
+
+    override suspend fun addToProject(id: String, projectPath: String): Boolean {
+        var added = false
+        references.value = references.value.map {
+            if (it.id == id && projectPath !in it.projects) it.copy(projects = it.projects + projectPath).also { added = true } else it
+        }
+        return added
+    }
+
+    override suspend fun tag(id: String, names: List<String>) {
+        references.value = references.value.map { if (it.id == id) it.copy(tags = (it.tags + names).distinct()) else it }
+    }
+
+    override suspend fun untag(id: String, names: List<String>) {
+        references.value = references.value.map { if (it.id == id) it.copy(tags = it.tags - names.toSet()) else it }
     }
 
     override suspend fun deleteProject(path: String) {
         projects.value = projects.value.filter { it.path != path && it.parentPath != path }
+    }
+
+    override suspend fun renameProject(path: String, name: String): String {
+        val renamed = (path.substringBeforeLast('/', "").let { if (it.isEmpty()) "" else "$it/" }) + name.lowercase().replace(' ', '-')
+        fun moved(p: String) = if (p == path || p.startsWith("$path/")) renamed + p.removePrefix(path) else p
+        projects.value = projects.value.map {
+            it.copy(path = moved(it.path), name = if (it.path == path) name else it.name, parentPath = it.parentPath?.let(::moved))
+        }
+        references.value = references.value.map { it.copy(projects = it.projects.map(::moved)) }
+        return renamed
+    }
+
+    /** Tag colours by name; the tags themselves are the references'. */
+    private val tagColors = MutableStateFlow(mapOf("deep learning" to "#2EA8E5"))
+
+    override fun tags(): Flow<List<Tag>> = combine(references, tagColors) { all, colors ->
+        all.flatMap { it.tags }.groupingBy { it }.eachCount().map { (name, count) -> Tag(name, colors[name], count) }.sortedBy { it.name }
+    }
+
+    override suspend fun renameTag(old: String, new: String): Boolean {
+        references.value = references.value.map { r -> r.copy(tags = r.tags.map { if (it == old) new else it }.distinct()) }
+        tagColors.value[old]?.let { tagColors.value = tagColors.value - old + (new to it) }
+        return true
+    }
+
+    override suspend fun deleteTag(name: String): Int {
+        val count = references.value.count { name in it.tags }
+        references.value = references.value.map { it.copy(tags = it.tags - name) }
+        tagColors.value -= name
+        return count
+    }
+
+    override suspend fun colorTag(name: String, color: String?, position: Int?): Tag {
+        tagColors.value = if (color == null) tagColors.value - name else tagColors.value + (name to color)
+        return Tag(name, color)
     }
 
     private fun comparator(column: SortColumn, ascending: Boolean): Comparator<Reference> {
