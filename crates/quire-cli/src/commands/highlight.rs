@@ -1,8 +1,11 @@
-//! `highlight list|comment|rm`: passages marked in the TUI reader. `list` prints them as Markdown
-//! quotes (ready to paste into notes or a manuscript).
+//! `highlight list|comment|rm|export`: passages marked in the TUI reader. `list` prints them as
+//! Markdown quotes (ready to paste into notes or a manuscript); `export` writes one Markdown file
+//! per paper (highlights and notes) for Obsidian, Logseq or any Markdown folder.
+
+use std::path::PathBuf;
 
 use clap::{Args, Subcommand};
-use quire_engine::{Engine, HighlightId};
+use quire_engine::{Engine, HighlightId, SlugPath, write_if_changed};
 
 use crate::output::{self, Tone, style};
 
@@ -28,6 +31,18 @@ enum Action {
     },
     /// Remove a highlight
     Rm { id: HighlightId },
+    /// Write each paper's highlights and notes as Markdown (one file per paper, named by cite key)
+    Export {
+        /// Only this project
+        #[arg(short, long)]
+        project: Option<SlugPath>,
+        /// With --project: include its subprojects
+        #[arg(short, long)]
+        recursive: bool,
+        /// Folder to write to (e.g. your Obsidian vault's literature folder); without it, print
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
 }
 
 pub async fn run(engine: &Engine, args: &HighlightArgs) -> anyhow::Result<()> {
@@ -51,6 +66,24 @@ pub async fn run(engine: &Engine, args: &HighlightArgs) -> anyhow::Result<()> {
         Action::Comment { id, message } => {
             let highlight = engine.comment_highlight(*id, message).await?;
             output::report(Tone::Ok, "commented", style::paint(style::DIM, highlight.id).to_string());
+        }
+        Action::Export { project, recursive, output } => {
+            let files = engine.annotations_markdown(project.as_ref(), *recursive).await?;
+            let Some(dir) = output else {
+                for (_, markdown) in &files {
+                    println!("{markdown}");
+                }
+                return Ok(());
+            };
+            let mut written = 0;
+            for (reference, markdown) in &files {
+                let path = dir.join(format!("{}.md", reference.cite_key));
+                if write_if_changed(&path, markdown)? {
+                    written += 1;
+                    output::report(Tone::Ok, "written", path.display());
+                }
+            }
+            output::hint(format!("papers with highlights or notes: {}; files changed: {written}", files.len()));
         }
         Action::Rm { id } => {
             let highlight = engine.remove_highlight(*id).await?;
