@@ -27,10 +27,6 @@ pub enum IoError {
     #[error("Hayagriva: {0}")]
     Hayagriva(String),
 
-    /// Bytes that are not a readable PDF (e.g. an HTML page sent instead).
-    #[error("not a PDF: {0}")]
-    NotPdf(String),
-
     /// An edited reference (TOML) that cannot be read back.
     #[error("{0}")]
     Edit(String),

@@ -4,7 +4,7 @@ use biblatex::{Chunk, Chunks, Person, Spanned};
 use quire_model::{Creator, CreatorRole, Name, PersonName};
 
 /// BibLaTeX name fields and the roles they hold.
-pub const NAME_FIELDS: &[(&str, CreatorRole)] = &[
+pub(super) const NAME_FIELDS: &[(&str, CreatorRole)] = &[
     ("author", CreatorRole::Author),
     ("editor", CreatorRole::Editor),
     ("translator", CreatorRole::Translator),
@@ -13,7 +13,7 @@ pub const NAME_FIELDS: &[(&str, CreatorRole)] = &[
 
 /// The name list for the creators in `role`, or `None` if there are none. People are written
 /// `von Last, Jr, First`; organisations and one-part names are braced so they are not split.
-pub fn to_chunks(creators: &[Creator], role: CreatorRole) -> Option<Chunks> {
+pub(super) fn to_chunks(creators: &[Creator], role: CreatorRole) -> Option<Chunks> {
     let mut chunks = Vec::new();
     for creator in creators.iter().filter(|c| c.role == role) {
         if !chunks.is_empty() {
@@ -49,7 +49,7 @@ fn person_text(p: &PersonName) -> String {
 
 /// A creator from a parsed BibLaTeX person. A name with only a last part (as `{WHO}` parses)
 /// becomes a literal name.
-pub fn from_person(role: CreatorRole, person: &Person) -> Creator {
+pub(super) fn from_person(role: CreatorRole, person: &Person) -> Creator {
     let some = |s: &str| (!s.trim().is_empty()).then(|| s.trim().to_string());
     if person.given_name.trim().is_empty() && person.prefix.trim().is_empty() && person.suffix.trim().is_empty() {
         return Creator::literal(role, person.name.trim());

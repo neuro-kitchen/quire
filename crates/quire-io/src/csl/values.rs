@@ -6,7 +6,7 @@ use serde_json::{Map, Value, json};
 
 /// A text value: a string, a number, or the first string of an array (Crossref sends titles and
 /// ISSNs as arrays). Blank text is `None`.
-pub fn text(value: &Value) -> Option<String> {
+pub(super) fn text(value: &Value) -> Option<String> {
     let text = match value {
         Value::String(s) => s.trim().to_string(),
         Value::Number(n) => n.to_string(),
@@ -18,7 +18,7 @@ pub fn text(value: &Value) -> Option<String> {
 
 /// The creators in a CSL name list (`"author": [{"family": …, "given": …}, …]`). Entries
 /// without a family name or literal are skipped.
-pub fn names(role: CreatorRole, value: &Value) -> Vec<Creator> {
+pub(super) fn names(role: CreatorRole, value: &Value) -> Vec<Creator> {
     let Some(items) = value.as_array() else { return Vec::new() };
     items.iter().filter_map(Value::as_object).filter_map(|name| creator(role, name)).collect()
 }
@@ -41,7 +41,7 @@ fn creator(role: CreatorRole, name: &Map<String, Value>) -> Option<Creator> {
 
 /// The first date of a CSL date (`{"date-parts": [[2017, 6, 12]]}`; parts may be strings, a
 /// single part list may lack the outer array), or its `raw`/`literal` form when it parses.
-pub fn date(value: &Value) -> Option<Date> {
+pub(super) fn date(value: &Value) -> Option<Date> {
     let object = value.as_object()?;
     if let Some(parts) = object.get("date-parts").and_then(Value::as_array) {
         let first = match parts.first() {
@@ -57,7 +57,7 @@ pub fn date(value: &Value) -> Option<Date> {
 }
 
 /// A CSL name object for `creator`.
-pub fn name_value(creator: &Creator) -> Value {
+pub(super) fn name_value(creator: &Creator) -> Value {
     match &creator.name {
         Name::Literal { literal } => json!({ "literal": literal }),
         Name::Person(p) => {
@@ -80,7 +80,7 @@ pub fn name_value(creator: &Creator) -> Value {
 }
 
 /// A CSL date object for `date`.
-pub fn date_value(date: Date) -> Value {
+pub(super) fn date_value(date: Date) -> Value {
     let mut parts = vec![json!(date.get_year())];
     parts.extend(date.month().map(|m| json!(m)));
     parts.extend(date.day().map(|d| json!(d)));

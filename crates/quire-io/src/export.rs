@@ -44,6 +44,17 @@ impl ExportFormat {
             Self::Hayagriva => "yml",
         }
     }
+
+    /// The format a file name's extension asks for: `.bib` BibLaTeX, `.yml`/`.yaml` Hayagriva,
+    /// `.json` CSL-JSON (any case).
+    pub fn from_path(path: &std::path::Path) -> Option<Self> {
+        match path.extension()?.to_str()?.to_lowercase().as_str() {
+            "bib" => Some(Self::Biblatex),
+            "yml" | "yaml" => Some(Self::Hayagriva),
+            "json" => Some(Self::CslJson),
+            _ => None,
+        }
+    }
 }
 
 impl std::str::FromStr for ExportFormat {
@@ -142,6 +153,17 @@ mod tests {
         data.set(TextField::Abstract, "Long text");
         data.identifiers.push(Identifier::parse("10.1038/nature12373").unwrap());
         Reference::new(CiteKey::parse("kucsko2013").unwrap(), data, Origin::User, DeviceId::new())
+    }
+
+    #[test]
+    fn format_from_a_file_name() {
+        let format = |name: &str| ExportFormat::from_path(std::path::Path::new(name));
+        assert_eq!(format("refs.bib"), Some(ExportFormat::Biblatex));
+        assert_eq!(format("~/thesis/refs.YAML"), Some(ExportFormat::Hayagriva));
+        assert_eq!(format("refs.yml"), Some(ExportFormat::Hayagriva));
+        assert_eq!(format("refs.json"), Some(ExportFormat::CslJson));
+        assert_eq!(format("refs.txt"), None);
+        assert_eq!(format("refs"), None);
     }
 
     #[test]

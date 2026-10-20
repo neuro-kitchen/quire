@@ -6,7 +6,7 @@
 use quire_model::EntryKind;
 
 /// BibLaTeX entry type for a CSL type (`target` table).
-pub fn to_biblatex(kind: EntryKind) -> &'static str {
+pub(super) fn to_biblatex(kind: EntryKind) -> &'static str {
     use EntryKind::*;
     match kind {
         Article => "online",
@@ -39,7 +39,7 @@ pub fn to_biblatex(kind: EntryKind) -> &'static str {
 }
 
 /// CSL type for a BibLaTeX (or BibTeX) entry type name (`source` table); unknown → `document`.
-pub fn from_biblatex(name: &str) -> EntryKind {
+pub(super) fn from_biblatex(name: &str) -> EntryKind {
     use EntryKind::*;
     match name.to_ascii_lowercase().as_str() {
         "article" => ArticleJournal,
@@ -73,7 +73,7 @@ pub fn from_biblatex(name: &str) -> EntryKind {
 }
 
 /// Journal-like types: container title is `journaltitle`, issue goes to `number`.
-pub fn is_article(kind: EntryKind) -> bool {
+pub(super) fn is_article(kind: EntryKind) -> bool {
     matches!(
         kind,
         EntryKind::Article | EntryKind::ArticleJournal | EntryKind::ArticleMagazine | EntryKind::ArticleNewspaper
@@ -81,7 +81,7 @@ pub fn is_article(kind: EntryKind) -> bool {
 }
 
 /// BibLaTeX source types whose `number` is the series number (citation-js `collection-number` rule).
-pub fn number_is_series_number(biblatex_type: &str) -> bool {
+pub(super) fn number_is_series_number(biblatex_type: &str) -> bool {
     matches!(
         biblatex_type,
         "book"
@@ -102,7 +102,7 @@ pub fn number_is_series_number(biblatex_type: &str) -> bool {
 }
 
 /// CSL types whose `collection-number` is written as BibLaTeX `number` (citation-js target list).
-pub fn writes_series_number(kind: EntryKind) -> bool {
+pub(super) fn writes_series_number(kind: EntryKind) -> bool {
     use EntryKind::*;
     matches!(
         kind,
