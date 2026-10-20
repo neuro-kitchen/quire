@@ -212,9 +212,9 @@ async fn annotations(engine: &Engine, id: ReferenceId) -> anyhow::Result<Action>
 }
 
 /// Where each paper was left in the reader: `<reference>\t<block>` lines in the library folder.
-pub const POSITIONS: &str = "reader-positions.tsv";
+pub(crate) const POSITIONS: &str = "reader-positions.tsv";
 
-pub fn load_positions(path: &Path) -> HashMap<ReferenceId, usize> {
+pub(crate) fn load_positions(path: &Path) -> HashMap<ReferenceId, usize> {
     let text = std::fs::read_to_string(path).unwrap_or_default();
     text.lines()
         .filter_map(|line| {
@@ -232,7 +232,7 @@ fn save_positions(path: &Path, positions: &[(ReferenceId, usize)]) -> anyhow::Re
 }
 
 /// The reader settings in the config, defaults for what is unset or invalid.
-pub fn reader_settings(config: &quire_engine::Config) -> Settings {
+pub(crate) fn reader_settings(config: &quire_engine::Config) -> Settings {
     let saved = &config.reader;
     let default = Settings::default();
     Settings {

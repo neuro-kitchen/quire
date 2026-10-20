@@ -10,7 +10,7 @@ use super::document::{Block, Kind};
 
 /// Words, in a block, that a highlight or selection covers.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Marked {
+pub(crate) struct Marked {
     pub block: usize,
     pub words: Range<usize>,
 }
@@ -65,7 +65,7 @@ fn starts_sentence(word: &str) -> bool {
 
 /// A run of sentences (`first..=last`) in one block of the paper.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Selection {
+pub(crate) struct Selection {
     pub block: usize,
     pub first: usize,
     pub last: usize,
@@ -118,7 +118,7 @@ impl Selection {
 }
 
 /// The quote of `marked` and the words before it (for [`locate`]).
-pub fn quote_of(blocks: &[Block], marked: &Marked) -> (String, String) {
+pub(crate) fn quote_of(blocks: &[Block], marked: &Marked) -> (String, String) {
     let words = &blocks[marked.block].words;
     let quote = words[marked.words.clone()].iter().map(|w| w.text.as_str()).collect::<Vec<_>>().join(" ");
     let from = marked.words.start.saturating_sub(PREFIX_WORDS);
