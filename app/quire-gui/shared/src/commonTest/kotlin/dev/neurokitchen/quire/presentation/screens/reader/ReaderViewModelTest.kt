@@ -1,5 +1,13 @@
 package dev.neurokitchen.quire.presentation.screens.reader
 
+import kotlin.test.assertTrue
+import dev.neurokitchen.quire.domain.repository.ReaderRepository
+import dev.neurokitchen.quire.domain.repository.PdfRepository
+import dev.neurokitchen.quire.domain.model.QuoteLocation
+import dev.neurokitchen.quire.domain.model.PdfMatch
+import dev.neurokitchen.quire.domain.model.PageSize
+import dev.neurokitchen.quire.domain.model.PageRect
+import dev.neurokitchen.quire.domain.model.Highlight
 import dev.neurokitchen.quire.data.repository.SamplePdfRepository
 import dev.neurokitchen.quire.data.repository.SampleReaderRepository
 import dev.neurokitchen.quire.domain.model.PaperTabKind
@@ -75,5 +83,52 @@ class ReaderViewModelTest {
         assertEquals(4f, vm.state.value.pdf.zoom)
         vm.onEvent(ReaderEvent.OnZoomReset)
         assertEquals(1f, vm.state.value.pdf.zoom)
+    }
+
+    @Test
+    fun findInTheTextCountsAndGoesAround() = runTest(dispatcher) {
+        val vm = viewModel()
+        val text = vm.state.value.tabs[1].blocks.joinToString("\n") { it.text }
+        val expected = Regex("place", RegexOption.IGNORE_CASE).findAll(text).count()
+        vm.onEvent(ReaderEvent.OnFindToggle)
+        vm.onEvent(ReaderEvent.OnFindChange("PLACE"))
+        advanceUntilIdle()
+        val find = vm.state.value.find
+        assertEquals(expected, find.count(ReaderMode.Text))
+        assertTrue(expected > 1, "the sample text says place more than once")
+        vm.onEvent(ReaderEvent.OnFindPrevious)
+        assertEquals(expected - 1, vm.state.value.find.current, "back from the first is the last")
+        vm.onEvent(ReaderEvent.OnFindNext)
+        assertEquals(0, vm.state.value.find.current)
+        vm.onEvent(ReaderEvent.OnTabClick(0))
+        val abstract = vm.state.value.tabs[0].blocks.joinToString("\n") { it.text }
+        assertEquals(Regex("place", RegexOption.IGNORE_CASE).findAll(abstract).count(), vm.state.value.find.count(ReaderMode.Text), "counted again in the tab shown")
+    }
+
+    @Test
+    fun findOnThePdfAsksTheEngineAndTheTextLayerPassesThrough() = runTest(dispatcher) {
+        val withPdf = object : ReaderRepository by reader {
+            override suspend fun pdfFiles(id: String) = listOf("/papers/okeefe.pdf")
+        }
+        val searched = mutableListOf<String>()
+        val pdf = object : PdfRepository by SamplePdfRepository() {
+            override suspend fun pageSizes(path: String) = listOf(PageSize(612f, 792f), PageSize(612f, 792f))
+            override suspend fun locate(path: String, highlights: List<Highlight>) = emptyList<QuoteLocation>()
+            override suspend fun search(path: String, query: String, limit: Int): List<PdfMatch> {
+                searched += query
+                return listOf(PdfMatch(0, listOf(PageRect(72f, 60f, 120f, 72f))), PdfMatch(1, listOf(PageRect(72f, 90f, 120f, 102f))))
+            }
+            override suspend fun nearestGlyph(path: String, page: Int, x: Float, y: Float) = 7
+        }
+        val vm = ReaderViewModel("3", "The hippocampus as a spatial map", withPdf, pdf).also { advanceUntilIdle() }
+        assertEquals(ReaderMode.Pdf, vm.state.value.mode)
+        vm.onEvent(ReaderEvent.OnFindChange("pla"))
+        vm.onEvent(ReaderEvent.OnFindChange("place"))
+        advanceUntilIdle()
+        assertEquals(listOf("place"), searched, "typing quickly searches once, for the last text")
+        assertEquals(2, vm.state.value.find.count(ReaderMode.Pdf))
+        vm.onEvent(ReaderEvent.OnFindNext)
+        assertEquals(1, vm.state.value.find.current)
+        assertEquals(7, vm.glyphAt(0, 80f, 66f))
     }
 }

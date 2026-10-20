@@ -37,5 +37,10 @@ class EnginePdfRepositoryTest {
 
         val text = pdf.pageText(path, 0)
         assertTrue(text.contains("Place cells fire"))
+
+        // Find: both places, in reading order, on page 0.
+        val matches = pdf.search(path, "place")
+        assertEquals(listOf(0, 0), matches.map { it.page })
+        assertTrue(matches[0].rects[0].left < matches[1].rects[0].left)
     }
 }
