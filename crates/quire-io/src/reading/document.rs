@@ -76,7 +76,7 @@ pub fn parse(markdown: &str, math: bool) -> Vec<Block> {
             }
             continue;
         }
-        if let Some(url) = quire_engine::paper_markdown::image_url(chunk) {
+        if let Some(url) = crate::paper_markdown::image_url(chunk) {
             blocks.push(Block {
                 kind: Kind::Image,
                 words: vec![Word { text: url.into(), emphasis: Emphasis::default() }],
