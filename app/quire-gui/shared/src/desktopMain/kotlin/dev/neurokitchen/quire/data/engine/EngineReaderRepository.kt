@@ -18,7 +18,7 @@ class EngineReaderRepository(private val session: EngineSession) : ReaderReposit
         library.highlights(id).map { Highlight(it.id, it.quote, it.prefix, it.comment) }
     }
 
-    override suspend fun addHighlight(id: String, quote: String, prefix: String, comment: String?) {
+    override suspend fun addHighlight(id: String, quote: String, prefix: String, comment: String?, color: String) {
         session.library().addHighlight(id, quote, prefix, comment)
     }
 

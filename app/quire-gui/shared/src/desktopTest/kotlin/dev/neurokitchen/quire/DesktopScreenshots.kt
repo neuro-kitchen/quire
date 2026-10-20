@@ -12,6 +12,7 @@ import dev.neurokitchen.quire.data.repository.SampleReaderRepository
 import dev.neurokitchen.quire.data.repository.SampleSettingsRepository
 import dev.neurokitchen.quire.domain.model.Highlight
 import dev.neurokitchen.quire.presentation.screens.reader.PdfViewState
+import dev.neurokitchen.quire.presentation.screens.reader.ReaderEvent
 import dev.neurokitchen.quire.presentation.screens.reader.ReaderMode
 import dev.neurokitchen.quire.presentation.screens.reader.ReaderScreen
 import dev.neurokitchen.quire.presentation.screens.reader.ReaderState
@@ -29,6 +30,7 @@ import dev.neurokitchen.quire.presentation.screens.library.LibraryEvent
 import dev.neurokitchen.quire.presentation.screens.library.LibraryScreen
 import dev.neurokitchen.quire.presentation.screens.library.LibraryState
 import dev.neurokitchen.quire.presentation.screens.library.LibraryViewModel
+import dev.neurokitchen.quire.presentation.screens.library.components.AddReferenceDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -98,13 +100,47 @@ class DesktopScreenshots {
     }
 
     @Test
+    fun readerThemedAndCustomFont() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        val reader = SampleReaderRepository()
+        runBlocking { reader.addHighlight("3", "form a map of space", "Together they ", "the key claim") }
+        val vm = ReaderViewModel("3", "The hippocampus as a spatial map", reader, SamplePdfRepository())
+        vm.onEvent(ReaderEvent.OnSetReaderTheme(dev.neurokitchen.quire.presentation.designsystem.ReaderTheme.Sepia))
+        vm.onEvent(ReaderEvent.OnSetReaderFont(dev.neurokitchen.quire.presentation.designsystem.ReaderFont.Serif))
+        vm.onEvent(ReaderEvent.OnChangeFontSize(2))
+        val state = runBlocking { vm.state.first { !it.isLoading && it.highlights.isNotEmpty() } }
+        render("desktop-reader-sepia.png") {
+            QuireTheme(darkTheme = false, desktop = true) { Surface { ReaderScreen(state, {}, { _, _ -> null }, { null }) } }
+        }
+    }
+
+    @Test
+    fun libraryWithCollapsedActivityRail() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        val vm = LibraryViewModel(SampleLibraryRepository())
+        vm.onEvent(LibraryEvent.OnToggleSidebar)
+        val state = runBlocking { vm.state.first { it.isSidebarCollapsed } }
+        render("desktop-activity-rail.png") {
+            QuireTheme(darkTheme = true, desktop = true) { Surface { LibraryScreen(state, onEvent = {}) } }
+        }
+    }
+
+    @Test
+    fun libraryDashboardOverview() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        val vm = LibraryViewModel(SampleLibraryRepository())
+        val state = runBlocking { vm.state.first { !it.isLoading && it.selected == null } }
+        render("desktop-dashboard.png") {
+            QuireTheme(darkTheme = true, desktop = true) { Surface { LibraryScreen(state, onEvent = {}) } }
+        }
+    }
+
+    @Test
     fun readerOnAPdf() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
-        val path = java.nio.file.Files.createTempFile("paper", ".pdf").also {
-            java.nio.file.Files.write(it, tinyPdf(listOf("Place cells in the hippocampus fire", "when the animal is in one place.")))
-        }.toString()
-        val pdf = EnginePdfRepository { System.getProperty("quire.pdfium.dir") }
-        val highlight = Highlight("h1", "hippocampus fire", comment = "first place cells")
+        val pdf = SamplePdfRepository()
+        val path = "mock://papers/place-cells.pdf"
+        val highlight = Highlight("h1", "hippocampus fire", comment = "first place cells", color = "yellow")
         val state = runBlocking {
             ReaderState(
                 referenceId = "3", title = "Place cells", isLoading = false, mode = ReaderMode.Pdf,
@@ -115,6 +151,78 @@ class DesktopScreenshots {
         render("desktop-reader-pdf.png") {
             QuireTheme(darkTheme = false, desktop = true) {
                 Surface { ReaderScreen(state, {}, { index, width -> pdf.render(path, index, width) }, { null }) }
+            }
+        }
+    }
+
+    @Test
+    fun addReferenceDialog() {
+        render("desktop-add-reference.png", width = 800, height = 650) {
+            QuireTheme(darkTheme = false, desktop = true) {
+                Surface {
+                    AddReferenceDialog(onDismiss = {}, onAdd = {})
+                }
+            }
+        }
+    }
+
+    @Test
+    fun nordThemeWindow() {
+        startKoin { modules(appModules(sampleDataModule)) }
+        render("desktop-nord.png") {
+            QuireTheme(appTheme = dev.neurokitchen.quire.presentation.designsystem.AppTheme.Nord, desktop = true) {
+                DesktopApp()
+            }
+        }
+    }
+
+    @Test
+    fun solarizedThemeWindow() {
+        startKoin { modules(appModules(sampleDataModule)) }
+        render("desktop-solarized.png") {
+            QuireTheme(appTheme = dev.neurokitchen.quire.presentation.designsystem.AppTheme.Solarized, desktop = true) {
+                DesktopApp()
+            }
+        }
+    }
+
+    @Test
+    fun multiSelectionTable() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        val vm = LibraryViewModel(SampleLibraryRepository())
+        vm.onEvent(LibraryEvent.OnReferenceSelect("1", isCtrlPressed = false, isShiftPressed = false))
+        vm.onEvent(LibraryEvent.OnReferenceSelect("2", isCtrlPressed = true, isShiftPressed = false))
+        vm.onEvent(LibraryEvent.OnReferenceSelect("3", isCtrlPressed = true, isShiftPressed = false))
+        val state = runBlocking { vm.state.first { it.selectedIds.size >= 3 } }
+        render("desktop-multi-select.png") {
+            QuireTheme(appTheme = dev.neurokitchen.quire.presentation.designsystem.AppTheme.Obsidian, desktop = true) {
+                Surface { LibraryScreen(state, onEvent = {}) }
+            }
+        }
+    }
+
+    @Test
+    fun settingsAppearanceCards() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        val vm = SettingsViewModel(SampleSettingsRepository(), SampleLibraryRepository())
+        vm.onEvent(SettingsEvent.OnSectionClick(SettingsSection.Appearance))
+        val state = runBlocking { vm.state.first { it.section == SettingsSection.Appearance } }
+        render("desktop-settings-appearance.png", width = 900, height = 650) {
+            QuireTheme(appTheme = dev.neurokitchen.quire.presentation.designsystem.AppTheme.Obsidian, desktop = true) {
+                Surface { SettingsScreen(state, onEvent = {}) }
+            }
+        }
+    }
+
+    @Test
+    fun settingsShortcutsCheatSheet() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        val vm = SettingsViewModel(SampleSettingsRepository(), SampleLibraryRepository())
+        vm.onEvent(SettingsEvent.OnSectionClick(SettingsSection.Shortcuts))
+        val state = runBlocking { vm.state.first { it.section == SettingsSection.Shortcuts } }
+        render("desktop-settings-shortcuts.png", width = 900, height = 650) {
+            QuireTheme(appTheme = dev.neurokitchen.quire.presentation.designsystem.AppTheme.Obsidian, desktop = true) {
+                Surface { SettingsScreen(state, onEvent = {}) }
             }
         }
     }

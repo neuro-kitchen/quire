@@ -5,17 +5,22 @@ import dev.neurokitchen.quire.domain.model.PageImage
 import dev.neurokitchen.quire.domain.model.PageRect
 import dev.neurokitchen.quire.domain.model.PageSize
 import dev.neurokitchen.quire.domain.model.QuoteLocation
+import dev.neurokitchen.quire.domain.model.SelectedTextRange
+import dev.neurokitchen.quire.domain.model.WordLocation
 import dev.neurokitchen.quire.domain.repository.PdfRepository
 import dev.neurokitchen.quire.ffi.pdfFind
 import dev.neurokitchen.quire.ffi.pdfInit
+import dev.neurokitchen.quire.ffi.pdfNearestGlyph
 import dev.neurokitchen.quire.ffi.pdfPageSizes
+import dev.neurokitchen.quire.ffi.pdfPageText
 import dev.neurokitchen.quire.ffi.pdfRenderPage
+import dev.neurokitchen.quire.ffi.pdfTextRange
+import dev.neurokitchen.quire.ffi.pdfWordAt
 
 /**
- * PDF pages through PDFium. The library is looked for in `pdfiumDir`; the desktop app passes the
- * folder of its bundled copy (Compose app resources), tests the one Gradle downloaded.
+ * Pure-Rust PDF pages and text layer through quire-pdf / hayro.
  */
-class EnginePdfRepository(private val pdfiumDir: () -> String?) : PdfRepository {
+class EnginePdfRepository(private val pdfiumDir: () -> String? = { null }) : PdfRepository {
     private val ready by lazy { pdfInit(pdfiumDir()) }
 
     override suspend fun pageSizes(path: String): List<PageSize> {
@@ -40,9 +45,32 @@ class EnginePdfRepository(private val pdfiumDir: () -> String?) : PdfRepository 
         }
     }
 
+    override suspend fun wordAt(path: String, page: Int, x: Float, y: Float): WordLocation? {
+        ready
+        val word = pdfWordAt(path, page.toUInt(), x, y) ?: return null
+        return WordLocation(word.text, PageRect(word.left, word.top, word.right, word.bottom))
+    }
+
+    override suspend fun nearestGlyph(path: String, page: Int, x: Float, y: Float): Int? {
+        ready
+        return pdfNearestGlyph(path, page.toUInt(), x, y)?.toInt()
+    }
+
+    override suspend fun textRange(path: String, page: Int, start: Int, end: Int): SelectedTextRange {
+        ready
+        val res = pdfTextRange(path, page.toUInt(), start.toUInt(), end.toUInt())
+        return SelectedTextRange(
+            text = res.text,
+            rects = res.rects.map { PageRect(it.left, it.top, it.right, it.bottom) },
+        )
+    }
+
+    override suspend fun pageText(path: String, page: Int): String {
+        ready
+        return pdfPageText(path, page.toUInt())
+    }
+
     companion object {
-        /** Where the desktop app finds PDFium: its resources folder, else `quire.pdfium.dir`. */
-        fun bundledDir(): String? =
-            System.getProperty("compose.application.resources.dir") ?: System.getProperty("quire.pdfium.dir")
+        fun bundledDir(): String? = null
     }
 }
