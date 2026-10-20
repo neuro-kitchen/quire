@@ -39,7 +39,7 @@ pub fn read(dir: &Path) -> Result<ZoteroLibrary> {
 
 /// Where an attachment's file is, if it is a file: `storage:<name>` under `storage/<key>/`, an
 /// absolute linked path, or `attachments:<relative>` under `base` (Zotero's linked-files folder).
-pub fn file_of(dir: &Path, attachment: &ZoteroAttachment, base: Option<&Path>) -> Option<PathBuf> {
+pub(crate) fn file_of(dir: &Path, attachment: &ZoteroAttachment, base: Option<&Path>) -> Option<PathBuf> {
     let path = attachment.path.as_deref()?;
     if let Some(name) = path.strip_prefix("storage:") {
         return Some(dir.join("storage").join(&attachment.key).join(name));

@@ -1,12 +1,33 @@
 //! Programs quire uses when they are installed, for what it does not do itself: poppler's
 //! `pdftotext` (text of PDFs whose layer pdf-inspector drops) and `pdftoppm` (page images),
 //! `tesseract` (OCR of scanned pages), `ocrmypdf` (a text layer added to a scanned PDF). Each is
-//! optional: quire says what to install when one is missing.
+//! optional: quire says what to install when one is missing. Also [`open`]: the system's default
+//! application for a URL or a file.
 
 use std::path::Path;
 use std::process::{Command, Stdio};
 
 use crate::error::{EngineError, Result};
+
+/// Opens `target` (a URL or a file) with the system's default application. The application is
+/// started in the background with its output discarded: browsers print their own diagnostics
+/// (Chrome's zygote errors), which would otherwise land in a front end's screen or prompts.
+pub fn open(target: &str) -> Result<()> {
+    let mut command = if cfg!(target_os = "macos") {
+        Command::new("open")
+    } else if cfg!(target_os = "windows") {
+        let mut start = Command::new("cmd");
+        start.args(["/C", "start", ""]);
+        start
+    } else {
+        Command::new("xdg-open")
+    };
+    command.arg(target).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+    let mut child = command.spawn().map_err(EngineError::file(Path::new(target)))?;
+    // `xdg-open` returns once the browser has the URL; reap it on its own thread.
+    std::thread::spawn(move || child.wait());
+    Ok(())
+}
 
 /// Page images for OCR: dots per inch (Tesseract reads best at about 300).
 const OCR_DPI: &str = "300";
@@ -40,7 +61,7 @@ pub fn poppler_text(path: &Path) -> Option<String> {
 /// OCR of every page of the PDF at `path`: pages drawn by `pdftoppm`, read by `tesseract` in
 /// `language` (Tesseract's codes: `eng`, `deu`, `eng+fra`). Pages are separated by form feeds,
 /// as `pdftotext` does. `None` when either program is missing.
-pub fn ocr_text(path: &Path, language: &str) -> Result<Option<String>> {
+pub(crate) fn ocr_text(path: &Path, language: &str) -> Result<Option<String>> {
     if !installed("pdftoppm") || !installed("tesseract") {
         return Ok(None);
     }
