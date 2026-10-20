@@ -24,6 +24,7 @@ class DesktopViewModel : ViewModel() {
                 val selected = if (state.selected == event.id) papers.getOrNull(index - 1)?.id else state.selected
                 state.copy(papers = papers, selected = selected)
             }
+            is DesktopEvent.OnSetAppTheme -> _state.update { it.copy(appTheme = event.theme) }
         }
     }
 }
