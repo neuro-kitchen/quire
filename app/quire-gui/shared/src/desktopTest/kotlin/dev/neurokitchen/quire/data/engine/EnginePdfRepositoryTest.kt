@@ -6,19 +6,36 @@ import kotlinx.coroutines.runBlocking
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/** PDF pages through the bridge and the PDFium Gradle downloaded (`quire.pdfium.dir`). */
+/** PDF pages and text layer through the pure-Rust hayro bridge. */
 class EnginePdfRepositoryTest {
     @Test
     fun rendersPagesAndLocatesHighlights() = runBlocking {
         val path = Files.createTempFile("paper", ".pdf").also { Files.write(it, tinyPdf(listOf("Place cells fire in one place"))) }.toString()
-        val pdf = EnginePdfRepository { System.getProperty("quire.pdfium.dir") }
+        val pdf = EnginePdfRepository()
         assertEquals(1, pdf.pageSizes(path).size)
         val page = pdf.render(path, 0, 612)
         assertEquals(612 to 792, page.width to page.height)
         val found = pdf.locate(path, listOf(Highlight("h1", "fire in one"), Highlight("h2", "absent")))
         assertEquals(listOf("h1"), found.map { it.highlightId })
         assertTrue(found[0].rects.isNotEmpty())
+
+        // Text layer tests
+        val word = pdf.wordAt(path, 0, 75f, 70f)
+        assertNotNull(word)
+        assertEquals("Place", word.text)
+
+        val glyph = pdf.nearestGlyph(path, 0, 72f, 70f)
+        assertEquals(0, glyph)
+
+        val range = pdf.textRange(path, 0, 0, 5)
+        assertNotNull(range)
+        assertEquals("Place", range.text)
+        assertTrue(range.rects.isNotEmpty())
+
+        val text = pdf.pageText(path, 0)
+        assertTrue(text.contains("Place cells fire"))
     }
 }
