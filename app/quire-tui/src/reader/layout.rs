@@ -26,7 +26,7 @@ pub const MIN_WIDTH: u16 = 40;
 pub(crate) const MAX_WIDTH: u16 = 120;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Theme {
+pub enum Theme {
     Dark,
     Light,
     Sepia,
@@ -59,7 +59,7 @@ impl Theme {
 
 /// A piece of a line.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Piece {
+pub struct Piece {
     pub text: String,
     pub emphasis: Emphasis,
     /// Index of the word in its block (`None` for spaces, bullets and table rows): lets the view
@@ -94,7 +94,7 @@ impl Line {
 
 /// The laid-out text.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub(crate) struct Laid {
+pub struct Laid {
     pub lines: Vec<Line>,
     /// Headings: (line, level, text), for the table of contents.
     pub headings: Vec<(usize, u8, String)>,

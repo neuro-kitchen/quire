@@ -99,7 +99,7 @@ pub enum Action {
 
 /// Engine work to run after an update.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Effect {
+pub enum Effect {
     LoadSidebar,
     LoadRows(Scope),
     LoadDetails(ReferenceId),

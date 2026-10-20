@@ -10,7 +10,7 @@ use super::document::{Block, Kind};
 
 /// Words, in a block, that a highlight or selection covers.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Marked {
+pub struct Marked {
     pub block: usize,
     pub words: Range<usize>,
 }
@@ -65,7 +65,7 @@ fn starts_sentence(word: &str) -> bool {
 
 /// A run of sentences (`first..=last`) in one block of the paper.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct Selection {
+pub struct Selection {
     pub block: usize,
     pub first: usize,
     pub last: usize,
