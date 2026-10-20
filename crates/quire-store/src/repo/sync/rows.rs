@@ -10,7 +10,7 @@ use crate::repo::codec::{id_at, parsed_at};
 use crate::repo::{attachments, highlights, members, notes, projects, reading, references, tags};
 
 /// The row `table` holds at (`k1`, `k2`), if it still exists.
-pub fn load(conn: &Connection, table: &str, k1: &[u8], k2: &[u8]) -> Result<Option<Row>> {
+pub(super) fn load(conn: &Connection, table: &str, k1: &[u8], k2: &[u8]) -> Result<Option<Row>> {
     Ok(match table {
         "reference" => references::by_id(conn, id(k1)?)?.map(Row::Reference),
         "project" => projects::by_id(conn, id(k1)?)?.map(Row::Project),
@@ -88,7 +88,7 @@ fn id<K: IdKind>(bytes: &[u8]) -> Result<Id<K>> {
 }
 
 /// The `created_at`, `updated_at`, `updated_by`, `deleted_at` columns of a link row.
-pub fn stamp(row: &SqlRow) -> rusqlite::Result<Stamp> {
+pub(super) fn stamp(row: &SqlRow) -> rusqlite::Result<Stamp> {
     Ok(Stamp {
         created_at: Timestamp::from_millis(row.get("created_at")?),
         updated_at: Timestamp::from_millis(row.get("updated_at")?),

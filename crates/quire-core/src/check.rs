@@ -19,7 +19,7 @@ pub struct Checked {
 }
 
 /// Issues found in `data`'s fields.
-pub fn lint(data: &ReferenceData) -> Vec<Issue> {
+pub(crate) fn lint(data: &ReferenceData) -> Vec<Issue> {
     let mut found = Vec::new();
     let mut flag = |code| found.push(Issue::new(code));
     match data.title() {

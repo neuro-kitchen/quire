@@ -105,7 +105,7 @@ const FIELDS: &[(&str, &str)] = &[
 
 /// The FTS5 query for what the user typed, and whether it names a field (then papers' text,
 /// which has no fields, is not searched). `None` when nothing searchable was typed.
-pub fn fts_query(input: &str) -> Option<(String, bool)> {
+pub(crate) fn fts_query(input: &str) -> Option<(String, bool)> {
     let mut terms = Vec::new();
     let mut fielded = false;
     for (field, text, phrase) in tokens(input) {

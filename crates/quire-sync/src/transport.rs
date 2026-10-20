@@ -9,7 +9,7 @@ use iroh::endpoint::presets;
 use iroh::{Endpoint, EndpointId, SecretKey};
 
 use crate::error::{Result, SyncError};
-use crate::session::{self, Replica, Report, Role};
+use crate::session::{self, Replica, Report, Side};
 
 /// How long to wait to get online (a relay connection) before giving up.
 const ONLINE_WAIT: std::time::Duration = std::time::Duration::from_secs(20);
@@ -24,10 +24,11 @@ fn is_not_found(error: &str) -> bool {
 }
 
 /// The application protocol on the QUIC connection.
-pub const ALPN: &[u8] = b"quire/sync/1";
+pub(crate) const ALPN: &[u8] = b"quire/sync/1";
 
-/// A new device key (32 bytes, to keep secret).
-pub fn new_secret() -> [u8; 32] {
+/// A new device key (32 bytes), for tests: the engine creates keys as secrets (`quire_engine::secrets`).
+#[cfg(test)]
+pub(crate) fn new_secret() -> [u8; 32] {
     SecretKey::generate().to_bytes()
 }
 
@@ -82,7 +83,7 @@ impl Device {
             }
         };
         let (mut send, mut receive) = connection.open_bi().await.map_err(|e| SyncError::Network(e.to_string()))?;
-        let report = session::run(replica, Role::Client, Some(&id.to_string()), &mut receive, &mut send).await;
+        let report = session::run(replica, Side::Client, Some(&id.to_string()), &mut receive, &mut send).await;
         let _ = send.finish();
         // The server closes once it has everything; closing first could drop the last bytes.
         if report.is_ok() {
@@ -123,7 +124,7 @@ impl Device {
             }
             let outcome = match connection.accept_bi().await {
                 Ok((mut send, mut receive)) => {
-                    let report = session::run(replica, Role::Server, Some(&remote), &mut receive, &mut send).await;
+                    let report = session::run(replica, Side::Server, Some(&remote), &mut receive, &mut send).await;
                     let _ = send.finish();
                     // The session ends with the client's last message read: all is delivered.
                     connection.close(0u8.into(), b"done");

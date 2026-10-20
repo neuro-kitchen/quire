@@ -14,7 +14,7 @@
 
 use std::future::Future;
 
-use quire_core::sync::{Merged, Row};
+use quire_core::sync::{MergeSummary, Row};
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
 use crate::error::{Result, SyncError};
@@ -22,7 +22,7 @@ use crate::identity::Certificate;
 use crate::protocol::{self, Message};
 
 /// Protocol version; both sides must speak the same one. 2: certificates, collaborators.
-pub const PROTOCOL: u32 = 2;
+pub(crate) const PROTOCOL: u32 = 2;
 
 /// The other side of a session.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -51,7 +51,7 @@ pub trait Replica: Sync {
     /// collaborator, only what is shared with them), and the last change number in it.
     fn changes_for(&self, seq: i64, to: &Peer) -> impl Future<Output = Result<(Vec<Row>, i64)>> + Send;
     /// Merges rows that came from `from` (a collaborator's: only what their role allows).
-    fn merge(&self, rows: Vec<Row>, from: &Peer) -> impl Future<Output = Result<Merged>> + Send;
+    fn merge(&self, rows: Vec<Row>, from: &Peer) -> impl Future<Output = Result<MergeSummary>> + Send;
     fn record_received(&self, device: &str, seq: i64) -> impl Future<Output = Result<()>> + Send;
     /// Hashes of files the attachments here name but are not here.
     fn missing_files(&self) -> impl Future<Output = Result<Vec<String>>> + Send;
@@ -64,7 +64,7 @@ pub trait Replica: Sync {
 
 /// Which side of the connection this is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Role {
+pub enum Side {
     /// Connected to the other device (speaks first).
     Client,
     /// Accepted the connection.
@@ -81,7 +81,7 @@ pub struct Report {
     /// This copy joined the other's library (it was new).
     pub joined: bool,
     pub sent: usize,
-    pub received: Merged,
+    pub received: MergeSummary,
     pub files_sent: usize,
     pub files_received: usize,
 }
@@ -90,7 +90,7 @@ pub struct Report {
 /// ID; `None` in tests over a pipe: its certificate is then only checked for its own device).
 pub async fn run<R, Rd, Wr>(
     replica: &R,
-    role: Role,
+    side: Side,
     authenticated: Option<&str>,
     reader: &mut Rd,
     writer: &mut Wr,
@@ -108,7 +108,7 @@ where
         new: replica.is_new().await?,
         certificate: my_certificate.clone(),
     };
-    let theirs = exchange(role, reader, writer, &mine).await?;
+    let theirs = exchange(side, reader, writer, &mine).await?;
     let (
         Message::Hello { library: my_library, new: i_am_new, .. },
         Message::Hello { protocol, library, device, new, certificate },
@@ -141,13 +141,13 @@ where
     }
     let peer = Peer { device: device.clone(), user, collaborator };
     let received = replica.received_from(&peer.device).await?;
-    let Message::Start { received: they_have } = exchange(role, reader, writer, &Message::Start { received }).await?
+    let Message::Start { received: they_have } = exchange(side, reader, writer, &Message::Start { received }).await?
     else {
         return Err(SyncError::Protocol("expected Start".into()));
     };
 
     // Changes: the client's first, then the server's.
-    if role == Role::Client {
+    if side == Side::Client {
         report.sent = send_changes(replica, writer, they_have, &peer).await?;
         report.received = receive_changes(replica, reader, &peer).await?;
     } else {
@@ -156,7 +156,7 @@ where
     }
 
     // Files: the client asks first, then serves the server's request.
-    if role == Role::Client {
+    if side == Side::Client {
         report.files_received = fetch_files(replica, reader, writer).await?;
         report.files_sent = serve_files(replica, reader, writer, &peer).await?;
     } else {
@@ -167,14 +167,14 @@ where
     Ok(report)
 }
 
-/// Sends `mine` and receives theirs, in the order of `role`.
+/// Sends `mine` and receives theirs, in the order of `side`.
 async fn exchange<Rd: AsyncRead + Unpin, Wr: AsyncWrite + Unpin>(
-    role: Role,
+    side: Side,
     reader: &mut Rd,
     writer: &mut Wr,
     mine: &Message,
 ) -> Result<Message> {
-    if role == Role::Client {
+    if side == Side::Client {
         protocol::send(writer, mine).await?;
         writer.flush().await?;
         protocol::receive(reader).await
@@ -213,7 +213,7 @@ async fn receive_changes<R: Replica, Rd: AsyncRead + Unpin>(
     replica: &R,
     reader: &mut Rd,
     peer: &Peer,
-) -> Result<Merged> {
+) -> Result<MergeSummary> {
     let mut all = Vec::new();
     let up_to = loop {
         let Message::Changes { rows, last, more } = protocol::receive(reader).await? else {
@@ -224,7 +224,7 @@ async fn receive_changes<R: Replica, Rd: AsyncRead + Unpin>(
             break last;
         }
     };
-    let merged = if all.is_empty() { Merged::default() } else { replica.merge(all, peer).await? };
+    let merged = if all.is_empty() { MergeSummary::default() } else { replica.merge(all, peer).await? };
     replica.record_received(&peer.device, up_to).await?;
     Ok(merged)
 }

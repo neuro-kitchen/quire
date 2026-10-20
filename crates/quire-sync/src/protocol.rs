@@ -12,7 +12,7 @@ use crate::error::{Result, SyncError};
 /// Largest message (a batch of rows; files are sent apart).
 const MAX_MESSAGE: u32 = 64 * 1024 * 1024;
 /// Largest file.
-pub const MAX_FILE: u64 = 2 * 1024 * 1024 * 1024;
+pub(crate) const MAX_FILE: u64 = 2 * 1024 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -50,13 +50,13 @@ pub async fn receive<R: AsyncRead + Unpin>(reader: &mut R) -> Result<Message> {
     serde_json::from_slice(&body).map_err(|e| SyncError::Protocol(format!("unreadable message: {e}")))
 }
 
-pub async fn send_file<W: AsyncWrite + Unpin>(writer: &mut W, hash: &str, bytes: &[u8]) -> Result<()> {
+pub(crate) async fn send_file<W: AsyncWrite + Unpin>(writer: &mut W, hash: &str, bytes: &[u8]) -> Result<()> {
     send(writer, &Message::File { hash: hash.to_string(), size: bytes.len() as u64 }).await?;
     writer.write_all(bytes).await?;
     Ok(())
 }
 
-pub async fn receive_bytes<R: AsyncRead + Unpin>(reader: &mut R, size: u64) -> Result<Vec<u8>> {
+pub(crate) async fn receive_bytes<R: AsyncRead + Unpin>(reader: &mut R, size: u64) -> Result<Vec<u8>> {
     if size > MAX_FILE {
         return Err(SyncError::TooLarge);
     }
