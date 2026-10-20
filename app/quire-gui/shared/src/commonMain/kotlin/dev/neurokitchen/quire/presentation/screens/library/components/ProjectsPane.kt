@@ -52,6 +52,7 @@ import dev.neurokitchen.quire.presentation.designsystem.components.ToolbarIconBu
 import dev.neurokitchen.quire.presentation.screens.library.LibraryEvent
 import dev.neurokitchen.quire.presentation.screens.library.LibraryState
 import dev.neurokitchen.quire.resources.Res
+import dev.neurokitchen.quire.resources.ic_auto_fix_high
 import dev.neurokitchen.quire.resources.ic_chevron_right
 import dev.neurokitchen.quire.resources.ic_create_new_folder
 import dev.neurokitchen.quire.resources.ic_delete
@@ -86,6 +87,11 @@ fun ProjectsPane(
                 Res.drawable.ic_create_new_folder,
                 stringResource(Res.string.library_new_project),
                 onClick = { onEvent(LibraryEvent.OnNameDialog(NameDialog.NewProject())) },
+            )
+            ToolbarIconButton(
+                Res.drawable.ic_auto_fix_high,
+                "New Smart Collection...",
+                onClick = { onEvent(LibraryEvent.OnNameDialog(NameDialog.SaveSearch(""))) },
             )
             Spacer(Modifier.weight(1f))
             Box(
@@ -161,7 +167,7 @@ fun ProjectsPane(
                 Box {
                     SourceRow(
                         modifier = Modifier.onSecondaryClick { menuOpen = true },
-                        icon = Res.drawable.ic_search,
+                        icon = Res.drawable.ic_auto_fix_high,
                         name = saved.name,
                         depth = 1,
                         isSelected = saved.isActive,

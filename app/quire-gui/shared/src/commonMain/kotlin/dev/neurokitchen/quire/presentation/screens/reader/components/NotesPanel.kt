@@ -1,6 +1,15 @@
 package dev.neurokitchen.quire.presentation.screens.reader.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.runtime.remember
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -54,9 +63,11 @@ fun NotesPanel(
     onRemove: (String) -> Unit,
     modifier: Modifier = Modifier,
     onCollapse: (() -> Unit)? = null,
+    onWikilinkClick: (String) -> Unit = {},
 ) {
     val colors = QuireTheme.colors
     val shape = RoundedCornerShape(Dimens.RadiusBase)
+    val wikilinkRegex = remember { Regex("\\[\\[([a-zA-Z0-9_:-]+)\\]\\]") }
     Column(modifier.fillMaxHeight().background(colors.sidepane).padding(Dimens.SpaceSm)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -117,7 +128,49 @@ fun NotesPanel(
                     modifier = Modifier.fillMaxWidth().border(1.dp, colors.border, RoundedCornerShape(Dimens.RadiusBase)),
                 ) {
                     Column(Modifier.padding(Dimens.SpaceSm)) {
-                        Text(note.body, style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
+                        val annotated = remember(note.body, colors.accent) {
+                            buildAnnotatedString {
+                                var lastIdx = 0
+                                wikilinkRegex.findAll(note.body).forEach { match ->
+                                    append(note.body.substring(lastIdx, match.range.first))
+                                    pushStyle(SpanStyle(color = colors.accent, fontWeight = FontWeight.Bold))
+                                    append(match.value)
+                                    pop()
+                                    lastIdx = match.range.last + 1
+                                }
+                                if (lastIdx < note.body.length) {
+                                    append(note.body.substring(lastIdx))
+                                }
+                            }
+                        }
+                        Text(annotated, style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
+
+                        // Extracted Wikilinks Badges
+                        val links = remember(note.body) {
+                            wikilinkRegex.findAll(note.body).map { it.groupValues[1] }.toList()
+                        }
+                        if (links.isNotEmpty()) {
+                            Spacer(Modifier.height(4.dp))
+                            @OptIn(ExperimentalLayoutApi::class)
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                links.forEach { key ->
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                                            .background(colors.accent.copy(alpha = 0.15f))
+                                            .clickable { onWikilinkClick(key) }
+                                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                                    ) {
+                                        Text(
+                                            "[[@$key]]",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.SemiBold),
+                                            color = colors.accent,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
                         Spacer(Modifier.height(4.dp))
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
