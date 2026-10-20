@@ -1,8 +1,7 @@
 //! Reader mode: the paper as one column of text you can tune (`.knowledge/tui.md`, section 1).
 //!
-//! - [`document`]: the stored Markdown → blocks (headings, paragraphs, lists, table rows).
-//! - [`math`]: LaTeX → Unicode for equations from arXiv and Europe PMC.
-//! - [`paper`]: blocks → the running text, and figures, tables, equations, references apart.
+//! - [`document`], [`math`], [`paper`]: the stored Markdown → blocks → tabs; shared with the apps,
+//!   they live in `quire_io::reading` and are re-exported here.
 //! - [`layout`]: blocks → lines for a width and [`Settings`].
 //! - [`figures`]: figure images on the Figures tab (graphics terminals).
 //! - [`annotate`] and `notes`: highlights (sentences selected with `v`) and notes, the Notes tab.
@@ -13,12 +12,11 @@
 //! position at the same block, not the same line number.
 
 pub mod annotate;
-pub mod document;
 pub mod figures;
 pub mod layout;
-pub mod math;
 mod notes;
-pub mod paper;
+
+pub use quire_engine::reading::{document, math, paper};
 
 use std::collections::HashMap;
 
@@ -219,21 +217,15 @@ impl Reader {
 
     /// The paper's text arrived; `math`: it has LaTeX math (from arXiv or Europe PMC, not a PDF).
     pub fn loaded(&mut self, markdown: &str, math: bool) {
-        let (front, body) = paper::split_front(markdown);
-        let paper = paper::organize(document::parse(&body, math));
-        let extra = paper.extra_tabs();
-        let mut body = Page::new(Tab::Paper, None, paper.body, &self.settings);
-        if let Some(block) = self.resume.take() {
-            body.top = body.line_of(block);
-        }
         self.pages.truncate(1);
-        self.pages.push(body);
-        if !front.is_empty() {
-            self.pages.push(Page::new(Tab::Front, None, document::parse(front, math), &self.settings));
-        }
-        for extra in extra {
-            let mut page = Page::new(extra.tab, Some(extra.count), extra.blocks, &self.settings);
-            page.images = extra.images;
+        for content in paper::tabs(markdown, math) {
+            let mut page = Page::new(content.tab, content.count, content.blocks, &self.settings);
+            page.images = content.images;
+            if content.tab == Tab::Paper
+                && let Some(block) = self.resume.take()
+            {
+                page.top = page.line_of(block);
+            }
             self.pages.push(page);
         }
         self.tab = self.tab.min(self.pages.len() - 1);

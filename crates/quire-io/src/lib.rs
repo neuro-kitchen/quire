@@ -10,6 +10,7 @@
 //! - [`text`]: plain text from markup (tags, entities, whitespace).
 //! - [`zotero`]: a Zotero library's items, notes and fields as quire's model.
 //! - [`pdf`]: checking PDFs (is it one, text or scanned, which DOIs it prints).
+//! - [`reading`]: a paper's stored text as blocks and reader tabs (terminal reader and apps).
 //! - [`bib`]: BibTeX/BibLaTeX `.bib` files, via the Typst `biblatex` crate.
 //! - [`error`]: the error type, [`IoError`].
 
@@ -23,6 +24,7 @@ pub mod export;
 pub mod manuscript;
 pub mod paper_markdown;
 pub mod pdf;
+pub mod reading;
 pub mod text;
 pub mod zotero;
 
