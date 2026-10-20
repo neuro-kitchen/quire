@@ -48,13 +48,22 @@ impl Added {
     }
 }
 
+/// Writes a changed `reference`, stamping the clocks of the parts that differ from the stored
+/// version (sync merges references part by part). Every change to a stored reference goes here.
+pub fn save(library: &mut impl Library, reference: &mut Reference) -> Result<()> {
+    if let Some(stored) = library.reference(reference.id)? {
+        crate::sync::stamp_changes(&stored, reference);
+    }
+    library.update_reference(reference)
+}
+
 /// Adds a reference, or finds the one already holding one of its identifiers.
 pub fn add(library: &mut impl Library, request: AddRequest) -> Result<Added> {
     let device = library.device();
     if let Some(mut existing) = find_duplicate(library, &request.data)? {
         if existing.meta.is_deleted() {
             existing.meta.restore(device);
-            library.update_reference(&existing)?;
+            save(library, &mut existing)?;
         }
         if let Some(project) = request.project {
             library.link(existing.id, project)?;
@@ -133,7 +142,7 @@ pub fn trash(library: &mut impl Library, query: &str) -> Result<Reference> {
     let mut reference = find(library, query)?;
     if !reference.meta.is_deleted() {
         reference.meta.delete(library.device());
-        library.update_reference(&reference)?;
+        save(library, &mut reference)?;
     }
     Ok(reference)
 }
@@ -143,7 +152,7 @@ pub fn restore(library: &mut impl Library, query: &str) -> Result<Reference> {
     let mut reference = find(library, query)?;
     if reference.meta.is_deleted() {
         reference.meta.restore(library.device());
-        library.update_reference(&reference)?;
+        save(library, &mut reference)?;
     }
     Ok(reference)
 }

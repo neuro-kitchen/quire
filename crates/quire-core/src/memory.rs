@@ -3,12 +3,14 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use quire_model::{
-    Attachment, AttachmentId, CiteKey, DeviceId, Highlight, HighlightId, Identifier, Issue, Note, NoteId, PdfAttempt,
-    Project, ProjectId, Reference, ReferenceId, Slug, Tag, TagId, TagKind, Timestamp,
+    Alert, AlertId, Attachment, AttachmentId, CiteKey, DeviceId, Highlight, HighlightId, Identifier, Issue, Note,
+    NoteId, PdfAttempt, Project, ProjectId, ProjectMember, Reading, Reference, ReferenceId, SavedSearch, SavedSearchId,
+    Slug, Tag, TagId, TagKind, Timestamp, UserId,
 };
 
 use crate::error::Result;
-use crate::ports::{AutoExport, FailedInput, Library, RawRecord, ReferenceFilter, SearchHit};
+use crate::ports::stores::*;
+use crate::ports::{AutoExport, FailedInput, RawRecord, ReferenceFilter, SearchHit};
 
 pub struct MemoryLibrary {
     device: DeviceId,
@@ -26,6 +28,12 @@ pub struct MemoryLibrary {
     relations: BTreeSet<(ReferenceId, ReferenceId)>,
     dismissed: BTreeSet<(ReferenceId, ReferenceId)>,
     highlights: Vec<Highlight>,
+    imported: BTreeMap<(String, String), ReferenceId>,
+    readings: BTreeMap<ReferenceId, Reading>,
+    saved: Vec<SavedSearch>,
+    alerts: Vec<Alert>,
+    seen: BTreeSet<(AlertId, String)>,
+    members: Vec<ProjectMember>,
 }
 
 impl Default for MemoryLibrary {
@@ -46,15 +54,23 @@ impl Default for MemoryLibrary {
             relations: BTreeSet::new(),
             dismissed: BTreeSet::new(),
             highlights: Vec::new(),
+            imported: BTreeMap::new(),
+            readings: BTreeMap::new(),
+            saved: Vec::new(),
+            alerts: Vec::new(),
+            seen: BTreeSet::new(),
+            members: Vec::new(),
         }
     }
 }
 
-impl Library for MemoryLibrary {
+impl Device for MemoryLibrary {
     fn device(&self) -> DeviceId {
         self.device
     }
+}
 
+impl ReferenceStore for MemoryLibrary {
     fn reference(&self, id: ReferenceId) -> Result<Option<Reference>> {
         Ok(self.references.iter().find(|r| r.id == id).cloned())
     }
@@ -102,7 +118,9 @@ impl Library for MemoryLibrary {
         found.sort_by(|a, b| a.cite_key.cmp(&b.cite_key));
         Ok(found)
     }
+}
 
+impl ProjectStore for MemoryLibrary {
     fn project(&self, id: ProjectId) -> Result<Option<Project>> {
         Ok(self.projects.iter().find(|p| p.id == id).cloned())
     }
@@ -142,7 +160,9 @@ impl Library for MemoryLibrary {
         let live = |p: &ProjectId| self.projects.iter().any(|project| project.id == *p && !project.meta.is_deleted());
         Ok(self.links.iter().filter(|(r, p)| *r == reference && live(p)).map(|(_, p)| *p).collect())
     }
+}
 
+impl IssueStore for MemoryLibrary {
     fn recorded_issues(&self, reference: ReferenceId) -> Result<Vec<Issue>> {
         Ok(self.issues.get(&reference).cloned().unwrap_or_default())
     }
@@ -182,7 +202,9 @@ impl Library for MemoryLibrary {
     fn failures(&self) -> Result<Vec<FailedInput>> {
         Ok(self.failures.clone())
     }
+}
 
+impl ExportStore for MemoryLibrary {
     fn auto_exports(&self) -> Result<Vec<AutoExport>> {
         Ok(self.auto_exports.clone())
     }
@@ -205,7 +227,9 @@ impl Library for MemoryLibrary {
         }
         Ok(())
     }
+}
 
+impl AttachmentStore for MemoryLibrary {
     fn attachments_of(&self, reference: ReferenceId) -> Result<Vec<Attachment>> {
         Ok(self.attachments.iter().filter(|a| a.reference == reference && !a.meta.is_deleted()).cloned().collect())
     }
@@ -245,7 +269,9 @@ impl Library for MemoryLibrary {
     fn pdf_attempts(&self) -> Result<Vec<(ReferenceId, PdfAttempt)>> {
         Ok(self.pdf_attempts.iter().map(|(r, a)| (*r, *a)).collect())
     }
+}
 
+impl TagStore for MemoryLibrary {
     fn tags(&self) -> Result<Vec<Tag>> {
         let mut tags: Vec<Tag> = self.tags.iter().filter(|t| !t.meta.is_deleted()).cloned().collect();
         tags.sort_by_key(|t| (t.position.is_none(), t.position, t.key()));
@@ -284,7 +310,9 @@ impl Library for MemoryLibrary {
     fn tagged(&self, tag: TagId) -> Result<Vec<ReferenceId>> {
         Ok(self.reference_tags.keys().filter(|(_, t)| *t == tag).map(|(r, _)| *r).collect())
     }
+}
 
+impl NoteStore for MemoryLibrary {
     fn notes_of(&self, reference: Option<ReferenceId>) -> Result<Vec<Note>> {
         Ok(self.notes.iter().filter(|n| n.reference == reference && !n.meta.is_deleted()).cloned().collect())
     }
@@ -314,7 +342,9 @@ impl Library for MemoryLibrary {
         }
         Ok(counts.into_iter().collect())
     }
+}
 
+impl RelationStore for MemoryLibrary {
     fn relate(&mut self, a: ReferenceId, b: ReferenceId) -> Result<bool> {
         Ok(self.relations.insert(if a < b { (a, b) } else { (b, a) }))
     }
@@ -346,7 +376,9 @@ impl Library for MemoryLibrary {
     fn dismissed_duplicates(&self) -> Result<Vec<(ReferenceId, ReferenceId)>> {
         Ok(self.dismissed.iter().copied().collect())
     }
+}
 
+impl HighlightStore for MemoryLibrary {
     fn highlights_of(&self, reference: ReferenceId) -> Result<Vec<Highlight>> {
         Ok(self.highlights.iter().filter(|h| h.reference == reference && !h.meta.is_deleted()).cloned().collect())
     }
@@ -366,7 +398,9 @@ impl Library for MemoryLibrary {
         }
         Ok(())
     }
+}
 
+impl SearchStore for MemoryLibrary {
     /// Naive: every word of the query (field prefixes and `*` dropped) in the title, abstract or
     /// a creator's name. Enough for use-case tests; SQLite does the real ranking.
     fn search(&self, query: &str, _in_text: bool, limit: usize) -> Result<Vec<SearchHit>> {
@@ -397,6 +431,109 @@ impl Library for MemoryLibrary {
     }
 
     fn index_paper_text(&mut self, _reference: ReferenceId, _text: Option<&str>) -> Result<()> {
+        Ok(())
+    }
+}
+
+impl ImportStore for MemoryLibrary {
+    fn imported(&self, source: &str, key: &str) -> Result<Option<ReferenceId>> {
+        Ok(self.imported.get(&(source.to_string(), key.to_string())).copied())
+    }
+
+    fn record_import(&mut self, source: &str, key: &str, reference: ReferenceId) -> Result<()> {
+        self.imported.insert((source.to_string(), key.to_string()), reference);
+        Ok(())
+    }
+}
+
+impl ReadingStore for MemoryLibrary {
+    fn reading(&self, reference: ReferenceId) -> Result<Option<Reading>> {
+        Ok(self.readings.get(&reference).cloned())
+    }
+
+    fn set_reading(&mut self, reading: &Reading) -> Result<()> {
+        self.readings.insert(reading.reference, reading.clone());
+        Ok(())
+    }
+
+    fn readings(&self) -> Result<Vec<Reading>> {
+        Ok(self.readings.values().cloned().collect())
+    }
+}
+
+impl SavedSearchStore for MemoryLibrary {
+    fn saved_searches(&self) -> Result<Vec<SavedSearch>> {
+        let mut live: Vec<SavedSearch> = self.saved.iter().filter(|s| !s.meta.is_deleted()).cloned().collect();
+        live.sort_by_key(SavedSearch::key);
+        Ok(live)
+    }
+
+    fn saved_search_by_key(&self, key: &str) -> Result<Option<SavedSearch>> {
+        Ok(self.saved.iter().find(|s| s.key() == key && !s.meta.is_deleted()).cloned())
+    }
+
+    fn saved_search(&self, id: SavedSearchId) -> Result<Option<SavedSearch>> {
+        Ok(self.saved.iter().find(|s| s.id == id).cloned())
+    }
+
+    fn insert_saved_search(&mut self, search: &SavedSearch) -> Result<()> {
+        self.saved.push(search.clone());
+        Ok(())
+    }
+
+    fn update_saved_search(&mut self, search: &SavedSearch) -> Result<()> {
+        if let Some(slot) = self.saved.iter_mut().find(|s| s.id == search.id) {
+            *slot = search.clone();
+        }
+        Ok(())
+    }
+}
+
+impl AlertStore for MemoryLibrary {
+    fn alerts(&self) -> Result<Vec<Alert>> {
+        let mut live: Vec<Alert> = self.alerts.iter().filter(|a| !a.meta.is_deleted()).cloned().collect();
+        live.sort_by_key(Alert::key);
+        Ok(live)
+    }
+
+    fn alert_by_key(&self, key: &str) -> Result<Option<Alert>> {
+        Ok(self.alerts.iter().find(|a| a.key() == key && !a.meta.is_deleted()).cloned())
+    }
+
+    fn insert_alert(&mut self, alert: &Alert) -> Result<()> {
+        self.alerts.push(alert.clone());
+        Ok(())
+    }
+
+    fn update_alert(&mut self, alert: &Alert) -> Result<()> {
+        if let Some(slot) = self.alerts.iter_mut().find(|a| a.id == alert.id) {
+            *slot = alert.clone();
+        }
+        Ok(())
+    }
+
+    fn seen(&self, alert: AlertId, works: &[String]) -> Result<Vec<String>> {
+        Ok(works.iter().filter(|w| self.seen.contains(&(alert, (*w).clone()))).cloned().collect())
+    }
+
+    fn mark_seen(&mut self, alert: AlertId, works: &[String]) -> Result<()> {
+        self.seen.extend(works.iter().map(|w| (alert, w.clone())));
+        Ok(())
+    }
+}
+
+impl MemberStore for MemoryLibrary {
+    fn members_of(&self, project: ProjectId) -> Result<Vec<ProjectMember>> {
+        Ok(self.members.iter().filter(|m| m.project == project).cloned().collect())
+    }
+
+    fn memberships(&self, user: &UserId) -> Result<Vec<ProjectMember>> {
+        Ok(self.members.iter().filter(|m| &m.user == user).cloned().collect())
+    }
+
+    fn set_member(&mut self, member: &ProjectMember) -> Result<()> {
+        self.members.retain(|m| !(m.project == member.project && m.user == member.user));
+        self.members.push(member.clone());
         Ok(())
     }
 }
