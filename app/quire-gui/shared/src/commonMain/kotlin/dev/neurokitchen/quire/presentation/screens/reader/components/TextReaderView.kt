@@ -1,5 +1,6 @@
 package dev.neurokitchen.quire.presentation.screens.reader.components
 
+import dev.neurokitchen.quire.presentation.screens.reader.TextMatch
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -87,12 +88,18 @@ fun TextReaderView(
     fontSizeSp: Int = 16,
     onHighlight: (quote: String, prefix: String, color: String) -> Unit = { _, _, _ -> },
     onAddNote: (body: String) -> Unit = {},
+    /** Find matches in this tab, and the one to bring into view. */
+    findMatches: List<TextMatch> = emptyList(),
+    currentFind: Int = 0,
 ) {
     val tab = tabs.getOrNull(selectedTab) ?: return
     val list = rememberLazyListState()
     val focusedQuote = highlights.firstOrNull { it.id == focused }?.quote
     val themeColors = readerColors(readerTheme)
     var localSelection by remember(selectedTab) { mutableStateOf<Pair<String, String>?>(null) }
+
+    val current = findMatches.getOrNull(currentFind)
+    LaunchedEffect(current) { if (current != null) list.animateScrollToItem(current.block) }
 
     LaunchedEffect(focusedQuote, selectedTab) {
         val index = focusedQuote?.let { q -> tab.blocks.indexOfFirst { q in it.text } } ?: -1
@@ -119,7 +126,7 @@ fun TextReaderView(
                 contentPadding = PaddingValues(vertical = Dimens.SpaceMd, horizontal = Dimens.SpaceLg),
                 modifier = Modifier.widthIn(max = ReadingWidth).fillMaxSize(),
             ) {
-                itemsIndexed(tab.blocks) { _, block ->
+                itemsIndexed(tab.blocks) { blockIndex, block ->
                     when (val kind = block.kind) {
                         is BlockKind.Image -> Figure(kind.url, loadFigure)
                         else -> SelectableBlock(
@@ -128,6 +135,8 @@ fun TextReaderView(
                             readerFont = readerFont,
                             fontSizeSp = fontSizeSp,
                             textColor = themeColors.text,
+                            finds = findMatches.filter { it.block == blockIndex },
+                            currentFind = current?.takeIf { it.block == blockIndex },
                             onSelection = {
                                 localSelection = it
                                 onSelection(it)
@@ -179,9 +188,11 @@ private fun SelectableBlock(
     fontSizeSp: Int,
     textColor: Color,
     onSelection: (Pair<String, String>?) -> Unit,
+    finds: List<TextMatch> = emptyList(),
+    currentFind: TextMatch? = null,
 ) {
     val colors = QuireTheme.colors
-    val text = remember(block, highlights, colors.accent) { annotate(block, highlights, colors) }
+    val text = remember(block, highlights, finds, currentFind, colors.accent) { annotate(block, highlights, colors, finds, currentFind) }
     var value by remember(text) { mutableStateOf(TextFieldValue(text.text)) }
     BasicTextField(
         value = value,
@@ -225,7 +236,13 @@ private fun style(kind: BlockKind, font: ReaderFont, fontSizeSp: Int): TextStyle
 }
 
 /** The block's words with their emphasis, highlights in respective colors, mentions in accent. */
-private fun annotate(block: TextBlock, highlights: List<Highlight>, colors: dev.neurokitchen.quire.presentation.designsystem.QuireColors): AnnotatedString = buildAnnotatedString {
+private fun annotate(
+    block: TextBlock,
+    highlights: List<Highlight>,
+    colors: dev.neurokitchen.quire.presentation.designsystem.QuireColors,
+    finds: List<TextMatch> = emptyList(),
+    currentFind: TextMatch? = null,
+): AnnotatedString = buildAnnotatedString {
     val prefix = if (block.kind == BlockKind.ListItem) "• " else ""
     append(prefix)
     block.words.forEachIndexed { i, word ->
@@ -253,6 +270,11 @@ private fun annotate(block: TextBlock, highlights: List<Highlight>, colors: dev.
             addStyle(SpanStyle(background = hlColor.copy(alpha = 0.45f)), from, from + highlight.quote.length)
             from = text.indexOf(highlight.quote, from + highlight.quote.length)
         }
+    }
+    // Find matches: offsets in the block's text, after the list marker.
+    for (find in finds) {
+        val alpha = if (find == currentFind) 0.6f else 0.3f
+        addStyle(SpanStyle(background = colors.findMatch.copy(alpha = alpha)), prefix.length + find.start, prefix.length + find.end)
     }
 }
 

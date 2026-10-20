@@ -1,5 +1,9 @@
 package dev.neurokitchen.quire.presentation.screens.reader
 
+import dev.neurokitchen.quire.domain.model.SelectedTextRange
+import dev.neurokitchen.quire.domain.model.WordLocation
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.neurokitchen.quire.domain.model.PageImage
@@ -21,14 +25,20 @@ class ReaderViewModel(
     title: String,
     private val reader: ReaderRepository,
     private val pdf: PdfRepository,
-) : ViewModel() {
+) : ViewModel(), PdfTextLayer {
     private val _state = MutableStateFlow(ReaderState(referenceId = referenceId, title = title))
     val state: StateFlow<ReaderState> = _state.asStateFlow()
 
     /** Rendered pages by (index, width), most recent last: the PDF view asks as pages scroll in. */
     private val pages = LinkedHashMap<Pair<Int, Int>, PageImage>()
 
+    /** What is typed in the find bar; searched a moment after typing stops. */
+    private val findQuery = MutableStateFlow("")
+
     init {
+        viewModelScope.launch {
+            findQuery.debounce(FIND_DELAY_MS).collectLatest { query -> find(query) }
+        }
         viewModelScope.launch { load() }
         viewModelScope.launch {
             reader.highlights(referenceId)
@@ -46,7 +56,17 @@ class ReaderViewModel(
     fun onEvent(event: ReaderEvent) {
         when (event) {
             is ReaderEvent.OnModeChange -> _state.update { it.copy(mode = event.mode) }
-            is ReaderEvent.OnTabClick -> _state.update { it.copy(selectedTab = event.index.coerceIn(0, (it.tabs.size - 1).coerceAtLeast(0))) }
+            is ReaderEvent.OnTabClick -> {
+                _state.update { it.copy(selectedTab = event.index.coerceIn(0, (it.tabs.size - 1).coerceAtLeast(0))) }
+                _state.update { it.copy(find = it.find.copy(textMatches = textMatches(it, it.find.query), current = 0)) }
+            }
+            ReaderEvent.OnFindToggle -> _state.update { it.copy(find = it.find.copy(isOpen = !it.find.isOpen)) }
+            is ReaderEvent.OnFindChange -> {
+                _state.update { it.copy(find = it.find.copy(query = event.query)) }
+                findQuery.value = event.query
+            }
+            ReaderEvent.OnFindNext -> step(1)
+            ReaderEvent.OnFindPrevious -> step(-1)
             ReaderEvent.OnZoomIn -> zoom { it * ZOOM_STEP }
             ReaderEvent.OnZoomOut -> zoom { it / ZOOM_STEP }
             ReaderEvent.OnZoomReset -> zoom { 1f }
@@ -93,6 +113,29 @@ class ReaderViewModel(
                 // Insertion order is common stdlib (an access-ordered map is JVM-only).
                 while (pages.size > PAGE_CACHE) pages.remove(pages.keys.first())
             }
+    }
+
+    override suspend fun glyphAt(page: Int, x: Float, y: Float): Int? =
+        _state.value.pdf.path?.let { path -> runCatching { pdf.nearestGlyph(path, page, x, y) }.getOrNull() }
+
+    override suspend fun range(page: Int, start: Int, end: Int): SelectedTextRange? =
+        _state.value.pdf.path?.let { path -> runCatching { pdf.textRange(path, page, start, end) }.getOrNull() }
+
+    override suspend fun wordAt(page: Int, x: Float, y: Float): WordLocation? =
+        _state.value.pdf.path?.let { path -> runCatching { pdf.wordAt(path, page, x, y) }.getOrNull() }
+
+    /** Matches on the PDF's pages (the engine) and in the text tab shown, for `query`. */
+    private suspend fun find(query: String) {
+        val path = _state.value.pdf.path
+        val pdfMatches = if (query.isBlank() || path == null) emptyList()
+            else runCatching { pdf.search(path, query) }.onFailure { fail(it) }.getOrDefault(emptyList())
+        _state.update { it.copy(find = it.find.copy(pdfMatches = pdfMatches, textMatches = textMatches(it, query), current = 0)) }
+    }
+
+    /** Moves to the next (`1`) or previous (`-1`) match, around the ends. */
+    private fun step(by: Int) = _state.update {
+        val count = it.find.count(it.mode)
+        if (count == 0) it else it.copy(find = it.find.copy(current = (it.find.current + by).mod(count)))
     }
 
     /** The local file of a figure image, `null` if it cannot be had. */
@@ -146,5 +189,19 @@ class ReaderViewModel(
         const val MAX_ZOOM = 4f
         /** Characters kept before a quote to tell repeated quotes apart. */
         const val PREFIX_LENGTH = 40
+        const val FIND_DELAY_MS = 150L
+    }
+}
+
+/** Every case-insensitive occurrence of `query` in the blocks of the text tab shown. */
+private fun textMatches(state: ReaderState, query: String): List<TextMatch> {
+    val needle = query.trim()
+    if (needle.isEmpty()) return emptyList()
+    val blocks = state.tabs.getOrNull(state.selectedTab)?.blocks.orEmpty()
+    return blocks.flatMapIndexed { index, block ->
+        val text = block.text
+        generateSequence(text.indexOf(needle, ignoreCase = true).takeIf { it >= 0 }) { from ->
+            text.indexOf(needle, from + needle.length, ignoreCase = true).takeIf { it >= 0 }
+        }.map { TextMatch(index, it, it + needle.length) }.toList()
     }
 }

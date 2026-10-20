@@ -3,6 +3,7 @@ package dev.neurokitchen.quire.presentation.screens.reader.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,33 +37,48 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
 import dev.neurokitchen.quire.domain.model.PageImage
 import dev.neurokitchen.quire.domain.model.PageRect
 import dev.neurokitchen.quire.domain.model.PageSize
+import dev.neurokitchen.quire.domain.model.PdfMatch
 import dev.neurokitchen.quire.domain.model.QuoteLocation
 import dev.neurokitchen.quire.presentation.designsystem.Dimens
 import dev.neurokitchen.quire.presentation.designsystem.QuireTheme
 import dev.neurokitchen.quire.presentation.designsystem.ReaderTheme
 import dev.neurokitchen.quire.presentation.designsystem.readerColors
 import dev.neurokitchen.quire.presentation.mapping.toImageBitmap
+import dev.neurokitchen.quire.presentation.screens.reader.PdfTextLayer
+import dev.neurokitchen.quire.resources.Res
+import dev.neurokitchen.quire.resources.reader_page_of
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
+import kotlin.math.max
 import kotlin.math.roundToInt
 
+/** Text selected on a page: glyphs [start] until [end], with its text and line boxes. */
 data class ActivePdfSelection(
     val page: Int,
+    val start: Int,
+    val end: Int,
     val rects: List<PageRect>,
     val text: String,
 )
 
 /**
- * Modern Material 3 Expressive PDF viewer with smooth page list,
- * multi-color highlights, interactive text selection, and floating action palette.
+ * The PDF's pages in a scrolling list, with highlights and find matches drawn over them. Dragging
+ * selects text through the [textLayer] (a double-click selects a word); the palette highlights,
+ * notes or copies the selection.
  */
 @Composable
 fun PdfPagesView(
@@ -72,12 +89,20 @@ fun PdfPagesView(
     loadPage: suspend (index: Int, widthPx: Int) -> PageImage?,
     modifier: Modifier = Modifier,
     readerTheme: ReaderTheme = ReaderTheme.Dark,
+    textLayer: PdfTextLayer = PdfTextLayer.None,
+    matches: List<PdfMatch> = emptyList(),
+    /** The match to bring into view and mark; ignored without matches. */
+    currentMatch: Int = 0,
     onHighlight: (quote: String, prefix: String, color: String) -> Unit = { _, _, _ -> },
     onAddNote: (body: String) -> Unit = {},
 ) {
     val list = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val clipboard = LocalClipboardManager.current
     val focusedPage = locations.firstOrNull { it.highlightId == focused }?.page
     LaunchedEffect(focusedPage) { if (focusedPage != null) list.animateScrollToItem(focusedPage) }
+    val current = matches.getOrNull(currentMatch)
+    LaunchedEffect(current) { if (current != null) list.animateScrollToItem(current.page) }
 
     var selection by remember { mutableStateOf<ActivePdfSelection?>(null) }
     val firstVisiblePage by remember { derivedStateOf { list.firstVisibleItemIndex + 1 } }
@@ -100,19 +125,25 @@ fun PdfPagesView(
                     width = pageWidth,
                     locations = locations.filter { it.page == index },
                     focused = focused,
+                    matches = matches.filter { it.page == index },
+                    current = current?.takeIf { it.page == index },
                     activeSelection = selection?.takeIf { it.page == index },
-                    onSelect = { sel -> selection = sel },
+                    textLayer = textLayer,
+                    onSelect = { selection = it },
                     loadPage = loadPage,
                 )
             }
         }
 
-        // Floating Material 3 Action Palette anchored at the BOTTOM
         selection?.let { sel ->
             SelectionActionPalette(
                 visible = true,
                 onHighlight = { colorName ->
-                    onHighlight(sel.text, "Page ${sel.page + 1}: ", colorName)
+                    // The words just before the selection tell repeated quotes apart.
+                    scope.launch {
+                        val prefix = textLayer.range(sel.page, max(0, sel.start - PREFIX_GLYPHS), sel.start)?.text.orEmpty()
+                        onHighlight(sel.text, prefix, colorName)
+                    }
                     selection = null
                 },
                 onAddNote = {
@@ -120,9 +151,11 @@ fun PdfPagesView(
                     selection = null
                 },
                 onCopy = {
+                    clipboard.setText(AnnotatedString(sel.text))
                     selection = null
                 },
                 onCopyCitation = {
+                    clipboard.setText(AnnotatedString("“${sel.text}” (p. ${sel.page + 1})"))
                     selection = null
                 },
                 modifier = Modifier
@@ -131,7 +164,6 @@ fun PdfPagesView(
             )
         }
 
-        // Page Indicator pill badge
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -142,7 +174,7 @@ fun PdfPagesView(
                 .padding(horizontal = 12.dp, vertical = 6.dp),
         ) {
             Text(
-                text = "Page $firstVisiblePage of ${pages.size} (${(zoom * 100).roundToInt()}%)",
+                text = stringResource(Res.string.reader_page_of, firstVisiblePage, pages.size, "${(zoom * 100).roundToInt()}%"),
                 style = MaterialTheme.typography.labelSmall,
                 color = QuireTheme.colors.fillPrimary,
             )
@@ -152,6 +184,9 @@ fun PdfPagesView(
 
 private val MaxPageWidth = 900.dp
 
+/** Glyphs before a selection kept as its highlight's prefix. */
+private const val PREFIX_GLYPHS = 40
+
 @Composable
 private fun PageItem(
     index: Int,
@@ -159,7 +194,10 @@ private fun PageItem(
     width: Dp,
     locations: List<QuoteLocation>,
     focused: String?,
+    matches: List<PdfMatch>,
+    current: PdfMatch?,
     activeSelection: ActivePdfSelection?,
+    textLayer: PdfTextLayer,
     onSelect: (ActivePdfSelection?) -> Unit,
     loadPage: suspend (Int, Int) -> PageImage?,
 ) {
@@ -167,8 +205,8 @@ private fun PageItem(
     val image: ImageBitmap? by produceState<ImageBitmap?>(null, index, widthPx) {
         value = loadPage(index, widthPx)?.toImageBitmap()
     }
-
     val colors = QuireTheme.colors
+    val scope = rememberCoroutineScope()
 
     Box(
         modifier = Modifier
@@ -177,99 +215,81 @@ private fun PageItem(
             .shadow(6.dp, RoundedCornerShape(Dimens.RadiusSmall))
             .clip(RoundedCornerShape(Dimens.RadiusSmall))
             .background(Color.White)
-            .pointerInput(index) {
+            .pointerInput(index, textLayer) {
+                // Pixels to points: the page is drawn the box's width.
+                fun points(offset: Offset): Offset = offset / (this.size.width.toFloat() / size.width)
                 detectTapGestures(
-                    onTap = { offset ->
-                        val scale = this.size.width.toFloat() / size.width
-                        val ptX = offset.x / scale
-                        val ptY = offset.y / scale
-
-                        // Hit test simulated text lines (100pt to 780pt)
-                        if (ptY in 100f..780f && ptX in 40f..560f) {
-                            val lineIndex = ((ptY - 100f) / 18f).toInt().coerceIn(0, 36)
-                            val lineTop = 100f + lineIndex * 18f
-                            val colLeft = if (ptX < 300f) 50f else 310f
-                            val colRight = if (ptX < 300f) 285f else 545f
-                            val hitRect = PageRect(colLeft, lineTop, colRight, lineTop + 14f)
-
-                            onSelect(
-                                ActivePdfSelection(
-                                    page = index,
-                                    rects = listOf(hitRect),
-                                    text = "Selected finding from page ${index + 1}, paragraph line $lineIndex.",
-                                )
-                            )
-                        } else {
-                            onSelect(null)
+                    onTap = { onSelect(null) },
+                    onDoubleTap = { offset ->
+                        val at = points(offset)
+                        scope.launch {
+                            val word = textLayer.wordAt(index, at.x, at.y) ?: return@launch
+                            val first = textLayer.glyphAt(index, word.rect.left + 0.5f, (word.rect.top + word.rect.bottom) / 2) ?: return@launch
+                            val last = textLayer.glyphAt(index, word.rect.right - 0.5f, (word.rect.top + word.rect.bottom) / 2) ?: return@launch
+                            select(textLayer, index, first, last)?.let(onSelect)
                         }
-                    }
+                    },
+                )
+            }
+            .pointerInput(index, textLayer) {
+                fun points(offset: Offset): Offset = offset / (this.size.width.toFloat() / size.width)
+                var anchor: Int? = null
+                var pending: Job? = null
+                detectDragGestures(
+                    onDragStart = { offset ->
+                        val at = points(offset)
+                        anchor = null
+                        scope.launch { anchor = textLayer.glyphAt(index, at.x, at.y) }
+                    },
+                    onDrag = { change, _ ->
+                        change.consume()
+                        val at = points(change.position)
+                        // The latest position wins: an older range still being read is dropped.
+                        pending?.cancel()
+                        pending = scope.launch {
+                            val from = anchor ?: return@launch
+                            val to = textLayer.glyphAt(index, at.x, at.y) ?: return@launch
+                            select(textLayer, index, from, to)?.let(onSelect)
+                        }
+                    },
                 )
             },
     ) {
         image?.let {
-            Image(
-                bitmap = it,
-                contentDescription = null,
-                contentScale = ContentScale.FillBounds,
-                modifier = Modifier.fillMaxSize(),
-            )
+            Image(bitmap = it, contentDescription = null, contentScale = ContentScale.FillBounds, modifier = Modifier.fillMaxSize())
         }
 
         Canvas(Modifier.fillMaxSize()) {
             val scale = this.size.width / size.width
-
-            // Draw existing highlights
             for (location in locations) {
+                // The engine keeps no colour per highlight yet: all are drawn in the one it means.
                 val isFocused = location.highlightId == focused
-                val alpha = if (isFocused) 0.55f else 0.35f
-                val color = when (location.highlightId.hashCode() % 4) {
-                    1 -> colors.highlightGreen
-                    2 -> colors.highlightBlue
-                    3 -> colors.highlightPurple
-                    else -> colors.highlightYellow
-                }
-
-                for (r in location.rects) {
-                    val rectOffset = Offset(r.left * scale, r.top * scale)
-                    val rectSize = Size((r.right - r.left) * scale, (r.bottom - r.top) * scale)
-                    drawRoundRect(
-                        color = color.copy(alpha = alpha),
-                        topLeft = rectOffset,
-                        size = rectSize,
-                        cornerRadius = CornerRadius(2.dp.toPx()),
-                    )
-                    if (isFocused) {
-                        drawRoundRect(
-                            color = colors.accent,
-                            topLeft = rectOffset,
-                            size = rectSize,
-                            cornerRadius = CornerRadius(2.dp.toPx()),
-                            style = Stroke(width = 1.5.dp.toPx()),
-                        )
-                    }
-                }
+                location.rects.forEach { box(it, scale, colors.highlightYellow.copy(alpha = if (isFocused) 0.55f else 0.35f), if (isFocused) colors.accent else null) }
             }
-
-            // Draw active text selection box
-            activeSelection?.let { sel ->
-                for (r in sel.rects) {
-                    val rectOffset = Offset(r.left * scale, r.top * scale)
-                    val rectSize = Size((r.right - r.left) * scale, (r.bottom - r.top) * scale)
-                    drawRoundRect(
-                        color = Color(0x553B82F6), // Semi-transparent blue selection
-                        topLeft = rectOffset,
-                        size = rectSize,
-                        cornerRadius = CornerRadius(2.dp.toPx()),
-                    )
-                    drawRoundRect(
-                        color = Color(0xFF2563EB),
-                        topLeft = rectOffset,
-                        size = rectSize,
-                        cornerRadius = CornerRadius(2.dp.toPx()),
-                        style = Stroke(width = 1.5.dp.toPx()),
-                    )
-                }
+            for (match in matches) {
+                val isCurrent = match == current
+                match.rects.forEach { box(it, scale, colors.findMatch.copy(alpha = if (isCurrent) 0.5f else 0.25f), if (isCurrent) colors.findMatch else null) }
             }
+            activeSelection?.rects?.forEach { box(it, scale, SelectionFill, SelectionStroke) }
         }
     }
 }
+
+/** The selection between glyphs `a` and `b` (either order, both included); `null` if no text. */
+private suspend fun select(layer: PdfTextLayer, page: Int, a: Int, b: Int): ActivePdfSelection? {
+    val (start, end) = minOf(a, b) to maxOf(a, b) + 1
+    val range = layer.range(page, start, end) ?: return null
+    if (range.text.isBlank()) return null
+    return ActivePdfSelection(page, start, end, range.rects, range.text)
+}
+
+private fun DrawScope.box(r: PageRect, scale: Float, fill: Color, stroke: Color?) {
+    val topLeft = Offset(r.left * scale, r.top * scale)
+    val size = Size((r.right - r.left) * scale, (r.bottom - r.top) * scale)
+    val corner = CornerRadius(2.dp.toPx())
+    drawRoundRect(color = fill, topLeft = topLeft, size = size, cornerRadius = corner)
+    if (stroke != null) drawRoundRect(color = stroke, topLeft = topLeft, size = size, cornerRadius = corner, style = Stroke(width = 1.5.dp.toPx()))
+}
+
+private val SelectionFill = Color(0x553B82F6)
+private val SelectionStroke = Color(0xFF2563EB)

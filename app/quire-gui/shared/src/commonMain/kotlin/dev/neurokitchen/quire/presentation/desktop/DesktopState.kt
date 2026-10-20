@@ -15,6 +15,9 @@ data class DesktopState(
 @Immutable
 data class OpenPaper(val id: String, val title: String)
 
+/** The tools tab's ID among the papers' tabs (reference IDs never have a colon). */
+const val ToolsTabId = "quire:tools"
+
 sealed interface DesktopEvent {
     /** Opens the paper in a tab (or goes to its tab if already open). */
     data class OnOpenPaper(val id: String, val title: String) : DesktopEvent

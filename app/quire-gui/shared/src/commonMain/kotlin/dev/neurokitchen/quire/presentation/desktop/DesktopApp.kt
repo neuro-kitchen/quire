@@ -1,5 +1,9 @@
 package dev.neurokitchen.quire.presentation.desktop
 
+import dev.neurokitchen.quire.presentation.screens.tools.ToolsRoute
+import dev.neurokitchen.quire.resources.Res
+import dev.neurokitchen.quire.resources.tools_title
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.HorizontalDivider
@@ -23,6 +27,7 @@ fun DesktopApp(
     onReload: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val toolsTitle = stringResource(Res.string.tools_title)
     QuireTheme(appTheme = state.appTheme, desktop = true) {
         Surface {
             Column(Modifier.fillMaxSize()) {
@@ -34,12 +39,15 @@ fun DesktopApp(
                     onClose = { viewModel.onEvent(DesktopEvent.OnCloseTab(it)) },
                     onSyncClick = onReload,
                     onSettingsClick = onOpenSettings,
+                    onToolsClick = { viewModel.onEvent(DesktopEvent.OnOpenPaper(ToolsTabId, toolsTitle)) },
                     onSetTheme = { viewModel.onEvent(DesktopEvent.OnSetAppTheme(it)) },
                 )
                 HorizontalDivider(color = QuireTheme.colors.paneDivider)
                 val paper = state.papers.firstOrNull { it.id == state.selected }
                 if (paper == null) {
                     LibraryRoute(onOpenReference = { id, title -> viewModel.onEvent(DesktopEvent.OnOpenPaper(id, title)) })
+                } else if (paper.id == ToolsTabId) {
+                    ToolsRoute()
                 } else {
                     ReaderRoute(paper.id, paper.title)
                 }

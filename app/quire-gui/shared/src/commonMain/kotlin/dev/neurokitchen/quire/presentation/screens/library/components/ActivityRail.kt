@@ -1,5 +1,6 @@
 package dev.neurokitchen.quire.presentation.screens.library.components
 
+import dev.neurokitchen.quire.presentation.screens.library.NameDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -79,7 +80,7 @@ fun ActivityRail(
             icon = Res.drawable.ic_create_new_folder,
             description = stringResource(Res.string.library_new_project),
             isSelected = false,
-            onClick = { onEvent(LibraryEvent.OnShowAddProjectDialog(true)) },
+            onClick = { onEvent(LibraryEvent.OnNameDialog(NameDialog.NewProject())) },
         )
 
         // Trash

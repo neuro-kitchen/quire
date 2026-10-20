@@ -1,5 +1,23 @@
 package dev.neurokitchen.quire.presentation.screens.library
 
+import dev.neurokitchen.quire.presentation.components.notice.Notice
+import dev.neurokitchen.quire.presentation.components.notice.NoticeBar
+import dev.neurokitchen.quire.resources.search_invalid
+import org.jetbrains.compose.resources.stringResource
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
+import org.jetbrains.compose.resources.pluralStringResource
+import dev.neurokitchen.quire.resources.drag_references
+import dev.neurokitchen.quire.resources.Res
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,7 +39,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
@@ -38,7 +58,9 @@ import dev.neurokitchen.quire.presentation.designsystem.Dimens
 import dev.neurokitchen.quire.presentation.designsystem.QuireTheme
 import dev.neurokitchen.quire.presentation.screens.library.components.ActivityRail
 import dev.neurokitchen.quire.presentation.screens.library.components.AddReferenceDialog
-import dev.neurokitchen.quire.presentation.screens.library.components.CreateProjectDialog
+import dev.neurokitchen.quire.presentation.screens.library.components.ConfirmDialog
+import dev.neurokitchen.quire.presentation.screens.library.components.NameDialogView
+import dev.neurokitchen.quire.presentation.screens.library.components.ReferenceDrag
 import dev.neurokitchen.quire.presentation.screens.library.components.ItemPane
 import dev.neurokitchen.quire.presentation.screens.library.components.ItemsTable
 import dev.neurokitchen.quire.presentation.screens.library.components.ItemsToolbar
@@ -71,6 +93,8 @@ fun LibraryScreen(
 ) {
     val searchFocusRequester = remember { FocusRequester() }
     val rootFocusRequester = remember { FocusRequester() }
+    val drag = remember { ReferenceDrag() }
+    val rootCoordinates = remember { arrayOfNulls<LayoutCoordinates>(1) }
 
     LaunchedEffect(Unit) {
         rootFocusRequester.requestFocus()
@@ -79,6 +103,7 @@ fun LibraryScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
+            .onGloballyPositioned { rootCoordinates[0] = it }
             .focusRequester(rootFocusRequester)
             .focusable()
             .onPreviewKeyEvent { event ->
@@ -127,26 +152,73 @@ fun LibraryScreen(
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             if (maxWidth >= ThreePaneWidth) {
-                ThreePanes(state, onEvent, onOpenReference, searchFocusRequester)
+                ThreePanes(state, onEvent, onOpenReference, searchFocusRequester, drag)
             } else {
                 OnePane(state, onEvent)
             }
         }
+        if (drag.ids.isNotEmpty()) {
+            val at = rootCoordinates[0]?.takeIf { it.isAttached }?.windowToLocal(drag.position) ?: drag.position
+            DragBadge(drag.ids.size, Modifier.offset { IntOffset(at.x.roundToInt() + 12, at.y.roundToInt() + 12) })
+        }
+        state.notice?.let { notice ->
+            NoticeBar(
+                notice = notice,
+                onDismiss = { onEvent(LibraryEvent.OnDismissNotice) },
+                modifier = Modifier.align(Alignment.BottomCenter).padding(Dimens.SpaceMd),
+            )
+        }
     }
 
-    if (state.showAddDialog) {
-        AddReferenceDialog(
-            onDismiss = { onEvent(LibraryEvent.OnShowAddDialog(false)) },
-            onAdd = { onEvent(LibraryEvent.OnAddReference(it)) },
-        )
+    state.addDialog?.let { dialog -> AddReferenceDialog(dialog, onEvent) }
+
+    val uriHandler = LocalUriHandler.current
+    LaunchedEffect(state.pageToOpen) {
+        state.pageToOpen?.let { page ->
+            runCatching { uriHandler.openUri(page) }
+            onEvent(LibraryEvent.OnPageOpened)
+        }
     }
 
-    if (state.showAddProjectDialog) {
-        CreateProjectDialog(
-            onDismiss = { onEvent(LibraryEvent.OnShowAddProjectDialog(false)) },
-            onCreate = { onEvent(LibraryEvent.OnCreateProject(it)) },
+    state.nameDialog?.let { dialog ->
+        NameDialogView(
+            dialog = dialog,
+            onDismiss = { onEvent(LibraryEvent.OnNameDialog(null)) },
+            onConfirm = { onEvent(LibraryEvent.OnNameConfirm(it)) },
         )
     }
+    state.confirm?.let { confirm ->
+        ConfirmDialog(
+            confirm = confirm,
+            onDismiss = { onEvent(LibraryEvent.OnConfirm(null)) },
+            onConfirm = { onEvent(LibraryEvent.OnConfirmed) },
+        )
+    }
+}
+
+/** Why the engine refused the search as typed; the results shown are the last good ones. */
+@Composable
+private fun SearchError(message: String) {
+    Text(
+        stringResource(Res.string.search_invalid, message),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.error,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.SpaceSm, vertical = Dimens.SpaceMin),
+    )
+}
+
+/** Follows the pointer while references are dragged: how many. */
+@Composable
+private fun DragBadge(count: Int, modifier: Modifier) {
+    Text(
+        pluralStringResource(Res.plurals.drag_references, count, count),
+        style = MaterialTheme.typography.labelMedium,
+        color = QuireTheme.colors.onAccent,
+        modifier = modifier
+            .clip(RoundedCornerShape(Dimens.RadiusFull))
+            .background(QuireTheme.colors.accent)
+            .padding(horizontal = Dimens.SpaceXs, vertical = 2.dp),
+    )
 }
 
 /** Desktop and large tablets: projects and tags | items | item pane, with resizable panes and minimizable sidebars. */
@@ -156,6 +228,7 @@ private fun ThreePanes(
     onEvent: (LibraryEvent) -> Unit,
     onOpen: (String, String) -> Unit,
     searchFocusRequester: FocusRequester,
+    drag: ReferenceDrag,
 ) {
     var leftPaneWidthDp by remember { androidx.compose.runtime.mutableFloatStateOf(260f) }
     var rightPaneWidthDp by remember { androidx.compose.runtime.mutableFloatStateOf(340f) }
@@ -164,7 +237,7 @@ private fun ThreePanes(
         if (state.isSidebarCollapsed) {
             ActivityRail(state, onEvent)
         } else {
-            ProjectsPane(state, onEvent, Modifier.width(leftPaneWidthDp.dp))
+            ProjectsPane(state, onEvent, Modifier.width(leftPaneWidthDp.dp), drag)
             dev.neurokitchen.quire.presentation.designsystem.components.DraggableSplitter(
                 onDelta = { delta ->
                     leftPaneWidthDp = (leftPaneWidthDp + delta).coerceIn(180f, 450f)
@@ -179,8 +252,11 @@ private fun ThreePanes(
                 searchFocusRequester = searchFocusRequester,
                 onToggleInspector = { onEvent(LibraryEvent.OnToggleInspector) },
                 isInspectorCollapsed = state.isInspectorCollapsed,
+                onSaveSearch = { onEvent(LibraryEvent.OnNameDialog(NameDialog.SaveSearch(state.query))) },
+                onImportPdf = { onEvent(LibraryEvent.OnImportPdf(it)) },
             )
             HorizontalDivider(color = QuireTheme.colors.paneDivider)
+            state.searchError?.let { SearchError(it) }
             val error = state.error
             if (error != null) {
                 LibraryErrorState(error)
@@ -200,7 +276,9 @@ private fun ThreePanes(
                     onDeleteSelected = { onEvent(LibraryEvent.OnDeleteSelected) },
                     onSelectAll = { onEvent(LibraryEvent.OnSelectAll) },
                     onClearSelection = { onEvent(LibraryEvent.OnClearSelection) },
-                    onCreateCollectionFromSelected = { onEvent(LibraryEvent.OnShowAddProjectDialog(true)) },
+                    onCreateCollectionFromSelected = { onEvent(LibraryEvent.OnNameDialog(NameDialog.NewProject(withIds = state.selectedIds))) },
+                    drag = drag,
+                    onDropOnProject = { ids, path -> onEvent(LibraryEvent.OnBatchAddToProject(ids, path)) },
                 )
             }
         }
@@ -218,9 +296,13 @@ private fun ThreePanes(
                 onOpen = { state.selected?.let { onOpen(it.id, it.title) } },
                 onDelete = { state.selected?.let { onEvent(LibraryEvent.OnDeleteReference(it.id)) } },
                 onAddReference = { onEvent(LibraryEvent.OnShowAddDialog(true)) },
-                onCreateProject = { onEvent(LibraryEvent.OnShowAddProjectDialog(true)) },
+                onCreateProject = { onEvent(LibraryEvent.OnNameDialog(NameDialog.NewProject())) },
                 onCollapse = { onEvent(LibraryEvent.OnToggleInspector) },
                 modifier = Modifier.width(rightPaneWidthDp.dp),
+                editing = state.editing,
+                tagDraft = state.tagDraft,
+                noteDraft = state.noteDraft,
+                onEvent = onEvent,
             )
         }
     }
@@ -236,6 +318,7 @@ private fun OnePane(state: LibraryState, onEvent: (LibraryEvent) -> Unit) {
     }
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         LibrarySearchField(state.query, onQueryChange = { onEvent(LibraryEvent.OnQueryChange(it)) })
+        state.searchError?.let { SearchError(it) }
         val error = state.error
         if (error != null) {
             LibraryErrorState(error)

@@ -1,5 +1,7 @@
 package dev.neurokitchen.quire.presentation.desktop.components
 
+import dev.neurokitchen.quire.resources.ic_inventory_2
+import dev.neurokitchen.quire.resources.tools_menu
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -67,6 +69,7 @@ fun TabBar(
     onClose: (String) -> Unit,
     onSyncClick: () -> Unit,
     onSettingsClick: () -> Unit = {},
+    onToolsClick: () -> Unit = {},
     onSetTheme: (AppTheme) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -122,6 +125,21 @@ fun TabBar(
                     onClick = {
                         menuOpen = false
                         onSettingsClick()
+                    },
+                )
+
+                // Tools: duplicates, checks, export, import, libraries, sync
+                DropdownMenuItem(
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(painterResource(Res.drawable.ic_inventory_2), contentDescription = null, tint = colors.fillSecondary, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(Res.string.tools_menu), style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
+                        }
+                    },
+                    onClick = {
+                        menuOpen = false
+                        onToolsClick()
                     },
                 )
 

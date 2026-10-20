@@ -1,5 +1,23 @@
 package dev.neurokitchen.quire.presentation.screens.library.components
 
+import dev.neurokitchen.quire.resources.ic_search
+import dev.neurokitchen.quire.resources.menu_remove
+import androidx.compose.foundation.border
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import dev.neurokitchen.quire.presentation.designsystem.components.onSecondaryClick
+import dev.neurokitchen.quire.presentation.screens.library.Confirm
+import dev.neurokitchen.quire.presentation.screens.library.NameDialog
+import dev.neurokitchen.quire.resources.menu_delete
+import dev.neurokitchen.quire.resources.menu_new_subproject
+import dev.neurokitchen.quire.resources.menu_rename
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -56,6 +74,8 @@ fun ProjectsPane(
     state: LibraryState,
     onEvent: (LibraryEvent) -> Unit,
     modifier: Modifier = Modifier,
+    /** References dragged from the table; a project row under the pointer takes them. */
+    drag: ReferenceDrag? = null,
 ) {
     Column(modifier.fillMaxHeight().background(QuireTheme.colors.sidepane)) {
         Row(
@@ -65,7 +85,7 @@ fun ProjectsPane(
             ToolbarIconButton(
                 Res.drawable.ic_create_new_folder,
                 stringResource(Res.string.library_new_project),
-                onClick = { onEvent(LibraryEvent.OnShowAddProjectDialog(true)) },
+                onClick = { onEvent(LibraryEvent.OnNameDialog(NameDialog.NewProject())) },
             )
             Spacer(Modifier.weight(1f))
             Box(
@@ -96,25 +116,69 @@ fun ProjectsPane(
                 )
             }
             items(state.projects, key = { it.id }) { project ->
-                SourceRow(
-                    icon = Res.drawable.ic_folder,
-                    name = project.name,
-                    depth = project.depth + 1,
-                    isSelected = project.isSelected,
-                    onClick = { onEvent(LibraryEvent.OnSourceClick(LibrarySource.InProject(project.id))) },
-                    count = project.referenceCount,
-                    twisty = {
-                        if (project.hasChildren) {
-                            Twisty(
-                                expanded = project.isExpanded,
-                                selected = project.isSelected,
-                                onClick = { onEvent(LibraryEvent.OnProjectExpandToggle(project.id)) },
-                            )
-                        } else {
-                            Spacer(Modifier.width(TwistyWidth))
-                        }
-                    },
-                )
+                var menuOpen by remember { mutableStateOf(false) }
+                if (drag != null) {
+                    DisposableEffect(project.id) { onDispose { drag.unregister(project.id) } }
+                }
+                Box {
+                    SourceRow(
+                        modifier = Modifier
+                            .onSecondaryClick { menuOpen = true }
+                            .then(if (drag != null) Modifier.onGloballyPositioned { drag.register(project.id, it.boundsInWindow()) } else Modifier),
+                        isDropTarget = drag?.target == project.id,
+                        icon = Res.drawable.ic_folder,
+                        name = project.name,
+                        depth = project.depth + 1,
+                        isSelected = project.isSelected,
+                        onClick = { onEvent(LibraryEvent.OnSourceClick(LibrarySource.InProject(project.id))) },
+                        count = project.referenceCount,
+                        twisty = {
+                            if (project.hasChildren) {
+                                Twisty(
+                                    expanded = project.isExpanded,
+                                    selected = project.isSelected,
+                                    onClick = { onEvent(LibraryEvent.OnProjectExpandToggle(project.id)) },
+                                )
+                            } else {
+                                Spacer(Modifier.width(TwistyWidth))
+                            }
+                        },
+                    )
+                    ProjectMenu(menuOpen, onDismiss = { menuOpen = false }) { action ->
+                        menuOpen = false
+                        onEvent(
+                            when (action) {
+                                ProjectAction.NewSubproject -> LibraryEvent.OnNameDialog(NameDialog.NewProject(parentPath = project.id))
+                                ProjectAction.Rename -> LibraryEvent.OnNameDialog(NameDialog.RenameProject(project.id, project.name))
+                                ProjectAction.Delete -> LibraryEvent.OnConfirm(Confirm.DeleteProject(project.id, project.name))
+                            },
+                        )
+                    }
+                }
+            }
+            items(state.savedSearches, key = { "search:" + it.name }) { saved ->
+                var menuOpen by remember { mutableStateOf(false) }
+                Box {
+                    SourceRow(
+                        modifier = Modifier.onSecondaryClick { menuOpen = true },
+                        icon = Res.drawable.ic_search,
+                        name = saved.name,
+                        depth = 1,
+                        isSelected = saved.isActive,
+                        onClick = { onEvent(LibraryEvent.OnSavedSearchClick(saved.name)) },
+                        twisty = { Spacer(Modifier.width(TwistyWidth)) },
+                    )
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(Res.string.menu_rename)) },
+                            onClick = { menuOpen = false; onEvent(LibraryEvent.OnNameDialog(NameDialog.RenameSavedSearch(saved.name))) },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(Res.string.menu_remove), color = MaterialTheme.colorScheme.error) },
+                            onClick = { menuOpen = false; onEvent(LibraryEvent.OnSavedSearchRemove(saved.name)) },
+                        )
+                    }
+                }
             }
             item(key = "unfiled") {
                 SourceRow(
@@ -141,6 +205,9 @@ fun ProjectsPane(
         TagSelector(
             tags = state.tags,
             onTagClick = { onEvent(LibraryEvent.OnTagClick(it)) },
+            onRename = { onEvent(LibraryEvent.OnNameDialog(NameDialog.RenameTag(it))) },
+            onColor = { name, color -> onEvent(LibraryEvent.OnTagColor(name, color)) },
+            onDelete = { onEvent(LibraryEvent.OnConfirm(Confirm.DeleteTag(it))) },
             modifier = Modifier.fillMaxWidth().height(TagSelectorHeight),
         )
     }
@@ -158,17 +225,27 @@ private fun SourceRow(
     isSelected: Boolean,
     onClick: () -> Unit,
     count: Int? = null,
+    modifier: Modifier = Modifier,
+    /** References are dragged over it. */
+    isDropTarget: Boolean = false,
     twisty: @Composable () -> Unit,
 ) {
     val colors = QuireTheme.colors
     val content = if (isSelected) colors.onAccent else colors.fillPrimary
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(Dimens.RowHeight)
             .clip(RoundedCornerShape(Dimens.RadiusLarge))
-            .background(if (isSelected) colors.accent else Color.Transparent)
+            .background(
+                when {
+                    isSelected -> colors.accent
+                    isDropTarget -> colors.accent.copy(alpha = 0.2f)
+                    else -> Color.Transparent
+                },
+            )
+            .then(if (isDropTarget) Modifier.border(1.dp, colors.accent, RoundedCornerShape(Dimens.RadiusLarge)) else Modifier)
             .clickable(onClick = onClick)
             .padding(start = IndentPerLevel * depth, end = Dimens.SpaceXs),
     ) {
@@ -205,6 +282,20 @@ private fun Twisty(expanded: Boolean, selected: Boolean, onClick: () -> Unit) {
             painterResource(Res.drawable.ic_chevron_right), description,
             tint = if (selected) QuireTheme.colors.onAccent else QuireTheme.colors.fillSecondary,
             modifier = Modifier.size(14.dp).rotate(if (expanded) 90f else 0f),
+        )
+    }
+}
+
+private enum class ProjectAction { NewSubproject, Rename, Delete }
+
+@Composable
+private fun ProjectMenu(expanded: Boolean, onDismiss: () -> Unit, onAction: (ProjectAction) -> Unit) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        DropdownMenuItem(text = { Text(stringResource(Res.string.menu_new_subproject)) }, onClick = { onAction(ProjectAction.NewSubproject) })
+        DropdownMenuItem(text = { Text(stringResource(Res.string.menu_rename)) }, onClick = { onAction(ProjectAction.Rename) })
+        DropdownMenuItem(
+            text = { Text(stringResource(Res.string.menu_delete), color = MaterialTheme.colorScheme.error) },
+            onClick = { onAction(ProjectAction.Delete) },
         )
     }
 }
