@@ -1,5 +1,36 @@
 package dev.neurokitchen.quire.presentation.screens.library.components
 
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import dev.neurokitchen.quire.presentation.designsystem.components.CompactTextField
+import dev.neurokitchen.quire.presentation.platform.pickFile
+import dev.neurokitchen.quire.presentation.screens.library.EditDraft
+import dev.neurokitchen.quire.presentation.screens.library.LibraryEvent
+import dev.neurokitchen.quire.resources.field_date
+import dev.neurokitchen.quire.resources.field_doi
+import dev.neurokitchen.quire.resources.field_issue
+import dev.neurokitchen.quire.resources.field_pages
+import dev.neurokitchen.quire.resources.field_publication
+import dev.neurokitchen.quire.resources.field_volume
+import dev.neurokitchen.quire.resources.item_add_note
+import dev.neurokitchen.quire.resources.item_add_tag
+import dev.neurokitchen.quire.resources.item_attach_pdf
+import dev.neurokitchen.quire.resources.item_cancel
+import dev.neurokitchen.quire.resources.item_collapse
+import dev.neurokitchen.quire.resources.item_delete
+import dev.neurokitchen.quire.resources.item_edit
+import dev.neurokitchen.quire.resources.item_get_pdf
+import dev.neurokitchen.quire.resources.item_pick_pdf
+import dev.neurokitchen.quire.resources.item_publisher_page
+import dev.neurokitchen.quire.resources.item_refetch
+import dev.neurokitchen.quire.resources.item_remove
+import dev.neurokitchen.quire.resources.item_remove_pdfs
+import dev.neurokitchen.quire.resources.item_restore
+import dev.neurokitchen.quire.resources.item_save
+import dev.neurokitchen.quire.resources.section_abstract
+import dev.neurokitchen.quire.resources.status_read
+import dev.neurokitchen.quire.resources.status_reading
+import dev.neurokitchen.quire.resources.status_unread
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -98,6 +129,7 @@ import org.jetbrains.compose.resources.stringResource
  * - When no reference is selected: displays the Library Dashboard (reading stats, quick actions, shortcuts).
  * - When a reference is selected: title header card, quick actions, and collapsible sections.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ItemPane(
     reference: ReferenceDetailState?,
@@ -111,6 +143,11 @@ fun ItemPane(
     onAddReference: () -> Unit = {},
     onCreateProject: () -> Unit = {},
     onCollapse: (() -> Unit)? = null,
+    /** The Info section being edited, and what is typed in the Tags and Notes inputs. */
+    editing: EditDraft? = null,
+    tagDraft: String = "",
+    noteDraft: String = "",
+    onEvent: (LibraryEvent) -> Unit = {},
 ) {
     val colors = QuireTheme.colors
     if (reference == null) {
@@ -138,10 +175,10 @@ fun ItemPane(
                 )
                 Spacer(Modifier.height(Dimens.SpaceSm))
 
-                // Action pills row
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                // Action pills; the actions wrap to their own line when the pane is narrow
+                FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
+                    verticalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Button(
@@ -158,9 +195,9 @@ fun ItemPane(
 
                     // Reading status badge
                     val (statusBg, statusFg, statusText) = when (reference.reading) {
-                        ReadingStatus.Read -> Triple(colors.statusRead.copy(alpha = 0.15f), colors.statusRead, "Read")
-                        ReadingStatus.Reading -> Triple(colors.statusReading.copy(alpha = 0.15f), colors.statusReading, "Reading")
-                        ReadingStatus.Unread -> Triple(colors.fillQuarternary, colors.fillSecondary, "Unread")
+                        ReadingStatus.Read -> Triple(colors.statusRead.copy(alpha = 0.15f), colors.statusRead, stringResource(Res.string.status_read))
+                        ReadingStatus.Reading -> Triple(colors.statusReading.copy(alpha = 0.15f), colors.statusReading, stringResource(Res.string.status_reading))
+                        ReadingStatus.Unread -> Triple(colors.fillQuarternary, colors.fillSecondary, stringResource(Res.string.status_unread))
                     }
                     Box(
                         modifier = Modifier
@@ -189,21 +226,20 @@ fun ItemPane(
                         )
                     }
 
-                    Spacer(Modifier.weight(1f))
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.height(30.dp)) {
+                        if (reference.isTrashed) {
+                            Action(Res.string.item_restore, { onEvent(LibraryEvent.OnRestore) })
+                        } else {
+                            Action(Res.string.item_refetch, { onEvent(LibraryEvent.OnRefetch) })
+                            IconButton(onClick = onDelete, modifier = Modifier.size(30.dp)) {
+                                Icon(painterResource(Res.drawable.ic_delete), stringResource(Res.string.item_delete), tint = colors.fillSecondary, modifier = Modifier.size(16.dp))
+                            }
+                        }
 
-                    IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier.size(30.dp),
-                    ) {
-                        Icon(painterResource(Res.drawable.ic_delete), "Delete Reference (Del)", tint = colors.fillSecondary, modifier = Modifier.size(16.dp))
-                    }
-
-                    if (onCollapse != null) {
-                        IconButton(
-                            onClick = onCollapse,
-                            modifier = Modifier.size(30.dp),
-                        ) {
-                            Icon(painterResource(Res.drawable.ic_close), "Minimize Inspector (Ctrl+I)", tint = colors.fillSecondary, modifier = Modifier.size(16.dp))
+                        if (onCollapse != null) {
+                            IconButton(onClick = onCollapse, modifier = Modifier.size(30.dp)) {
+                                Icon(painterResource(Res.drawable.ic_close), stringResource(Res.string.item_collapse), tint = colors.fillSecondary, modifier = Modifier.size(16.dp))
+                            }
                         }
                     }
                 }
@@ -213,7 +249,7 @@ fun ItemPane(
             ItemSection.entries.forEach { section ->
                 Column(Modifier.onGloballyPositioned { offsets[section] = it.positionInParent().y.toInt() }) {
                     Section(section, isCollapsed = section in collapsed, onToggle = { onSectionToggle(section) }) {
-                        SectionBody(section, reference, onOpen)
+                        SectionBody(section, reference, editing, tagDraft, noteDraft, onOpen, onEvent)
                     }
                     HorizontalDivider(color = colors.fillQuarternary)
                 }
@@ -339,7 +375,7 @@ private fun LibraryDashboard(
                 )
                 ShortcutRow("Ctrl + B", "Toggle Left Sidebar")
                 ShortcutRow("Ctrl + F / Ctrl + S", "Search Library")
-                ShortcutRow("Ctrl + A / Ctrl + N", "Add Reference Modal")
+                ShortcutRow("Ctrl + N", "Add Reference Modal")
                 ShortcutRow("Ctrl + R", "Reload Library")
                 ShortcutRow("Ctrl + ,", "Settings")
             }
@@ -450,97 +486,187 @@ private fun Section(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SectionBody(section: ItemSection, reference: ReferenceDetailState, onOpen: () -> Unit) {
+private fun SectionBody(
+    section: ItemSection,
+    reference: ReferenceDetailState,
+    editing: EditDraft?,
+    tagDraft: String,
+    noteDraft: String,
+    onOpen: () -> Unit,
+    onEvent: (LibraryEvent) -> Unit,
+) {
+    val colors = QuireTheme.colors
     when (section) {
         ItemSection.Info -> Column {
-            Field(stringResource(Res.string.field_item_type), kindName(reference.kind))
-            Field(stringResource(Res.string.field_title), reference.title)
-            reference.authors.forEach { Field(stringResource(Res.string.field_author), it) }
-            reference.fields.forEach { Field(stringResource(it.label), it.value) }
-            Field(stringResource(Res.string.field_cite_key), reference.citeKey)
-        }
-        ItemSection.Abstract -> BodyText(reference.abstract, Res.string.section_empty_abstract)
-        ItemSection.Attachments ->
-            if (reference.hasPdf) {
-                Card(
-                    shape = RoundedCornerShape(Dimens.RadiusBase),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(Dimens.SpaceSm),
-                    ) {
-                        Icon(painterResource(Res.drawable.ic_picture_as_pdf), null, tint = QuireTheme.colors.accentRed, modifier = Modifier.size(24.dp))
-                        Spacer(Modifier.width(Dimens.SpaceSm))
-                        Column(Modifier.weight(1f)) {
-                            Text(reference.title + ".pdf", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                            Text("Full text PDF document", style = MaterialTheme.typography.labelSmall, color = QuireTheme.colors.fillSecondary)
-                        }
-                        Text("View", style = MaterialTheme.typography.labelMedium, color = QuireTheme.colors.accent, fontWeight = FontWeight.SemiBold)
-                    }
+            if (reference.issues.isNotEmpty()) {
+                reference.issues.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+                Spacer(Modifier.height(Dimens.SpaceXs))
+            }
+            if (editing != null) {
+                EditFields(editing) { onEvent(LibraryEvent.OnEditChange(it)) }
+                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                    Action(Res.string.item_cancel, { onEvent(LibraryEvent.OnEditCancel) })
+                    Action(Res.string.item_save, { onEvent(LibraryEvent.OnEditSave) })
                 }
             } else {
-                BodyText("", Res.string.section_empty_attachments)
+                Field(stringResource(Res.string.field_item_type), kindName(reference.kind))
+                Field(stringResource(Res.string.field_title), reference.title)
+                reference.authors.forEach { Field(stringResource(Res.string.field_author), it) }
+                reference.fields.forEach { Field(stringResource(it.label), it.value) }
+                Field(stringResource(Res.string.field_cite_key), reference.citeKey)
+                if (!reference.isTrashed) {
+                    Action(Res.string.item_edit, { onEvent(LibraryEvent.OnEditStart) })
+                }
             }
-        ItemSection.Notes -> {
-            Card(
-                shape = RoundedCornerShape(Dimens.RadiusBase),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Column(Modifier.padding(Dimens.SpaceSm)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(painterResource(Res.drawable.ic_sticky_note_2), null, tint = QuireTheme.colors.sectionNotes, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(Dimens.SpaceMin))
-                        Text("Reading Notes", style = MaterialTheme.typography.labelSmall, color = QuireTheme.colors.fillSecondary)
-                    }
-                    Spacer(Modifier.height(Dimens.SpaceMin))
+        }
+        ItemSection.Abstract -> BodyText(reference.abstract, Res.string.section_empty_abstract)
+        ItemSection.Attachments -> Column {
+            if (reference.pdfFiles.isEmpty()) BodyText("", Res.string.section_empty_attachments)
+            reference.pdfFiles.forEach { path ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().height(Dimens.RowHeight).clickable(onClick = onOpen),
+                ) {
+                    Icon(painterResource(Res.drawable.ic_picture_as_pdf), null, tint = colors.accentRed, modifier = Modifier.size(Dimens.Icon))
                     Text(
-                        "Detailed reading notes, mathematical derivation checks, and follow-up ideas are saved in the Reader notes panel.",
+                        path.substringAfterLast('/').substringAfterLast('\\'),
                         style = MaterialTheme.typography.bodySmall,
-                        color = QuireTheme.colors.fillPrimary,
+                        maxLines = 1,
+                        modifier = Modifier.padding(start = Dimens.SpaceXs),
                     )
                 }
+            }
+            val pickTitle = stringResource(Res.string.item_pick_pdf)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceXs)) {
+                if (reference.pdfFiles.isEmpty()) {
+                    Action(Res.string.item_get_pdf, { onEvent(LibraryEvent.OnGetPdf) })
+                    Action(Res.string.item_publisher_page, { onEvent(LibraryEvent.OnOpenPublisherPage) })
+                }
+                Action(Res.string.item_attach_pdf) { pickFile(pickTitle, listOf("pdf"))?.let { onEvent(LibraryEvent.OnAttachPdf(it)) } }
+                if (reference.pdfFiles.isNotEmpty()) {
+                    Action(Res.string.item_remove_pdfs, { onEvent(LibraryEvent.OnRemovePdfs) })
+                }
+            }
+        }
+        ItemSection.Notes -> Column(verticalArrangement = Arrangement.spacedBy(Dimens.SpaceXs)) {
+            if (reference.notes.isEmpty()) BodyText("", Res.string.section_empty_notes)
+            reference.notes.forEach { note ->
+                Row(verticalAlignment = Alignment.Top) {
+                    Icon(painterResource(Res.drawable.ic_sticky_note_2), null, tint = colors.sectionNotes, modifier = Modifier.size(16.dp))
+                    Column(Modifier.weight(1f).padding(start = Dimens.SpaceXs)) {
+                        Text(note.body, style = MaterialTheme.typography.bodySmall, color = colors.fillPrimary)
+                        Text(note.updated, style = MaterialTheme.typography.labelSmall, color = colors.fillSecondary)
+                    }
+                    RemoveButton { onEvent(LibraryEvent.OnNoteDelete(note.id)) }
+                }
+            }
+            InputRow(noteDraft, stringResource(Res.string.item_add_note), { onEvent(LibraryEvent.OnNoteDraftChange(it)) }) {
+                onEvent(LibraryEvent.OnNoteAdd)
             }
         }
         ItemSection.Projects -> Column {
             if (reference.projects.isEmpty()) BodyText("", Res.string.section_empty_projects)
-            reference.projects.forEach { name ->
+            reference.projects.forEachIndexed { i, name ->
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.height(Dimens.RowHeight)) {
-                    Icon(painterResource(Res.drawable.ic_folder), null, tint = QuireTheme.colors.accent, modifier = Modifier.size(Dimens.Icon))
-                    BodyText(name, Res.string.section_empty_projects, Modifier.padding(start = Dimens.SpaceXs))
+                    Icon(painterResource(Res.drawable.ic_folder), null, tint = colors.accent, modifier = Modifier.size(Dimens.Icon))
+                    Text(name, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = Dimens.SpaceXs).weight(1f))
+                    reference.projectPaths.getOrNull(i)?.let { path -> RemoveButton { onEvent(LibraryEvent.OnProjectRemove(path)) } }
                 }
             }
         }
-        ItemSection.Tags -> {
-            if (reference.tags.isEmpty()) {
-                BodyText("", Res.string.section_empty_tags)
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    reference.tags.forEach { tag ->
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(Dimens.RadiusFull))
-                                .background(QuireTheme.colors.accent.copy(alpha = 0.12f))
-                                .padding(horizontal = 8.dp, vertical = 3.dp),
-                        ) {
-                            Text(
-                                text = "#$tag",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = QuireTheme.colors.accent,
-                                fontWeight = FontWeight.Medium,
-                            )
-                        }
+        ItemSection.Tags -> Column(verticalArrangement = Arrangement.spacedBy(Dimens.SpaceXs)) {
+            if (reference.tags.isEmpty()) BodyText("", Res.string.section_empty_tags)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                reference.tags.forEach { tag ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(Dimens.RadiusFull))
+                            .background(colors.accent.copy(alpha = 0.12f))
+                            .padding(start = 8.dp),
+                    ) {
+                        Text("#$tag", style = MaterialTheme.typography.labelSmall, color = colors.accent, fontWeight = FontWeight.Medium)
+                        RemoveButton { onEvent(LibraryEvent.OnTagRemove(tag)) }
                     }
                 }
             }
+            InputRow(tagDraft, stringResource(Res.string.item_add_tag), { onEvent(LibraryEvent.OnTagDraftChange(it)) }) {
+                onEvent(LibraryEvent.OnTagAdd)
+            }
         }
-        ItemSection.Related -> BodyText("", Res.string.section_empty_related)
+        ItemSection.Related -> Column {
+            if (reference.related.isEmpty()) BodyText("", Res.string.section_empty_related)
+            reference.related.forEach { related ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().clickable { onEvent(LibraryEvent.OnReferenceClick(related.id)) },
+                ) {
+                    Column(Modifier.weight(1f).padding(vertical = 2.dp)) {
+                        Text(related.title, style = MaterialTheme.typography.bodySmall, color = colors.fillPrimary, maxLines = 2)
+                        Text(related.creatorYear, style = MaterialTheme.typography.labelSmall, color = colors.fillSecondary)
+                    }
+                    RemoveButton { onEvent(LibraryEvent.OnUnrelate(related.id)) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditFields(draft: EditDraft, onChange: (EditDraft) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.SpaceMin)) {
+        EditRow(stringResource(Res.string.field_title), draft.title) { onChange(draft.copy(title = it)) }
+        EditRow(stringResource(Res.string.field_author), draft.authors) { onChange(draft.copy(authors = it)) }
+        EditRow(stringResource(Res.string.field_date), draft.date) { onChange(draft.copy(date = it)) }
+        EditRow(stringResource(Res.string.field_publication), draft.containerTitle) { onChange(draft.copy(containerTitle = it)) }
+        EditRow(stringResource(Res.string.field_volume), draft.volume) { onChange(draft.copy(volume = it)) }
+        EditRow(stringResource(Res.string.field_issue), draft.issue) { onChange(draft.copy(issue = it)) }
+        EditRow(stringResource(Res.string.field_pages), draft.pages) { onChange(draft.copy(pages = it)) }
+        EditRow(stringResource(Res.string.field_doi), draft.doi) { onChange(draft.copy(doi = it)) }
+        EditRow(stringResource(Res.string.section_abstract), draft.abstract) { onChange(draft.copy(abstract = it)) }
+    }
+}
+
+@Composable
+private fun EditRow(label: String, value: String, onChange: (String) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Text(
+            label, style = MaterialTheme.typography.bodyMedium, color = QuireTheme.colors.fillSecondary,
+            textAlign = TextAlign.End, modifier = Modifier.width(LabelWidth).padding(end = Dimens.SpaceXs),
+        )
+        CompactTextField(value = value, onValueChange = onChange, placeholder = label, modifier = Modifier.weight(1f))
+    }
+}
+
+/** A text input with an Add button (tags, notes); Enter is not bound, the button adds. */
+@Composable
+private fun InputRow(value: String, placeholder: String, onChange: (String) -> Unit, onAdd: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        CompactTextField(value = value, onValueChange = onChange, placeholder = placeholder, modifier = Modifier.weight(1f))
+        IconButton(onClick = onAdd, enabled = value.isNotBlank(), modifier = Modifier.size(30.dp)) {
+            Icon(painterResource(Res.drawable.ic_add), placeholder, modifier = Modifier.size(16.dp))
+        }
+    }
+}
+
+/** A text action as tall as the header pills (a [TextButton] is 48dp at least). */
+@Composable
+private fun Action(label: StringResource, onClick: () -> Unit) {
+    TextButton(
+        onClick = onClick,
+        contentPadding = PaddingValues(horizontal = Dimens.SpaceXs),
+        modifier = Modifier.height(30.dp),
+    ) {
+        Text(stringResource(label), style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+@Composable
+private fun RemoveButton(onClick: () -> Unit) {
+    IconButton(onClick = onClick, modifier = Modifier.size(24.dp)) {
+        Icon(painterResource(Res.drawable.ic_close), stringResource(Res.string.item_remove), tint = QuireTheme.colors.fillSecondary, modifier = Modifier.size(12.dp))
     }
 }
 

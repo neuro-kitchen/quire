@@ -1,5 +1,11 @@
 package dev.neurokitchen.quire.presentation.screens.library.components
 
+import dev.neurokitchen.quire.resources.add_title
+import dev.neurokitchen.quire.resources.pick_pdf
+import dev.neurokitchen.quire.resources.search_save
+import dev.neurokitchen.quire.presentation.platform.pickFile
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -55,6 +61,10 @@ fun ItemsToolbar(
     searchFocusRequester: FocusRequester? = null,
     onToggleInspector: (() -> Unit)? = null,
     isInspectorCollapsed: Boolean = false,
+    /** Saves the search as typed; offered while there is one. */
+    onSaveSearch: (() -> Unit)? = null,
+    /** Adds a paper from a PDF the user picks. */
+    onImportPdf: ((String) -> Unit)? = null,
 ) {
     val colors = QuireTheme.colors
     Row(
@@ -84,7 +94,7 @@ fun ItemsToolbar(
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                text = "Add Reference",
+                text = stringResource(Res.string.add_title),
                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                 color = colors.onAccent,
             )
@@ -96,7 +106,7 @@ fun ItemsToolbar(
                     .padding(horizontal = 4.dp, vertical = 1.dp),
             ) {
                 Text(
-                    text = "Ctrl+A",
+                    text = "Ctrl+N",
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
                     color = colors.onAccent,
                 )
@@ -104,9 +114,20 @@ fun ItemsToolbar(
         }
 
         ToolbarIconButton(Res.drawable.ic_sticky_note_2, stringResource(Res.string.library_new_note), onClick = {})
-        ToolbarIconButton(Res.drawable.ic_attach_file, stringResource(Res.string.library_add_attachment), onClick = {})
+        val pickTitle = stringResource(Res.string.pick_pdf)
+        ToolbarIconButton(
+            Res.drawable.ic_attach_file,
+            stringResource(Res.string.library_add_attachment),
+            onClick = { pickFile(pickTitle, listOf("pdf"))?.let { onImportPdf?.invoke(it) } },
+        )
 
         Spacer(Modifier.weight(1f))
+
+        if (onSaveSearch != null && query.isNotBlank()) {
+            TextButton(onClick = onSaveSearch, contentPadding = PaddingValues(horizontal = Dimens.SpaceXs), modifier = Modifier.height(30.dp)) {
+                Text(stringResource(Res.string.search_save), style = MaterialTheme.typography.labelMedium)
+            }
+        }
 
         CompactTextField(
             value = query,

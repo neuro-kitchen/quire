@@ -434,12 +434,14 @@ private fun ShortcutsSectionView() {
         ShortcutCategoryCard(
             title = "Library & References",
             shortcuts = listOf(
-                "Ctrl + N / Ctrl + A" to "Add Reference (DOI, arXiv, BibTeX)",
+                "Ctrl + N" to "Add Reference (DOI, arXiv, BibTeX)",
+                "Ctrl + A" to "Select All Items",
                 "Ctrl + F / Ctrl + S" to "Search Library Items",
                 "Shift + Click" to "Range Multi-Selection of Papers",
                 "Ctrl + Click" to "Toggle Item Selection",
                 "Delete / Backspace" to "Delete Selected Paper(s)",
-                "Right-Click" to "Context Menu (Reader, Collections, Citations)",
+                "Right-Click" to "Context Menu (items, projects, tags, saved searches)",
+                "Drag to a Project" to "Add the Dragged Items to It",
                 "Double-Click" to "Open Reference in Reader Tab",
             ),
         )

@@ -48,6 +48,8 @@ data class QuireColors(
     val highlightRed: Color = if (isDark) Color(0x66FB7185) else Color(0xFFFECDD3),
     val statusRead: Color = Color(0xFF10B981),
     val statusReading: Color = Color(0xFFF59E0B),
+    /** Find matches on a page (distinct from the highlight colours). */
+    val findMatch: Color = Color(0xFFF97316),
     val statusUnread: Color = Color(0xFF94A3B8),
 )
 

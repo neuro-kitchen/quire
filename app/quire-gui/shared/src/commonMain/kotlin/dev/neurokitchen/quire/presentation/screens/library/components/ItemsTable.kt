@@ -1,5 +1,10 @@
 package dev.neurokitchen.quire.presentation.screens.library.components
 
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -96,6 +101,9 @@ fun ItemsTable(
     onClearSelection: () -> Unit = {},
     onCreateCollectionFromSelected: () -> Unit = {},
     modifier: Modifier = Modifier,
+    /** Dragging rows onto a project: the shared drag, and what to do on a drop. */
+    drag: ReferenceDrag? = null,
+    onDropOnProject: (ids: Set<String>, projectPath: String) -> Unit = { _, _ -> },
 ) {
     val colors = QuireTheme.colors
 
@@ -194,6 +202,10 @@ fun ItemsTable(
                     onDoubleClick = { onReferenceOpen(reference.id) },
                     onDelete = { onDeleteReference(reference.id) },
                     onCreateCollection = onCreateCollectionFromSelected,
+                    drag = drag,
+                    // A selected row drags the whole selection; another row drags itself.
+                    dragIds = { if (reference.id in selectedIds) selectedIds else setOf(reference.id) },
+                    onDrop = onDropOnProject,
                 )
             }
         }
@@ -237,9 +249,16 @@ private fun ItemRow(
     onDoubleClick: () -> Unit,
     onDelete: () -> Unit,
     onCreateCollection: () -> Unit,
+    drag: ReferenceDrag? = null,
+    dragIds: () -> Set<String> = { emptySet() },
+    onDrop: (Set<String>, String) -> Unit = { _, _ -> },
 ) {
     val colors = QuireTheme.colors
     val clipboardManager = LocalClipboardManager.current
+    // Where the row is in the window, to report the drag in window coordinates.
+    val rowCoordinates = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    val currentDragIds by rememberUpdatedState(dragIds)
+    val currentOnDrop by rememberUpdatedState(onDrop)
     var contextMenuOpen by remember { mutableStateOf(false) }
 
     val content = if (isSelected) colors.onAccent else colors.fillPrimary
@@ -259,6 +278,19 @@ private fun ItemRow(
                 .padding(horizontal = Dimens.SpaceXs)
                 .clip(RoundedCornerShape(Dimens.RadiusSmall))
                 .background(background)
+                .onGloballyPositioned { rowCoordinates[0] = it }
+                .then(
+                    if (drag == null) Modifier
+                    else Modifier.pointerInput(reference.id, drag) {
+                        fun window(local: Offset) = rowCoordinates[0]?.takeIf { it.isAttached }?.localToWindow(local) ?: local
+                        detectDragGestures(
+                            onDragStart = { drag.start(currentDragIds(), window(it)) },
+                            onDrag = { change, _ -> change.consume(); drag.move(window(change.position)) },
+                            onDragEnd = { drag.end()?.let { (ids, path) -> currentOnDrop(ids, path) } },
+                            onDragCancel = { drag.cancel() },
+                        )
+                    },
+                )
                 .pointerInput(reference.id) {
                     awaitPointerEventScope {
                         while (true) {

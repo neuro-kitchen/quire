@@ -57,7 +57,7 @@ fun ReaderRoute(
     viewModel: ReaderViewModel = koinViewModel(key = "reader-$id") { parametersOf(id, title) },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    ReaderScreen(state, viewModel::onEvent, loadPage = viewModel::page, loadFigure = viewModel::figure)
+    ReaderScreen(state, viewModel::onEvent, loadPage = viewModel::page, loadFigure = viewModel::figure, textLayer = viewModel)
 }
 
 /**
@@ -71,11 +71,10 @@ fun ReaderScreen(
     loadPage: suspend (Int, Int) -> PageImage?,
     loadFigure: suspend (String) -> String?,
     modifier: Modifier = Modifier,
+    textLayer: PdfTextLayer = PdfTextLayer.None,
 ) {
     val colors = QuireTheme.colors
     var selection by remember(state.referenceId) { mutableStateOf<Pair<String, String>?>(null) }
-    var isSearchOpen by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
     var sidebarWidthDp by remember { mutableFloatStateOf(260f) }
     var notesWidthDp by remember { mutableFloatStateOf(280f) }
     val rootFocusRequester = remember { FocusRequester() }
@@ -111,7 +110,7 @@ fun ReaderScreen(
                                 true
                             }
                             Key.F -> {
-                                isSearchOpen = !isSearchOpen
+                                onEvent(ReaderEvent.OnFindToggle)
                                 true
                             }
                             Key.B -> {
@@ -121,8 +120,8 @@ fun ReaderScreen(
                             else -> false
                         }
                     } else if (event.key == Key.Escape) {
-                        if (isSearchOpen) {
-                            isSearchOpen = false
+                        if (state.find.isOpen) {
+                            onEvent(ReaderEvent.OnFindToggle)
                             true
                         } else false
                     } else false
@@ -155,7 +154,7 @@ fun ReaderScreen(
                     reading = state.reading,
                     isAnnotationsCollapsed = state.isAnnotationsCollapsed,
                     isNotesCollapsed = state.isNotesCollapsed,
-                    isSearchOpen = isSearchOpen,
+                    isSearchOpen = state.find.isOpen,
                     readerTheme = state.readerTheme,
                     readerFont = state.readerFont,
                     fontSizeSp = state.fontSizeSp,
@@ -179,7 +178,7 @@ fun ReaderScreen(
                     onReadingChange = { onEvent(ReaderEvent.OnReadingChange(it)) },
                     onToggleAnnotations = { onEvent(ReaderEvent.OnToggleAnnotations) },
                     onToggleNotes = { onEvent(ReaderEvent.OnToggleNotes) },
-                    onToggleSearch = { isSearchOpen = !isSearchOpen },
+                    onToggleSearch = { onEvent(ReaderEvent.OnFindToggle) },
                     onSetReaderTheme = { onEvent(ReaderEvent.OnSetReaderTheme(it)) },
                     onSetReaderFont = { onEvent(ReaderEvent.OnSetReaderFont(it)) },
                     onChangeFontSize = { onEvent(ReaderEvent.OnChangeFontSize(it)) },
@@ -187,13 +186,16 @@ fun ReaderScreen(
                 HorizontalDivider(color = colors.paneDivider)
 
                 // In-Reader Search Bar
-                if (isSearchOpen) {
+                if (state.find.isOpen) {
+                    val count = state.find.count(state.mode)
                     ReaderSearchBar(
-                        query = searchQuery,
-                        onQueryChange = { searchQuery = it },
-                        matchCount = if (searchQuery.isNotEmpty()) 3 else 0,
-                        currentMatch = if (searchQuery.isNotEmpty()) 1 else 0,
-                        onClose = { isSearchOpen = false },
+                        query = state.find.query,
+                        onQueryChange = { onEvent(ReaderEvent.OnFindChange(it)) },
+                        matchCount = count,
+                        currentMatch = if (count == 0) 0 else state.find.current + 1,
+                        onNextMatch = { onEvent(ReaderEvent.OnFindNext) },
+                        onPrevMatch = { onEvent(ReaderEvent.OnFindPrevious) },
+                        onClose = { onEvent(ReaderEvent.OnFindToggle) },
                     )
                 }
 
@@ -206,6 +208,9 @@ fun ReaderScreen(
                         focused = state.focusedHighlight,
                         loadPage = loadPage,
                         readerTheme = state.readerTheme,
+                        textLayer = textLayer,
+                        matches = if (state.find.isOpen) state.find.pdfMatches else emptyList(),
+                        currentMatch = state.find.current,
                         onHighlight = { quote, prefix, color ->
                             onEvent(ReaderEvent.OnHighlight(quote, prefix, color))
                         },
@@ -233,6 +238,8 @@ fun ReaderScreen(
                             onEvent(ReaderEvent.OnNoteAdd)
                         },
                         loadFigure = loadFigure,
+                        findMatches = if (state.find.isOpen) state.find.textMatches else emptyList(),
+                        currentFind = state.find.current,
                     )
                 }
             }

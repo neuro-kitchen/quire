@@ -1,5 +1,17 @@
 package dev.neurokitchen.quire.presentation.screens.library.components
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.runtime.remember
+import dev.neurokitchen.quire.presentation.designsystem.components.onSecondaryClick
+import dev.neurokitchen.quire.resources.menu_delete
+import dev.neurokitchen.quire.resources.menu_rename
+import dev.neurokitchen.quire.resources.menu_tag_color
+import dev.neurokitchen.quire.resources.menu_tag_no_color
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.background
@@ -35,8 +47,10 @@ import dev.neurokitchen.quire.resources.tags_none
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * Zotero's tag selector: the tags of the references in view as a wrapped list; clicking one keeps
- * only references with it. The filter field narrows the list itself (local UI state).
+ * Zotero's tag selector: the library's coloured tags first (with their colour), then the tags of
+ * the references in view, as a wrapped list; clicking one keeps only references with it, a
+ * secondary click offers rename, colour and delete. The filter field narrows the list itself
+ * (local UI state).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -44,6 +58,10 @@ fun TagSelector(
     tags: List<TagState>,
     onTagClick: (String) -> Unit,
     modifier: Modifier = Modifier,
+    onRename: (String) -> Unit = {},
+    /** A tag and its new colour (`#rrggbb`), or `null` to take the colour away. */
+    onColor: (String, String?) -> Unit = { _, _ -> },
+    onDelete: (String) -> Unit = {},
 ) {
     var filter by rememberSaveable { mutableStateOf("") }
     val shown = tags.filter { it.isSelected || filter.isBlank() || filter.lowercase() in it.name.lowercase() }
@@ -62,7 +80,15 @@ fun TagSelector(
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                 ) {
-                    shown.forEach { tag -> Tag(tag, onClick = { onTagClick(tag.name) }) }
+                    shown.forEach { tag ->
+                        Tag(
+                            tag,
+                            onClick = { onTagClick(tag.name) },
+                            onRename = { onRename(tag.name) },
+                            onColor = { onColor(tag.name, it) },
+                            onDelete = { onDelete(tag.name) },
+                        )
+                    }
                 }
             }
         }
@@ -77,16 +103,71 @@ fun TagSelector(
 }
 
 @Composable
-private fun Tag(tag: TagState, onClick: () -> Unit) {
+private fun Tag(tag: TagState, onClick: () -> Unit, onRename: () -> Unit, onColor: (String?) -> Unit, onDelete: () -> Unit) {
     val colors = QuireTheme.colors
-    Text(
-        text = tag.name,
-        style = MaterialTheme.typography.bodyMedium,
-        color = if (tag.isSelected) colors.onAccent else colors.fillPrimary,
-        modifier = Modifier
-            .clip(RoundedCornerShape(Dimens.RadiusBase))
-            .background(if (tag.isSelected) colors.accent else Color.Transparent)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 1.dp),
-    )
+    var menuOpen by remember { mutableStateOf(false) }
+    val tagColor = tag.color?.let(::parseHex)
+    Box {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(RoundedCornerShape(Dimens.RadiusBase))
+                .background(if (tag.isSelected) colors.accent else Color.Transparent)
+                .onSecondaryClick { menuOpen = true }
+                .clickable(onClick = onClick)
+                .padding(horizontal = 4.dp, vertical = 1.dp),
+        ) {
+            if (tagColor != null) {
+                Box(Modifier.padding(end = 4.dp).size(8.dp).clip(CircleShape).background(tagColor))
+            }
+            Text(
+                text = tag.name,
+                style = MaterialTheme.typography.bodyMedium,
+                color = when {
+                    tag.isSelected -> colors.onAccent
+                    tagColor != null -> tagColor
+                    else -> colors.fillPrimary
+                },
+            )
+        }
+        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            DropdownMenuItem(text = { Text(stringResource(Res.string.menu_rename)) }, onClick = { menuOpen = false; onRename() })
+            Text(
+                stringResource(Res.string.menu_tag_color),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.fillSecondary,
+                modifier = Modifier.padding(horizontal = Dimens.SpaceSm, vertical = Dimens.SpaceMin),
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = Dimens.SpaceSm, vertical = Dimens.SpaceMin),
+            ) {
+                TagColors.forEach { hex ->
+                    Box(
+                        Modifier
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .background(parseHex(hex))
+                            .then(if (hex.equals(tag.color, ignoreCase = true)) Modifier.border(2.dp, colors.fillPrimary, CircleShape) else Modifier)
+                            .clickable { menuOpen = false; onColor(hex) },
+                    )
+                }
+            }
+            if (tag.color != null) {
+                DropdownMenuItem(text = { Text(stringResource(Res.string.menu_tag_no_color)) }, onClick = { menuOpen = false; onColor(null) })
+            }
+            DropdownMenuItem(
+                text = { Text(stringResource(Res.string.menu_delete), color = MaterialTheme.colorScheme.error) },
+                onClick = { menuOpen = false; onDelete() },
+            )
+        }
+    }
 }
+
+/** Zotero's tag colours. */
+private val TagColors = listOf("#FF6666", "#FF8C19", "#999999", "#5FB236", "#009980", "#2EA8E5", "#576DD9", "#A28AE5", "#A6507B")
+
+/** `#rrggbb` as a colour; grey if it is not one. */
+private fun parseHex(hex: String): Color =
+    hex.removePrefix("#").takeIf { it.length == 6 }?.toLongOrNull(16)?.let { Color(0xFF000000 or it) } ?: Color.Gray

@@ -69,14 +69,8 @@ fun SelectionActionPalette(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             ) {
-                // Pastel highlight color chips
-                val paletteColors = listOf(
-                    "yellow" to colors.highlightYellow,
-                    "green" to colors.highlightGreen,
-                    "blue" to colors.highlightBlue,
-                    "purple" to colors.highlightPurple,
-                    "red" to colors.highlightRed,
-                )
+                // One colour: the engine keeps no colour per highlight yet, so others would not stay.
+                val paletteColors = listOf("yellow" to colors.highlightYellow)
 
                 for ((name, color) in paletteColors) {
                     Box(

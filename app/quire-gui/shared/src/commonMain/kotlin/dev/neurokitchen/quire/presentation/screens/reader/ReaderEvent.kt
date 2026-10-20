@@ -22,4 +22,9 @@ sealed interface ReaderEvent {
     data class OnSetReaderTheme(val theme: dev.neurokitchen.quire.presentation.designsystem.ReaderTheme) : ReaderEvent
     data class OnSetReaderFont(val font: dev.neurokitchen.quire.presentation.designsystem.ReaderFont) : ReaderEvent
     data class OnChangeFontSize(val delta: Int) : ReaderEvent
+    /** Opens or closes the find bar. */
+    data object OnFindToggle : ReaderEvent
+    data class OnFindChange(val query: String) : ReaderEvent
+    data object OnFindNext : ReaderEvent
+    data object OnFindPrevious : ReaderEvent
 }
