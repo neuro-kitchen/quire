@@ -109,9 +109,9 @@ fun SettingsScreen(
                     Text(stringResource(Res.string.settings_load_failed), color = colors.accentRed, style = MaterialTheme.typography.titleMedium)
                     Text(error, color = colors.fillSecondary, style = MaterialTheme.typography.bodyMedium)
                 }
-                state.section == SettingsSection.Appearance -> AppearanceSectionView()
+                state.section == SettingsSection.Appearance -> AppearanceSectionView(state.appTheme, onEvent)
                 state.section == SettingsSection.Shortcuts -> ShortcutsSectionView()
-                state.section == SettingsSection.Reader -> ReaderDefaultsSectionView()
+                state.section == SettingsSection.Reader -> ReaderDefaultsSectionView(state.readerFont, state.readerTheme, state.readerFontSize, onEvent)
                 state.section == SettingsSection.Export -> ExportSectionView()
                 state.section == SettingsSection.ConfigFile -> RawConfigEditor(
                     state.raw,
@@ -147,9 +147,11 @@ fun SettingsScreen(
 
 /** Appearance & Full App Theming preferences */
 @Composable
-private fun AppearanceSectionView() {
+private fun AppearanceSectionView(
+    activeTheme: AppTheme,
+    onEvent: (SettingsEvent) -> Unit,
+) {
     val colors = QuireTheme.colors
-    var activeTheme by remember { mutableStateOf(AppTheme.Obsidian) }
 
     Column(
         modifier = Modifier
@@ -171,7 +173,7 @@ private fun AppearanceSectionView() {
                     modifier = Modifier
                         .fillMaxWidth()
                         .border(if (isSelected) 1.5.dp else 1.dp, if (isSelected) colors.accent else colors.border, RoundedCornerShape(Dimens.RadiusBase))
-                        .clickable { activeTheme = theme },
+                        .clickable { onEvent(SettingsEvent.OnSetAppTheme(theme)) },
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -244,11 +246,13 @@ private fun AppearanceSectionView() {
 
 /** Reader Defaults preferences */
 @Composable
-private fun ReaderDefaultsSectionView() {
+private fun ReaderDefaultsSectionView(
+    selectedFont: ReaderFont,
+    selectedTheme: ReaderTheme,
+    defaultFontSize: Int,
+    onEvent: (SettingsEvent) -> Unit,
+) {
     val colors = QuireTheme.colors
-    var selectedFont by remember { mutableStateOf(ReaderFont.Serif) }
-    var selectedTheme by remember { mutableStateOf(ReaderTheme.Dark) }
-    var defaultFontSize by remember { mutableIntStateOf(16) }
 
     Column(
         modifier = Modifier
@@ -300,7 +304,7 @@ private fun ReaderDefaultsSectionView() {
                         .clip(RoundedCornerShape(Dimens.RadiusBase))
                         .background(if (isSelected) colors.accent else colors.sidepane)
                         .border(1.dp, if (isSelected) colors.accent else colors.border, RoundedCornerShape(Dimens.RadiusBase))
-                        .clickable { selectedFont = font }
+                        .clickable { onEvent(SettingsEvent.OnSetReaderFont(font)) }
                         .padding(vertical = 8.dp),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -333,7 +337,7 @@ private fun ReaderDefaultsSectionView() {
                         .clip(CircleShape)
                         .background(themeCol.background)
                         .border(if (isSelected) 2.5.dp else 1.dp, if (isSelected) colors.accent else colors.border, CircleShape)
-                        .clickable { selectedTheme = theme },
+                        .clickable { onEvent(SettingsEvent.OnSetReaderTheme(theme)) },
                     contentAlignment = Alignment.Center,
                 ) {
                     Text("Aa", style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp, fontWeight = FontWeight.Bold), color = themeCol.text)
