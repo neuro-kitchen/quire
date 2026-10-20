@@ -48,6 +48,7 @@ import dev.neurokitchen.quire.resources.ic_close
 import dev.neurokitchen.quire.resources.ic_description
 import dev.neurokitchen.quire.resources.ic_library_books
 import dev.neurokitchen.quire.resources.ic_menu
+import dev.neurokitchen.quire.resources.ic_search
 import dev.neurokitchen.quire.resources.ic_settings
 import dev.neurokitchen.quire.resources.ic_sync
 import dev.neurokitchen.quire.resources.library_my_library
@@ -70,6 +71,7 @@ fun TabBar(
     onSyncClick: () -> Unit,
     onSettingsClick: () -> Unit = {},
     onToolsClick: () -> Unit = {},
+    onCommandPaletteClick: () -> Unit = {},
     onSetTheme: (AppTheme) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -111,6 +113,23 @@ fun TabBar(
                     .background(colors.sidepane)
                     .border(1.dp, colors.border, RoundedCornerShape(Dimens.RadiusBase)),
             ) {
+                // Command Palette
+                DropdownMenuItem(
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(painterResource(Res.drawable.ic_search), contentDescription = null, tint = colors.fillSecondary, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Command Palette...", style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
+                            Spacer(Modifier.weight(1f))
+                            Text("Ctrl+K", style = MaterialTheme.typography.labelSmall, color = colors.fillTertiary)
+                        }
+                    },
+                    onClick = {
+                        menuOpen = false
+                        onCommandPaletteClick()
+                    },
+                )
+
                 // Settings & Preferences
                 DropdownMenuItem(
                     text = {
@@ -259,6 +278,43 @@ fun TabBar(
             Tab(Res.drawable.ic_description, paper.title, selected == paper.id, onClick = { onSelect(paper.id) }, onClose = { onClose(paper.id) })
         }
         Spacer(Modifier.weight(1f))
+
+        // Command Palette Quick Search Pill
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                .background(colors.fillQuarternary.copy(alpha = 0.5f))
+                .clickable(onClick = onCommandPaletteClick)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+        ) {
+            Icon(
+                painterResource(Res.drawable.ic_search),
+                contentDescription = "Command Palette",
+                tint = colors.fillSecondary,
+                modifier = Modifier.size(13.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                "Search or jump to...",
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                color = colors.fillTertiary,
+            )
+            Spacer(Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(colors.fillQuarternary)
+                    .padding(horizontal = 4.dp, vertical = 1.dp),
+            ) {
+                Text(
+                    "Ctrl+K",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                    color = colors.fillSecondary,
+                )
+            }
+        }
+
         ToolbarIconButton(Res.drawable.ic_sync, stringResource(Res.string.library_sync) + " (Ctrl+R)", onClick = onSyncClick)
     }
 }
