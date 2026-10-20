@@ -55,6 +55,7 @@ class DesktopViewModel(
                 viewModelScope.launch { preferencesRepository.setAppTheme(event.theme) }
             }
             is DesktopEvent.OnToggleCommandPalette -> _state.update { it.copy(isCommandPaletteOpen = event.open) }
+            is DesktopEvent.OnToggleCitationGraph -> _state.update { it.copy(isCitationGraphOpen = event.open) }
         }
     }
 }

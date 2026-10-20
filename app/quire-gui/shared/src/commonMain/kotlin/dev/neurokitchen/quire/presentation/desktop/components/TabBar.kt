@@ -47,6 +47,7 @@ import dev.neurokitchen.quire.resources.Res
 import dev.neurokitchen.quire.resources.ic_close
 import dev.neurokitchen.quire.resources.ic_description
 import dev.neurokitchen.quire.resources.ic_library_books
+import dev.neurokitchen.quire.resources.ic_link
 import dev.neurokitchen.quire.resources.ic_menu
 import dev.neurokitchen.quire.resources.ic_search
 import dev.neurokitchen.quire.resources.ic_settings
@@ -72,6 +73,7 @@ fun TabBar(
     onSettingsClick: () -> Unit = {},
     onToolsClick: () -> Unit = {},
     onCommandPaletteClick: () -> Unit = {},
+    onCitationGraphClick: () -> Unit = {},
     onSetTheme: (AppTheme) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -159,6 +161,21 @@ fun TabBar(
                     onClick = {
                         menuOpen = false
                         onToolsClick()
+                    },
+                )
+
+                // Citation Network Graph
+                DropdownMenuItem(
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(painterResource(Res.drawable.ic_link), contentDescription = null, tint = colors.fillSecondary, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Citation Network Graph...", style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
+                        }
+                    },
+                    onClick = {
+                        menuOpen = false
+                        onCitationGraphClick()
                     },
                 )
 

@@ -144,6 +144,7 @@ fun CommandPaletteDialog(
     onOpenSettings: () -> Unit,
     onReload: () -> Unit,
     onOpenTools: () -> Unit,
+    onOpenCitationGraph: () -> Unit = {},
 ) {
     if (!isOpen) return
 
@@ -193,6 +194,15 @@ fun CommandPaletteDialog(
                 shortcut = null,
                 iconType = ActionIcon.Tools,
                 onExecute = { onOpenTools(); onDismissRequest() },
+            )
+        )
+        items.add(
+            PaletteItem.Action(
+                title = "View Citation Network Graph",
+                subtitle = "Interactive 2D graph of connections between library papers",
+                shortcut = null,
+                iconType = ActionIcon.Default,
+                onExecute = { onOpenCitationGraph(); onDismissRequest() },
             )
         )
 

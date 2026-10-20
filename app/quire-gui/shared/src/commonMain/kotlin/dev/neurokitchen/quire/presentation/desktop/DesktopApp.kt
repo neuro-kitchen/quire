@@ -1,6 +1,7 @@
 package dev.neurokitchen.quire.presentation.desktop
 
 import dev.neurokitchen.quire.presentation.components.commandpalette.CommandPaletteDialog
+import dev.neurokitchen.quire.presentation.components.graph.CitationGraphDialog
 import dev.neurokitchen.quire.presentation.screens.tools.ToolsRoute
 import dev.neurokitchen.quire.resources.Res
 import dev.neurokitchen.quire.resources.tools_title
@@ -62,6 +63,7 @@ fun DesktopApp(
                         onSettingsClick = onOpenSettings,
                         onToolsClick = { viewModel.onEvent(DesktopEvent.OnOpenPaper(ToolsTabId, toolsTitle)) },
                         onCommandPaletteClick = { viewModel.onEvent(DesktopEvent.OnToggleCommandPalette(true)) },
+                        onCitationGraphClick = { viewModel.onEvent(DesktopEvent.OnToggleCitationGraph(true)) },
                         onSetTheme = { viewModel.onEvent(DesktopEvent.OnSetAppTheme(it)) },
                     )
                     HorizontalDivider(color = QuireTheme.colors.paneDivider)
@@ -88,6 +90,15 @@ fun DesktopApp(
                     onOpenSettings = onOpenSettings,
                     onReload = onReload,
                     onOpenTools = { viewModel.onEvent(DesktopEvent.OnOpenPaper(ToolsTabId, toolsTitle)) },
+                    onOpenCitationGraph = { viewModel.onEvent(DesktopEvent.OnToggleCitationGraph(true)) },
+                )
+
+                // Local Citation Network Graph
+                CitationGraphDialog(
+                    isOpen = state.isCitationGraphOpen,
+                    onDismissRequest = { viewModel.onEvent(DesktopEvent.OnToggleCitationGraph(false)) },
+                    references = state.allReferences,
+                    onOpenPaper = { id, title -> viewModel.onEvent(DesktopEvent.OnOpenPaper(id, title)) },
                 )
             }
         }
