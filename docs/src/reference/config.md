@@ -13,7 +13,6 @@ file). Change them with `quire config set <key> <value>`; `*` is a name you choo
 | `library.default` | library used when none is chosen |
 | `libraries.*.path` | folder of a registered library (see `quire library new`) |
 | `peers.*.id` | a device to sync with: its ID (`quire sync id` on it) |
-| `access.proxy` | institutional proxy prefix, for opening publisher pages in your browser |
 | `access.downloads` | folder your browser saves downloads to (default: ~/Downloads) |
 | `export.*.format` | export profile: output format |
 | `export.*.omit` | export profile: fields left out, e.g. abstract,file,note |

@@ -38,9 +38,6 @@ pub async fn run(context: &Context, args: &ConfigArgs) -> anyhow::Result<()> {
         Action::Set { key, value } => {
             config::set(&file, key, value)?;
             output::report(Tone::Ok, "set", format!("{} = {value}", style::paint(style::KEY, key)));
-            if key == "access.proxy" {
-                output::hint("`quire pdf get --browser` opens publishers' pages through it in your browser.");
-            }
         }
         Action::Unset { key } => {
             if config::unset(&file, key)? {

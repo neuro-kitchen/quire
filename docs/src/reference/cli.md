@@ -1492,7 +1492,6 @@ Options:
       --all                Every reference in the library that has no PDF
   -v, --verbose            Show debug logs (requests, database)
       --browser            Try the download first; open only what fails in your browser, one at a time, and attach the PDF you download there
-      --direct             With --browser: open publishers' pages directly, not through the proxy (for Cloudflare checks that fail on the proxy, e.g. Wiley; use the publisher's institutional login or a VPN)
       --wait <WAIT>        With --browser: minutes to wait for each download [default: 5]
   -h, --help               Print help
 ```

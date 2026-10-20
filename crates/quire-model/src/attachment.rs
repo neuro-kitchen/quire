@@ -66,7 +66,7 @@ impl Attachment {
 name_enum! {
     /// Why the last `pdf get` for a reference without a PDF found none.
     pub enum PdfAttempt (unknown: crate::error::ModelError::UnknownIssue) {
-        /// A site refused scripts or showed a bot check, or the proxy needs a login.
+        /// A site refused scripts, showed a bot check or asked for a login.
         Blocked => "blocked",
         /// Every source was tried; none had a PDF.
         NotFound => "not-found",

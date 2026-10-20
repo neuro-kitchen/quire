@@ -1,6 +1,6 @@
-//! Lines that are not the paper: download stamps added by a proxy or publisher on every page, and
-//! running heads and feet (journal, volume and pages; "Author et al. / Journal…") that the
-//! converter left between paragraphs.
+//! Lines that are not the paper: download stamps added by an institution or publisher on every
+//! page, and running heads and feet (journal, volume and pages; "Author et al. / Journal…") that
+//! the converter left between paragraphs.
 
 use std::collections::HashMap;
 
