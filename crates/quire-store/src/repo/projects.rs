@@ -58,16 +58,16 @@ fn from_row(row: &Row) -> rusqlite::Result<Project> {
     })
 }
 
-pub fn by_id(conn: &Connection, id: ProjectId) -> Result<Option<Project>> {
+pub(super) fn by_id(conn: &Connection, id: ProjectId) -> Result<Option<Project>> {
     first(conn, &format!("SELECT {COLUMNS} FROM project WHERE id = ?1"), [id_blob(id)], from_row)
 }
 
-pub fn child(conn: &Connection, parent: Option<ProjectId>, slug: &Slug) -> Result<Option<Project>> {
+pub(super) fn child(conn: &Connection, parent: Option<ProjectId>, slug: &Slug) -> Result<Option<Project>> {
     let sql = format!("SELECT {COLUMNS} FROM project WHERE parent_id IS ?1 AND slug = ?2 AND deleted_at IS NULL");
     first(conn, &sql, params![parent.map(id_blob), slug.as_str()], from_row)
 }
 
-pub fn insert(conn: &Connection, project: &Project) -> Result<()> {
+pub(super) fn insert(conn: &Connection, project: &Project) -> Result<()> {
     let sql = "INSERT INTO project (id, parent_id, name, slug, created_at, updated_at, updated_by, deleted_at, owner)
                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)";
     let meta = &project.meta;
@@ -89,7 +89,7 @@ pub fn insert(conn: &Connection, project: &Project) -> Result<()> {
     Ok(())
 }
 
-pub fn update(conn: &Connection, project: &Project) -> Result<()> {
+pub(super) fn update(conn: &Connection, project: &Project) -> Result<()> {
     let sql =
         "UPDATE project SET parent_id = ?2, name = ?3, slug = ?4, updated_at = ?5, updated_by = ?6, deleted_at = ?7,
                owner = ?8 WHERE id = ?1";

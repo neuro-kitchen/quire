@@ -112,7 +112,7 @@ pub fn copy_in(library: &mut impl Library, reference: Reference, project: Option
 }
 
 /// The reference holding any of `data`'s identifiers.
-pub fn find_duplicate(library: &impl Library, data: &ReferenceData) -> Result<Option<Reference>> {
+pub(crate) fn find_duplicate(library: &impl Library, data: &ReferenceData) -> Result<Option<Reference>> {
     for identifier in &data.identifiers {
         if let Some(found) = library.reference_by_identifier(identifier)? {
             return Ok(Some(found));

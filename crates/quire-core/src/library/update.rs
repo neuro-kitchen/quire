@@ -47,7 +47,7 @@ fn all_fields() -> impl Iterator<Item = Field> {
 }
 
 /// `field` of `data` as text, for comparing and showing changes.
-pub fn field_text(data: &ReferenceData, field: Field) -> Option<String> {
+pub(crate) fn field_text(data: &ReferenceData, field: Field) -> Option<String> {
     let joined = |items: Vec<String>| Some(items.join("; ")).filter(|t| !t.is_empty());
     match field {
         Field::Kind => Some(data.kind.to_string()),
@@ -59,7 +59,7 @@ pub fn field_text(data: &ReferenceData, field: Field) -> Option<String> {
 }
 
 /// The changes that turn `current` into `new` under `mode`.
-pub fn plan(current: &Reference, new: &ReferenceData, mode: Mode) -> Vec<FieldChange> {
+pub(crate) fn plan(current: &Reference, new: &ReferenceData, mode: Mode) -> Vec<FieldChange> {
     let mut changes = Vec::new();
     for field in all_fields() {
         let old = field_text(&current.data, field);

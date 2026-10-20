@@ -18,7 +18,7 @@
 
 use quire_core::Result;
 use quire_core::citekey::free_key;
-use quire_core::sync::{Distinct, Membership, Merged, Relation, Row, Stamp, Tagging, merge_reference, newer};
+use quire_core::sync::{Distinct, Membership, MergeSummary, Relation, Row, Stamp, Tagging, merge_reference, newer};
 use quire_model::reference::parts;
 use quire_model::{
     Attachment, DeviceId, Highlight, Id, IdKind, Note, Project, ProjectMember, Reading, Reference, SavedSearch, Tag,
@@ -33,8 +33,12 @@ use crate::repo::{attachments, highlights, members, notes, projects, reading, re
 /// Merges `rows`; also returns the references this merge changed beyond what the sender sent
 /// (a new cite key, parts of the local copy, another ID): their change must reach every
 /// device, the sender too).
-pub fn merge(conn: &Connection, device: DeviceId, rows: Vec<Row>) -> Result<(Merged, Vec<quire_model::ReferenceId>)> {
-    let mut merged = Merged::default();
+pub(super) fn merge(
+    conn: &Connection,
+    device: DeviceId,
+    rows: Vec<Row>,
+) -> Result<(MergeSummary, Vec<quire_model::ReferenceId>)> {
+    let mut merged = MergeSummary::default();
     let mut relog = Vec::new();
     let (mut projects_in, mut tags_in, mut rest) = (Vec::new(), Vec::new(), Vec::new());
     for row in rows {
@@ -135,7 +139,7 @@ fn reference(
     conn: &Connection,
     device: DeviceId,
     incoming: Reference,
-    merged: &mut Merged,
+    merged: &mut MergeSummary,
     relog: &mut Vec<quire_model::ReferenceId>,
 ) -> Result<()> {
     let mut r = incoming;
@@ -205,7 +209,7 @@ fn reference(
     Ok(())
 }
 
-fn project(conn: &Connection, mut p: Project, merged: &mut Merged) -> Result<()> {
+fn project(conn: &Connection, mut p: Project, merged: &mut MergeSummary) -> Result<()> {
     p.id = alias(conn, p.id)?;
     p.parent = p.parent.map(|parent| alias(conn, parent)).transpose()?;
     let local = projects::by_id(conn, p.id)?;
@@ -236,7 +240,7 @@ fn project(conn: &Connection, mut p: Project, merged: &mut Merged) -> Result<()>
     Ok(())
 }
 
-fn tag(conn: &Connection, mut t: Tag, merged: &mut Merged) -> Result<()> {
+fn tag(conn: &Connection, mut t: Tag, merged: &mut MergeSummary) -> Result<()> {
     t.id = alias(conn, t.id)?;
     let local = tags::by_id(conn, t.id)?;
     if local.is_none()
@@ -284,7 +288,7 @@ fn wins(incoming: &Stamp, stored: Option<Stamp>) -> bool {
     stored.is_none_or(|s| newer((incoming.updated_at, incoming.updated_by), (s.updated_at, s.updated_by)))
 }
 
-fn membership(conn: &Connection, mut m: Membership, merged: &mut Merged) -> Result<()> {
+fn membership(conn: &Connection, mut m: Membership, merged: &mut MergeSummary) -> Result<()> {
     m.project = alias(conn, m.project)?;
     m.reference = alias(conn, m.reference)?;
     if projects::by_id(conn, m.project)?.is_none() || !reference_exists(conn, m.reference)? {
@@ -318,7 +322,7 @@ fn membership(conn: &Connection, mut m: Membership, merged: &mut Merged) -> Resu
     Ok(())
 }
 
-fn tagging(conn: &Connection, mut t: Tagging, merged: &mut Merged) -> Result<()> {
+fn tagging(conn: &Connection, mut t: Tagging, merged: &mut MergeSummary) -> Result<()> {
     t.tag = alias(conn, t.tag)?;
     t.reference = alias(conn, t.reference)?;
     if tags::by_id(conn, t.tag)?.is_none() || !reference_exists(conn, t.reference)? {
@@ -352,7 +356,7 @@ fn tagging(conn: &Connection, mut t: Tagging, merged: &mut Merged) -> Result<()>
     Ok(())
 }
 
-fn relation(conn: &Connection, mut r: Relation, merged: &mut Merged) -> Result<()> {
+fn relation(conn: &Connection, mut r: Relation, merged: &mut MergeSummary) -> Result<()> {
     (r.a, r.b) = ordered(alias(conn, r.a)?, alias(conn, r.b)?);
     if !reference_exists(conn, r.a)? || !reference_exists(conn, r.b)? {
         merged.kept += 1;
@@ -376,7 +380,7 @@ fn relation(conn: &Connection, mut r: Relation, merged: &mut Merged) -> Result<(
     Ok(())
 }
 
-fn note(conn: &Connection, mut n: Note, merged: &mut Merged) -> Result<()> {
+fn note(conn: &Connection, mut n: Note, merged: &mut MergeSummary) -> Result<()> {
     n.reference = n.reference.map(|r| alias(conn, r)).transpose()?;
     if let Some(reference) = n.reference
         && !reference_exists(conn, reference)?
@@ -402,7 +406,7 @@ fn note(conn: &Connection, mut n: Note, merged: &mut Merged) -> Result<()> {
     Ok(())
 }
 
-fn highlight(conn: &Connection, mut h: Highlight, merged: &mut Merged) -> Result<()> {
+fn highlight(conn: &Connection, mut h: Highlight, merged: &mut MergeSummary) -> Result<()> {
     h.reference = alias(conn, h.reference)?;
     if !reference_exists(conn, h.reference)? {
         merged.kept += 1;
@@ -426,7 +430,7 @@ fn highlight(conn: &Connection, mut h: Highlight, merged: &mut Merged) -> Result
     Ok(())
 }
 
-fn attachment(conn: &Connection, mut a: Attachment, merged: &mut Merged) -> Result<()> {
+fn attachment(conn: &Connection, mut a: Attachment, merged: &mut MergeSummary) -> Result<()> {
     a.reference = alias(conn, a.reference)?;
     if !reference_exists(conn, a.reference)? {
         merged.kept += 1;
@@ -459,7 +463,7 @@ fn attachment(conn: &Connection, mut a: Attachment, merged: &mut Merged) -> Resu
     Ok(())
 }
 
-fn distinct(conn: &Connection, mut d: Distinct, merged: &mut Merged) -> Result<()> {
+fn distinct(conn: &Connection, mut d: Distinct, merged: &mut MergeSummary) -> Result<()> {
     (d.a, d.b) = ordered(alias(conn, d.a)?, alias(conn, d.b)?);
     if !reference_exists(conn, d.a)? || !reference_exists(conn, d.b)? {
         merged.kept += 1;
@@ -479,7 +483,7 @@ fn distinct(conn: &Connection, mut d: Distinct, merged: &mut Merged) -> Result<(
     Ok(())
 }
 
-fn reading(conn: &Connection, mut r: Reading, merged: &mut Merged) -> Result<()> {
+fn reading(conn: &Connection, mut r: Reading, merged: &mut MergeSummary) -> Result<()> {
     r.reference = alias(conn, r.reference)?;
     if !reference_exists(conn, r.reference)? {
         merged.kept += 1;
@@ -499,7 +503,7 @@ fn reading(conn: &Connection, mut r: Reading, merged: &mut Merged) -> Result<()>
     Ok(())
 }
 
-fn member(conn: &Connection, mut m: ProjectMember, merged: &mut Merged) -> Result<()> {
+fn member(conn: &Connection, mut m: ProjectMember, merged: &mut MergeSummary) -> Result<()> {
     m.project = alias(conn, m.project)?;
     if projects::by_id(conn, m.project)?.is_none() {
         merged.kept += 1;
@@ -519,7 +523,7 @@ fn member(conn: &Connection, mut m: ProjectMember, merged: &mut Merged) -> Resul
     Ok(())
 }
 
-fn saved_search(conn: &Connection, s: SavedSearch, merged: &mut Merged) -> Result<()> {
+fn saved_search(conn: &Connection, s: SavedSearch, merged: &mut MergeSummary) -> Result<()> {
     let local = reading::search_by_id(conn, s.id)?;
     if let Some(local) = &local
         && !newer((s.meta.updated_at, s.meta.updated_by), (local.meta.updated_at, local.meta.updated_by))

@@ -10,15 +10,15 @@ use super::core::{LinkTable, all};
 
 const MEMBERS: LinkTable = LinkTable { table: "project_reference", keys: ["project_id", "reference_id"] };
 
-pub fn link(conn: &Connection, reference: ReferenceId, project: ProjectId, device: DeviceId) -> Result<bool> {
+pub(super) fn link(conn: &Connection, reference: ReferenceId, project: ProjectId, device: DeviceId) -> Result<bool> {
     MEMBERS.set(conn, [id_blob(project), id_blob(reference)], None, device)
 }
 
-pub fn unlink(conn: &Connection, reference: ReferenceId, project: ProjectId, device: DeviceId) -> Result<bool> {
+pub(super) fn unlink(conn: &Connection, reference: ReferenceId, project: ProjectId, device: DeviceId) -> Result<bool> {
     MEMBERS.clear(conn, [id_blob(project), id_blob(reference)], device)
 }
 
-pub fn projects_of(conn: &Connection, reference: ReferenceId) -> Result<Vec<ProjectId>> {
+pub(super) fn projects_of(conn: &Connection, reference: ReferenceId) -> Result<Vec<ProjectId>> {
     let sql = "SELECT project_id FROM project_reference
                WHERE reference_id = ?1 AND deleted_at IS NULL
                  AND project_id IN (SELECT id FROM project WHERE deleted_at IS NULL)";

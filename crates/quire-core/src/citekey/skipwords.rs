@@ -126,7 +126,7 @@ const SKIP_WORDS: &[&str] = &[
 ];
 
 /// Whether `word` (any case) is a skip word.
-pub fn is_skip_word(word: &str) -> bool {
+pub(super) fn is_skip_word(word: &str) -> bool {
     SKIP_WORDS.iter().any(|skip| skip.eq_ignore_ascii_case(word))
 }
 

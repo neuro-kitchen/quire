@@ -62,13 +62,13 @@ fn reading_from_row(row: &Row) -> rusqlite::Result<Reading> {
     })
 }
 
-pub fn reading_by_id(conn: &Connection, reference: ReferenceId) -> Result<Option<Reading>> {
+pub(super) fn reading_by_id(conn: &Connection, reference: ReferenceId) -> Result<Option<Reading>> {
     let sql = format!("SELECT {READING_COLUMNS} FROM reading WHERE reference_id = ?1");
     first(conn, &sql, [id_blob(reference)], reading_from_row)
 }
 
 /// Inserts or replaces the reading status of its reference.
-pub fn set_reading(conn: &Connection, r: &Reading) -> Result<()> {
+pub(super) fn set_reading(conn: &Connection, r: &Reading) -> Result<()> {
     let sql = format!(
         "INSERT INTO reading ({READING_COLUMNS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
          ON CONFLICT (reference_id) DO UPDATE SET status = excluded.status, started_at = excluded.started_at,
@@ -99,11 +99,11 @@ fn search_from_row(row: &Row) -> rusqlite::Result<SavedSearch> {
     Ok(SavedSearch { id: id_at(row, "id")?, name: row.get("name")?, query: row.get("query")?, meta: meta_at(row)? })
 }
 
-pub fn search_by_id(conn: &Connection, id: SavedSearchId) -> Result<Option<SavedSearch>> {
+pub(super) fn search_by_id(conn: &Connection, id: SavedSearchId) -> Result<Option<SavedSearch>> {
     first(conn, &format!("SELECT {SEARCH_COLUMNS} FROM saved_search WHERE id = ?1"), [id_blob(id)], search_from_row)
 }
 
-pub fn insert_search(conn: &Connection, s: &SavedSearch) -> Result<()> {
+pub(super) fn insert_search(conn: &Connection, s: &SavedSearch) -> Result<()> {
     let sql = "INSERT INTO saved_search (id, name, key, query, created_at, updated_at, updated_by, deleted_at)
                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)";
     let m = &s.meta;
@@ -124,7 +124,7 @@ pub fn insert_search(conn: &Connection, s: &SavedSearch) -> Result<()> {
     Ok(())
 }
 
-pub fn update_search(conn: &Connection, s: &SavedSearch) -> Result<()> {
+pub(super) fn update_search(conn: &Connection, s: &SavedSearch) -> Result<()> {
     let sql =
         "UPDATE saved_search SET name = ?2, key = ?3, query = ?4, updated_at = ?5, updated_by = ?6, deleted_at = ?7
                WHERE id = ?1";

@@ -226,7 +226,7 @@ fn key(row: &Row) -> String {
 #[cfg(test)]
 mod tests {
     use quire_core::library::{projects, references, sharing, tags};
-    use quire_core::sync::Merged;
+    use quire_core::sync::MergeSummary;
     use quire_core::{AddRequest, ReferenceFilter};
     use quire_model::{EntryKind, Identifier, Origin, ReferenceData, Role, TagKind, TextField};
     use rusqlite::Connection;
@@ -249,7 +249,12 @@ mod tests {
     }
 
     /// One direction of a session between two people's libraries.
-    fn send(from: &SqliteLibrary, from_user: &UserId, to: &mut SqliteLibrary, to_user: &UserId) -> (Merged, usize) {
+    fn send(
+        from: &SqliteLibrary,
+        from_user: &UserId,
+        to: &mut SqliteLibrary,
+        to_user: &UserId,
+    ) -> (MergeSummary, usize) {
         let peer = from.device.to_string();
         let since = to.received_from(&peer).unwrap();
         let (rows, last) = from.changes_since(since, &to.device.to_string()).unwrap();

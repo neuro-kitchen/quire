@@ -28,7 +28,7 @@ impl From<StoreError> for CoreError {
 }
 
 /// `?` from store results inside `Library` methods (which return `quire_core::Result`).
-pub trait OrCore<T> {
+pub(crate) trait OrCore<T> {
     fn or_core(self) -> quire_core::Result<T>;
 }
 

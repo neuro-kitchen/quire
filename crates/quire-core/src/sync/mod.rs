@@ -117,7 +117,7 @@ pub fn newer(incoming: (Timestamp, DeviceId), stored: (Timestamp, DeviceId)) -> 
 
 /// What merging a batch of rows did.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Merged {
+pub struct MergeSummary {
     /// Rows written (new or newer).
     pub applied: usize,
     /// Rows older than (or the same as) what was here.

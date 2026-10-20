@@ -6,14 +6,14 @@ mod rows;
 mod share;
 
 use quire_core::Result;
-use quire_core::sync::{Merged, Row};
+use quire_core::sync::{MergeSummary, Row};
 use rusqlite::{OptionalExtension, params};
 
 use super::SqliteLibrary;
 use crate::error::OrCore;
 
 /// Changes sent at most in one batch (the rest follow in the next).
-pub const BATCH: usize = 500;
+pub(super) const BATCH: usize = 500;
 
 impl SqliteLibrary<'_> {
     /// The library's identity, shared by every device that syncs it.
@@ -96,7 +96,7 @@ impl SqliteLibrary<'_> {
 
     /// Merges rows from the device `from` (`merge` has the rules). The changes it makes are
     /// marked as coming from `from`, so they are not sent back to it, except renames made here.
-    pub fn merge(&mut self, rows: Vec<Row>, from: &str) -> Result<Merged> {
+    pub fn merge(&mut self, rows: Vec<Row>, from: &str) -> Result<MergeSummary> {
         let conn = self.conn;
         conn.execute("INSERT OR REPLACE INTO sync_state (key, value) VALUES ('merging_from', ?1)", [from]).or_core()?;
         let result = merge::merge(conn, self.device, rows);
@@ -137,9 +137,9 @@ mod tests {
     }
 
     /// Sends everything `from` has that `to` has not received, as a sync session would.
-    fn sync(from: &SqliteLibrary, to: &mut SqliteLibrary) -> Merged {
+    fn sync(from: &SqliteLibrary, to: &mut SqliteLibrary) -> MergeSummary {
         let peer = from.device.to_string();
-        let mut total = Merged::default();
+        let mut total = MergeSummary::default();
         loop {
             let since = to.received_from(&peer).unwrap();
             let (rows, last) = from.changes_since(since, &to.device.to_string()).unwrap();

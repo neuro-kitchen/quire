@@ -13,7 +13,7 @@ use crate::error::Result;
 
 /// A key for `data` that `taken` does not report as used: the formula's key, else the first free
 /// of `key` + `a`, `b`, …, `z`, `aa`, `ab`, …
-pub fn unique_key(data: &ReferenceData, taken: impl Fn(&str) -> Result<bool>) -> Result<CiteKey> {
+pub(crate) fn unique_key(data: &ReferenceData, taken: impl Fn(&str) -> Result<bool>) -> Result<CiteKey> {
     free_key(&base_key(data), taken)
 }
 

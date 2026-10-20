@@ -88,18 +88,18 @@ fn kind_from(name: &str) -> Option<PdfKind> {
     })
 }
 
-pub fn of(conn: &Connection, reference: ReferenceId) -> Result<Vec<Attachment>> {
+pub(super) fn of(conn: &Connection, reference: ReferenceId) -> Result<Vec<Attachment>> {
     let sql =
         format!("SELECT {COLUMNS} FROM attachment WHERE reference_id = ?1 AND deleted_at IS NULL ORDER BY created_at");
     all(conn, &sql, [id_blob(reference)], from_row)
 }
 
-pub fn by_id(conn: &Connection, id: AttachmentId) -> Result<Option<Attachment>> {
+pub(super) fn by_id(conn: &Connection, id: AttachmentId) -> Result<Option<Attachment>> {
     let sql = format!("SELECT {COLUMNS} FROM attachment WHERE id = ?1");
     first(conn, &sql, [id_blob(id)], from_row)
 }
 
-pub fn insert(conn: &Connection, a: &Attachment) -> Result<()> {
+pub(super) fn insert(conn: &Connection, a: &Attachment) -> Result<()> {
     let sql =
         format!("INSERT INTO attachment ({COLUMNS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)");
     conn.execute(
@@ -124,7 +124,7 @@ pub fn insert(conn: &Connection, a: &Attachment) -> Result<()> {
     Ok(())
 }
 
-pub fn update(conn: &Connection, a: &Attachment) -> Result<()> {
+pub(super) fn update(conn: &Connection, a: &Attachment) -> Result<()> {
     // `reference_id` too: merging duplicates moves attachments to the kept reference.
     let sql = "UPDATE attachment SET filename = ?2, pdf_kind = ?3, pages = ?4, updated_at = ?5, updated_by = ?6,
                deleted_at = ?7, reference_id = ?8 WHERE id = ?1";

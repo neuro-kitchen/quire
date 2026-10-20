@@ -39,13 +39,13 @@ fn from_row(row: &Row) -> rusqlite::Result<ProjectMember> {
 }
 
 /// The membership of `user` in `project`, removed or not.
-pub fn get(conn: &Connection, project: ProjectId, user: &str) -> Result<Option<ProjectMember>> {
+pub(super) fn get(conn: &Connection, project: ProjectId, user: &str) -> Result<Option<ProjectMember>> {
     let sql = format!("SELECT {COLUMNS} FROM project_member WHERE project_id = ?1 AND user_id = ?2");
     first(conn, &sql, params![id_blob(project), user], from_row)
 }
 
 /// Inserts or replaces a membership.
-pub fn set(conn: &Connection, m: &ProjectMember) -> Result<()> {
+pub(super) fn set(conn: &Connection, m: &ProjectMember) -> Result<()> {
     let sql = format!(
         "INSERT INTO project_member ({COLUMNS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
          ON CONFLICT (project_id, user_id) DO UPDATE SET name = excluded.name, role = excluded.role,

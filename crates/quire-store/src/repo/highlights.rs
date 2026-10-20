@@ -44,12 +44,12 @@ fn from_row(row: &Row) -> rusqlite::Result<Highlight> {
     })
 }
 
-pub fn by_id(conn: &Connection, id: HighlightId) -> Result<Option<Highlight>> {
+pub(super) fn by_id(conn: &Connection, id: HighlightId) -> Result<Option<Highlight>> {
     let sql = format!("SELECT {COLUMNS} FROM highlight WHERE id = ?1");
     first(conn, &sql, [id_blob(id)], from_row)
 }
 
-pub fn insert(conn: &Connection, h: &Highlight) -> Result<()> {
+pub(super) fn insert(conn: &Connection, h: &Highlight) -> Result<()> {
     let sql = format!("INSERT INTO highlight ({COLUMNS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)");
     let m = &h.meta;
     conn.execute(
@@ -71,7 +71,7 @@ pub fn insert(conn: &Connection, h: &Highlight) -> Result<()> {
 }
 
 /// Writes a highlight's changes (comment, the reference after a merge, soft delete).
-pub fn update(conn: &Connection, h: &Highlight) -> Result<()> {
+pub(super) fn update(conn: &Connection, h: &Highlight) -> Result<()> {
     let sql = "UPDATE highlight SET reference_id = ?2, comment = ?3, updated_at = ?4, updated_by = ?5, deleted_at = ?6
                WHERE id = ?1";
     let m = &h.meta;

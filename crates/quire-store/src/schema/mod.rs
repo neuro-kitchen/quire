@@ -4,7 +4,7 @@
 use rusqlite_migration::{M, Migrations};
 
 /// Every migration, oldest first.
-pub fn migrations() -> Migrations<'static> {
+pub(crate) fn migrations() -> Migrations<'static> {
     Migrations::new(vec![
         M::up(include_str!("001_initial.sql")),
         M::up(include_str!("002_issues.sql")),
