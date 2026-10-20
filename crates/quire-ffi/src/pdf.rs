@@ -2,10 +2,10 @@
 //!
 //! Positions are in PDF points (1/72 inch) from the page's top-left corner.
 //!
-//! `PageSize`, `RenderedPage`, `PageRect` and `QuoteMatch` are `quire-document`'s own types, sent
+//! `PageSize`, `RenderedPage`, `PageRect`, `QuoteMatch` and `TextMatch` are `quire-document`'s own types, sent
 //! as they are (UniFFI remote records: the compiler checks the field lists below against them).
 
-pub use quire_document::pdf::{PageRect, PageSize, QuoteMatch, RenderedPage};
+pub use quire_document::pdf::{PageRect, PageSize, QuoteMatch, RenderedPage, TextMatch};
 
 use crate::{QuireError, Result, on_runtime};
 
@@ -39,6 +39,13 @@ pub struct QuoteMatch {
     pub rects: Vec<PageRect>,
 }
 
+/// One place [`pdf_search`] found: its page and line boxes.
+#[uniffi::remote(Record)]
+pub struct TextMatch {
+    pub page: u32,
+    pub rects: Vec<PageRect>,
+}
+
 /// Word bounding record for PDF text layer hit-testing.
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
 pub struct PdfWordRecord {
@@ -54,12 +61,6 @@ pub struct PdfWordRecord {
 pub struct TextRangeRecord {
     pub text: String,
     pub rects: Vec<PageRect>,
-}
-
-/// No-op initialization kept for backwards compatibility with existing UI callers.
-#[uniffi::export]
-pub fn pdf_init(_library_dir: Option<String>) -> Result<()> {
-    Ok(())
 }
 
 /// The size of every page in points.
@@ -78,6 +79,13 @@ pub async fn pdf_render_page(path: String, index: u32, width: u32) -> Result<Ren
 #[uniffi::export]
 pub async fn pdf_find(path: String, quotes: Vec<String>) -> Result<Vec<QuoteMatch>> {
     blocking(move || quire_document::pdf::locate(&path, &quotes).map_err(pdf_error)).await
+}
+
+/// Every place `query` appears (the reader's find), in page order, at most `limit`: its words in
+/// order, ignoring case and punctuation, the last one as the start of a word.
+#[uniffi::export]
+pub async fn pdf_search(path: String, query: String, limit: u32) -> Result<Vec<TextMatch>> {
+    blocking(move || quire_document::pdf::search(&path, &query, limit as usize).map_err(pdf_error)).await
 }
 
 /// Finds the word at point `(x, y)` on page `page` (points from top-left).
