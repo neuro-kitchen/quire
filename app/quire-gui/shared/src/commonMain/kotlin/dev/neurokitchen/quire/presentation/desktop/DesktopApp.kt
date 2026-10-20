@@ -15,19 +15,26 @@ import dev.neurokitchen.quire.presentation.screens.reader.ReaderRoute
 import dev.neurokitchen.quire.presentation.screens.settings.SettingsRoute
 import org.koin.compose.viewmodel.koinViewModel
 
-/** The desktop main window's content: tab bar above the library or an open paper (Zotero layout). */
+/** The desktop main window's content: tab bar above the library or an open paper. */
 @Composable
-fun DesktopApp(viewModel: DesktopViewModel = koinViewModel()) {
+fun DesktopApp(
+    viewModel: DesktopViewModel = koinViewModel(),
+    onOpenSettings: () -> Unit = {},
+    onReload: () -> Unit = {},
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    QuireTheme(desktop = true) {
+    QuireTheme(appTheme = state.appTheme, desktop = true) {
         Surface {
             Column(Modifier.fillMaxSize()) {
                 TabBar(
                     papers = state.papers,
                     selected = state.selected,
+                    currentTheme = state.appTheme,
                     onSelect = { viewModel.onEvent(DesktopEvent.OnSelectTab(it)) },
                     onClose = { viewModel.onEvent(DesktopEvent.OnCloseTab(it)) },
-                    onSyncClick = {},
+                    onSyncClick = onReload,
+                    onSettingsClick = onOpenSettings,
+                    onSetTheme = { viewModel.onEvent(DesktopEvent.OnSetAppTheme(it)) },
                 )
                 HorizontalDivider(color = QuireTheme.colors.paneDivider)
                 val paper = state.papers.firstOrNull { it.id == state.selected }
