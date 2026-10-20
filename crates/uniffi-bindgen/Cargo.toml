@@ -1,0 +1,12 @@
+[package]
+name = "uniffi-bindgen"
+description = "Generates the Kotlin bindings of quire-ffi for the apps (`app/`)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+uniffi = { workspace = true, features = ["cli"] }
