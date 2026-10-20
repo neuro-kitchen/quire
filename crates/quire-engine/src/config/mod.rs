@@ -87,6 +87,8 @@ pub struct ReaderSettings {
     /// `"1"` or `"2"`.
     pub spacing: Option<String>,
     pub theme: Option<String>,
+    /// Tesseract's language codes for OCR of scans (`eng`, `deu`, `eng+fra`).
+    pub ocr_language: Option<String>,
 }
 
 /// How to write an export (Better BibTeX's export options).

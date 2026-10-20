@@ -1,27 +1,15 @@
 //! The first milestone end to end through the engine: create projects, add by DOI and arXiv
 //! (mock doi.org), add again without fetching, import a `.bib`, export, trash.
 
-use quire_engine::{Added, AutoExportOutcome, Endpoints, Engine, ExportFormat, ExportRequest, OpenOptions, SlugPath};
-use url::Url;
+mod common;
+use common::{engine, fixture};
+
+use quire_engine::{Added, AutoExportOutcome, Engine, ExportFormat, ExportRequest, OpenOptions, SlugPath};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-fn fixture(name: &str) -> String {
-    std::fs::read_to_string(format!("{}/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"))).unwrap()
-}
-
 fn slug_path(text: &str) -> SlugPath {
     text.parse().unwrap()
-}
-
-async fn engine(dir: &tempfile::TempDir, server: &MockServer) -> Engine {
-    let base = Url::parse(&format!("{}/", server.uri())).unwrap();
-    let options = OpenOptions {
-        library: quire_engine::LibraryChoice::Path(dir.path().join("library")),
-        config_file: Some(dir.path().join("config.toml")),
-        endpoints: Some(Endpoints::all_at(&base)),
-    };
-    Engine::open(options).await.unwrap()
 }
 
 #[tokio::test]
@@ -36,7 +24,7 @@ async fn projects_add_import_export() {
     serve("/10.48550/arXiv.1706.03762", "csl-arxiv-1706.03762.json").expect(1).mount(&server).await;
 
     let dir = tempfile::tempdir().unwrap();
-    let engine = engine(&dir, &server).await;
+    let engine = engine(dir.path(), Some(&server)).await;
     engine.create_project("Thesis", None).await.unwrap();
     engine.create_project("Chapter 1", Some(&slug_path("thesis"))).await.unwrap();
 
@@ -88,7 +76,7 @@ async fn projects_add_import_export() {
 async fn unknown_project_is_checked_before_fetching() {
     let server = MockServer::start().await;
     let dir = tempfile::tempdir().unwrap();
-    let engine = engine(&dir, &server).await;
+    let engine = engine(dir.path(), Some(&server)).await;
     let error = engine.add("10.1038/nature12373", Some(&slug_path("nope"))).await.unwrap_err();
     assert!(error.to_string().contains("no project `nope`"), "{error}");
     assert!(server.received_requests().await.unwrap().is_empty());
@@ -99,11 +87,11 @@ async fn library_persists_between_opens() {
     let server = MockServer::start().await;
     let dir = tempfile::tempdir().unwrap();
     let device = {
-        let engine = engine(&dir, &server).await;
+        let engine = engine(dir.path(), Some(&server)).await;
         engine.create_project("kept", None).await.unwrap();
         engine.device()
     };
-    let engine = engine(&dir, &server).await;
+    let engine = engine(dir.path(), Some(&server)).await;
     assert_eq!(engine.device(), device);
     assert_eq!(engine.projects().await.unwrap().len(), 1);
 }
@@ -112,7 +100,7 @@ async fn library_persists_between_opens() {
 async fn copy_between_libraries_keeps_the_id() {
     let server = MockServer::start().await;
     let dir = tempfile::tempdir().unwrap();
-    let source = engine(&dir, &server).await;
+    let source = engine(dir.path(), Some(&server)).await;
     let bib = dir.path().join("refs.bib");
     std::fs::write(
         &bib,
@@ -139,7 +127,7 @@ async fn copy_between_libraries_keeps_the_id() {
 async fn rename_and_remove_projects() {
     let server = MockServer::start().await;
     let dir = tempfile::tempdir().unwrap();
-    let engine = engine(&dir, &server).await;
+    let engine = engine(dir.path(), Some(&server)).await;
     engine.create_project("Thesis", None).await.unwrap();
     engine.create_project("Draft", Some(&slug_path("thesis"))).await.unwrap();
     let (path, _) = engine.rename_project(&slug_path("thesis/draft"), "Chapter 1").await.unwrap();
@@ -155,7 +143,7 @@ async fn rename_and_remove_projects() {
 async fn failed_lookups_are_recorded_until_added() {
     let server = MockServer::start().await;
     let dir = tempfile::tempdir().unwrap();
-    let engine = engine(&dir, &server).await;
+    let engine = engine(dir.path(), Some(&server)).await;
     engine.create_project("Thesis", None).await.unwrap();
     assert!(engine.add("10.1038/nature12373", Some(&slug_path("thesis"))).await.is_err());
     let failures = engine.failures().await.unwrap();
@@ -189,7 +177,7 @@ async fn check_reports_lints_and_recorded_fallbacks() {
         .mount(&server)
         .await;
     let dir = tempfile::tempdir().unwrap();
-    let engine = engine(&dir, &server).await;
+    let engine = engine(dir.path(), Some(&server)).await;
     engine.add("10.1038/nature12373", None).await.unwrap();
     let bib = dir.path().join("refs.bib");
     std::fs::write(&bib, "@misc{untitled, note = {nothing else}}").unwrap();
@@ -213,7 +201,7 @@ async fn refetch_keeps_user_edits() {
         .mount(&server)
         .await;
     let dir = tempfile::tempdir().unwrap();
-    let engine = engine(&dir, &server).await;
+    let engine = engine(dir.path(), Some(&server)).await;
     let added = engine.add("10.1038/nature12373", None).await.unwrap().reference().clone();
 
     // The user edits the title and the cite key.
@@ -243,7 +231,7 @@ async fn profiles_and_automatic_exports() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("config.toml"), "[export.typst]\nformat = \"hayagriva\"\nomit = [\"note\"]\n")
         .unwrap();
-    let engine = engine(&dir, &server).await;
+    let engine = engine(dir.path(), Some(&server)).await;
     engine.create_project("Paper", None).await.unwrap();
     let bib = dir.path().join("in.bib");
     std::fs::write(
@@ -278,7 +266,7 @@ async fn profiles_and_automatic_exports() {
 async fn keywords_become_tags_and_tags_export_as_keywords() {
     let server = MockServer::start().await;
     let dir = tempfile::tempdir().unwrap();
-    let engine = engine(&dir, &server).await;
+    let engine = engine(dir.path(), Some(&server)).await;
     let bib = dir.path().join("in.bib");
     std::fs::write(
         &bib,
@@ -304,7 +292,7 @@ async fn keywords_become_tags_and_tags_export_as_keywords() {
 async fn subscribers_hear_about_changes() {
     let server = MockServer::start().await;
     let dir = tempfile::tempdir().unwrap();
-    let engine = engine(&dir, &server).await;
+    let engine = engine(dir.path(), Some(&server)).await;
     let mut changes = engine.subscribe();
     let bib = dir.path().join("in.bib");
     std::fs::write(&bib, "@book{knuth1984, title = {The TeXbook}, author = {Knuth, D.}, date = {1984}}").unwrap();

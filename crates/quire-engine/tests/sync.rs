@@ -2,7 +2,10 @@
 //! carries the same session): a new copy joins, gets references, a note, a highlight and the PDF
 //! file; nothing is sent twice; a later change on either side reaches the other.
 
-use quire_engine::{Engine, LibraryChoice, OpenOptions, SyncRole};
+mod common;
+use common::{engine, tiny_pdf};
+
+use quire_engine::{Engine, SyncRole};
 
 const BIB: &str = "@article{rivera2025,
   title = {Diaphragm pacing restores breathing after injury},
@@ -10,40 +13,6 @@ const BIB: &str = "@article{rivera2025,
   journal = {Journal of Tests},
   year = {2025},
 }";
-
-/// A one-page PDF showing `text`.
-fn tiny_pdf(text: &str) -> Vec<u8> {
-    let stream = format!("BT /F1 12 Tf 72 720 Td ({text}) Tj ET");
-    let objects = [
-        "<< /Type /Catalog /Pages 2 0 R >>".to_string(),
-        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_string(),
-        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>".to_string(),
-        format!("<< /Length {} >>\nstream\n{stream}\nendstream", stream.len()),
-        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_string(),
-    ];
-    let mut pdf = String::from("%PDF-1.4\n");
-    let mut offsets = Vec::new();
-    for (i, body) in objects.iter().enumerate() {
-        offsets.push(pdf.len());
-        pdf.push_str(&format!("{} 0 obj\n{body}\nendobj\n", i + 1));
-    }
-    let xref = pdf.len();
-    pdf.push_str(&format!("xref\n0 {}\n0000000000 65535 f \n", objects.len() + 1));
-    for offset in offsets {
-        pdf.push_str(&format!("{offset:010} 00000 n \n"));
-    }
-    pdf.push_str(&format!("trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n", objects.len() + 1));
-    pdf.into_bytes()
-}
-
-async fn engine(dir: &std::path::Path) -> Engine {
-    let options = OpenOptions {
-        library: LibraryChoice::Path(dir.join("library")),
-        config_file: Some(dir.join("config.toml")),
-        endpoints: None,
-    };
-    Engine::open(options).await.unwrap()
-}
 
 /// One session between `a` (connecting) and `b`.
 async fn sync(a: &Engine, b: &Engine) -> (quire_engine::SyncReport, quire_engine::SyncReport) {
@@ -60,7 +29,9 @@ async fn sync(a: &Engine, b: &Engine) -> (quire_engine::SyncReport, quire_engine
 #[tokio::test]
 async fn a_new_device_joins_and_changes_flow_both_ways() {
     let (dir_a, dir_b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
-    let (a, b) = (engine(dir_a.path()).await, engine(dir_b.path()).await);
+    let (a, b) = (engine(dir_a.path(), None).await, engine(dir_b.path(), None).await);
+    // Two devices of one person: the same user key.
+    b.import_user_key(&a.export_user_key().unwrap()).unwrap();
     let bib = dir_a.path().join("refs.bib");
     std::fs::write(&bib, BIB).unwrap();
     let key = a.import_bib(&bib, None).await.unwrap()[0].reference().cite_key.to_string();
@@ -98,18 +69,67 @@ async fn a_new_device_joins_and_changes_flow_both_ways() {
     assert_eq!(a.tags_of(vec![on_b.id]).await.unwrap()[&on_b.id].len(), 1);
 }
 
-#[tokio::test]
-async fn two_libraries_with_data_do_not_mix() {
-    let (dir_a, dir_b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
-    let (a, b) = (engine(dir_a.path()).await, engine(dir_b.path()).await);
-    a.create_project("Thesis", None).await.unwrap();
-    b.create_project("Lab", None).await.unwrap();
+/// One session, keeping the errors.
+async fn try_sync(
+    a: &Engine,
+    b: &Engine,
+) -> (quire_engine::Result<quire_engine::SyncReport>, quire_engine::Result<quire_engine::SyncReport>) {
     let (left, right) = tokio::io::duplex(64 * 1024);
     let (mut lr, mut lw) = tokio::io::split(left);
     let (mut rr, mut rw) = tokio::io::split(right);
-    let (client, server) = tokio::join!(
-        a.sync_session(SyncRole::Client, &mut lr, &mut lw),
-        b.sync_session(SyncRole::Server, &mut rr, &mut rw),
-    );
+    tokio::join!(a.sync_session(SyncRole::Client, &mut lr, &mut lw), b.sync_session(SyncRole::Server, &mut rr, &mut rw),)
+}
+
+#[tokio::test]
+async fn one_persons_two_libraries_do_not_mix() {
+    let (dir_a, dir_b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let (a, b) = (engine(dir_a.path(), None).await, engine(dir_b.path(), None).await);
+    b.import_user_key(&a.export_user_key().unwrap()).unwrap();
+    a.create_project("Thesis", None).await.unwrap();
+    b.create_project("Lab", None).await.unwrap();
+    let (client, server) = try_sync(&a, &b).await;
     assert!(client.is_err() && server.is_err(), "different libraries are refused");
+}
+
+#[tokio::test]
+async fn collaborators_see_only_what_is_shared() {
+    let (dir_bob, dir_alice) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let (bob, alice) = (engine(dir_bob.path(), None).await, engine(dir_alice.path(), None).await);
+    let bib = dir_bob.path().join("refs.bib");
+    std::fs::write(&bib, BIB).unwrap();
+    let key = bob.import_bib(&bib, None).await.unwrap()[0].reference().cite_key.to_string();
+    bob.create_project("Lab", None).await.unwrap();
+    bob.create_project("Private", None).await.unwrap();
+    let lab: quire_engine::SlugPath = "lab".parse().unwrap();
+    bob.link(&key, &lab).await.unwrap();
+    bob.add_note(Some(&key), "bob's thoughts").await.unwrap();
+    let pdf = dir_bob.path().join("rivera.pdf");
+    std::fs::write(&pdf, tiny_pdf("Diaphragm pacing restores breathing after injury")).unwrap();
+    bob.attach_file(&key, &pdf, false).await.unwrap();
+    alice.create_project("Mine", None).await.unwrap();
+
+    // Not shared yet: a session works and moves nothing.
+    let (client, _) = try_sync(&alice, &bob).await;
+    let client = client.unwrap();
+    assert!(client.collaborator.is_some());
+    assert_eq!((client.received.applied, client.files_received), (0, 0), "{client:?}");
+
+    let (alice_id, _) = alice.user_id().unwrap();
+    bob.share_project(&lab, &alice_id, "Alice", quire_engine::MemberRole::Editor).await.unwrap();
+    let (client, _) = sync(&alice, &bob).await;
+    assert_eq!(client.files_received, 1, "the shared paper's PDF: {client:?}");
+    let (on_alice, projects) = alice.show(&key).await.unwrap();
+    assert_eq!(projects.len(), 1, "in Lab");
+    assert!(alice.notes(Some(&key)).await.unwrap().is_empty(), "Bob's note stays his");
+    assert_eq!(alice.projects().await.unwrap().len(), 2, "Mine and Lab, not Bob's Private");
+    let (_, members) = alice.project_members(&lab).await.unwrap();
+    assert_eq!(members.len(), 1);
+
+    // Alice's tags and notes stay hers.
+    alice.tag(&key, &["alice-only".to_string()]).await.unwrap();
+    alice.add_note(Some(&key), "alice's thoughts").await.unwrap();
+    sync(&alice, &bob).await;
+    assert!(bob.notes(Some(&key)).await.unwrap().iter().all(|n| n.body != "alice's thoughts"));
+    assert!(bob.tags().await.unwrap().is_empty(), "Alice's tag stays hers");
+    assert_eq!(on_alice.id, bob.show(&key).await.unwrap().0.id);
 }

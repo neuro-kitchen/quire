@@ -1,49 +1,12 @@
 //! PDFs through the engine: download and attach (arXiv, mock), the same file only once, a PDF
 //! showing another DOI, importing a PDF as a new reference, and a blocked page recorded as an issue.
 
-use quire_engine::{Endpoints, Engine, IssueCode, LibraryChoice, OpenOptions, PdfOutcome};
-use url::Url;
+mod common;
+use common::{engine, fixture, tiny_pdf};
+
+use quire_engine::{IssueCode, PdfOutcome};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
-
-fn fixture(name: &str) -> String {
-    std::fs::read_to_string(format!("{}/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"))).unwrap()
-}
-
-/// A one-page PDF showing `text`.
-fn tiny_pdf(text: &str) -> Vec<u8> {
-    let stream = format!("BT /F1 12 Tf 72 720 Td ({text}) Tj ET");
-    let objects = [
-        "<< /Type /Catalog /Pages 2 0 R >>".to_string(),
-        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_string(),
-        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>".to_string(),
-        format!("<< /Length {} >>\nstream\n{stream}\nendstream", stream.len()),
-        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_string(),
-    ];
-    let mut pdf = String::from("%PDF-1.4\n");
-    let mut offsets = Vec::new();
-    for (i, body) in objects.iter().enumerate() {
-        offsets.push(pdf.len());
-        pdf.push_str(&format!("{} 0 obj\n{body}\nendobj\n", i + 1));
-    }
-    let xref = pdf.len();
-    pdf.push_str(&format!("xref\n0 {}\n0000000000 65535 f \n", objects.len() + 1));
-    for offset in offsets {
-        pdf.push_str(&format!("{offset:010} 00000 n \n"));
-    }
-    pdf.push_str(&format!("trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n", objects.len() + 1));
-    pdf.into_bytes()
-}
-
-async fn engine(dir: &tempfile::TempDir, server: &MockServer) -> Engine {
-    let base = Url::parse(&format!("{}/", server.uri())).unwrap();
-    let options = OpenOptions {
-        library: LibraryChoice::Path(dir.path().join("library")),
-        config_file: Some(dir.path().join("config.toml")),
-        endpoints: Some(Endpoints::all_at(&base)),
-    };
-    Engine::open(options).await.unwrap()
-}
 
 async fn serve(server: &MockServer, at: &str, response: ResponseTemplate) {
     Mock::given(method("GET")).and(path(at)).respond_with(response).mount(server).await;
@@ -65,7 +28,7 @@ async fn download_attach_once_and_remove() {
     )
     .await;
     let dir = tempfile::tempdir().unwrap();
-    let engine = engine(&dir, &server).await;
+    let engine = engine(dir.path(), Some(&server)).await;
     engine.add("arXiv:1706.03762", None).await.unwrap();
 
     let PdfOutcome::Downloaded { attached, source, .. } = engine.get_pdf("vaswaniAttentionAllYou2017").await.unwrap()
@@ -96,7 +59,7 @@ async fn pdf_of_another_paper_is_flagged() {
     )
     .await;
     let dir = tempfile::tempdir().unwrap();
-    let engine = engine(&dir, &server).await;
+    let engine = engine(dir.path(), Some(&server)).await;
     let reference = engine.add("10.1038/nature12373", None).await.unwrap().reference().clone();
     let file = dir.path().join("wrong.pdf");
     let other_paper =
@@ -122,7 +85,7 @@ async fn import_pdf_adds_its_reference() {
     )
     .await;
     let dir = tempfile::tempdir().unwrap();
-    let engine = engine(&dir, &server).await;
+    let engine = engine(dir.path(), Some(&server)).await;
     let file = dir.path().join("paper.pdf");
     std::fs::write(&file, tiny_pdf("Nature 500, 54 doi:10.1038/nature12373")).unwrap();
     let (added, attached) = engine.import_pdf(&file, None).await.unwrap();
@@ -147,7 +110,7 @@ async fn blocked_download_is_recorded() {
     serve(&server, "/articles/1", ResponseTemplate::new(200).set_body_string(page)).await;
     serve(&server, "/pmc/pdf", ResponseTemplate::new(200).set_body_string(fixture("challenge-pmc-pdf.html"))).await;
     let dir = tempfile::tempdir().unwrap();
-    let engine = engine(&dir, &server).await;
+    let engine = engine(dir.path(), Some(&server)).await;
     let reference = engine.add(&format!("{}/articles/1", server.uri()), None).await.unwrap().reference().clone();
 
     let error = engine.get_pdf(reference.cite_key.as_str()).await.unwrap_err();
@@ -174,7 +137,7 @@ async fn paper_text_is_converted_once_and_stored() {
     )
     .await;
     let dir = tempfile::tempdir().unwrap();
-    let engine = engine(&dir, &server).await;
+    let engine = engine(dir.path(), Some(&server)).await;
     engine.add("10.1038/nature12373", None).await.unwrap();
     let file = dir.path().join("paper.pdf");
     std::fs::write(&file, tiny_pdf("Nanometre scale thermometry doi:10.1038/nature12373")).unwrap();
@@ -190,4 +153,28 @@ async fn paper_text_is_converted_once_and_stored() {
     std::fs::write(attached.path.with_extension("md"), "<!-- quire reader text: old -->\nstale").unwrap();
     let (_, rebuilt, stored) = engine.paper_text("10.1038/nature12373").await.unwrap();
     assert!(!stored && rebuilt == first);
+}
+
+#[tokio::test]
+async fn scans_without_ocr_tools_say_what_to_install() {
+    if quire_engine::tools::installed("tesseract") || quire_engine::tools::installed("ocrmypdf") {
+        return; // OCR would run here; this checks the message when it cannot.
+    }
+    let server = MockServer::start().await;
+    serve(
+        &server,
+        "/10.1038/nature12373",
+        ResponseTemplate::new(200).set_body_string(fixture("csl-crossref-nature12373.json")),
+    )
+    .await;
+    let dir = tempfile::tempdir().unwrap();
+    let engine = engine(dir.path(), Some(&server)).await;
+    let added = engine.add("10.1038/nature12373", None).await.unwrap();
+    let key = added.reference().cite_key.to_string();
+    // A page with no text at all, as a scan without a text layer looks to the converter.
+    let scan = dir.path().join("scan.pdf");
+    std::fs::write(&scan, tiny_pdf("")).unwrap();
+    engine.attach_file(&key, &scan, false).await.unwrap();
+    let error = engine.ocr(&key).await.unwrap_err().to_string();
+    assert!(error.contains("OCRmyPDF") && error.contains("Tesseract"), "{error}");
 }

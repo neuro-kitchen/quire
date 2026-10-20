@@ -6,7 +6,8 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use quire_core::library::{attachments, references};
-use quire_core::{Added, Library, check};
+use quire_core::prelude::*;
+use quire_core::{Added, check};
 use quire_io::pdf::{self, PdfMatch};
 use quire_model::{Attachment, Identifier, Issue, IssueCode, PdfAttempt, Reference, ReferenceId, SlugPath, TextField};
 use url::Url;
@@ -14,6 +15,7 @@ use url::Url;
 use super::Engine;
 use crate::error::{EngineError, Result};
 use crate::files::FileStore;
+use crate::tools;
 
 const PDF_TYPE: &str = "application/pdf";
 
@@ -43,7 +45,7 @@ pub enum PdfStatus {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PdfOutcome {
     /// It already had a PDF; nothing was downloaded.
-    Present(Reference, Vec<Attachment>),
+    Present(Box<Reference>, Vec<Attachment>),
     /// Downloaded from `source` and attached.
     Downloaded { attached: Box<Attached>, source: String, url: String },
 }
@@ -60,7 +62,7 @@ impl Engine {
         let (reference, _) = self.show(query).await?;
         let present = self.attachments(&reference).await?;
         if !present.is_empty() {
-            return Ok(PdfOutcome::Present(reference, present));
+            return Ok(PdfOutcome::Present(Box::new(reference), present));
         }
         let found = match self.fetcher.find_pdf(&reference.data).await {
             Ok(found) => found,
@@ -242,14 +244,25 @@ impl Engine {
         }
         let bytes = std::fs::read(&pdf_path).map_err(EngineError::file(&pdf_path))?;
         let pages = attachment.pages.unwrap_or(1);
+        let language = self.ocr_language();
         // Conversion is CPU work (tens of ms per page): off the async threads.
         let markdown = tokio::task::spawn_blocking(move || {
-            let converted = pdf::to_markdown(&bytes);
-            // Only stamps read (a scan whose OCR text pdf-inspector drops): poppler, if installed.
+            let converted = pdf::to_markdown(&bytes).map_err(EngineError::from);
+            // Only stamps read (a scan whose OCR text pdf-inspector drops): poppler, if installed;
+            // no text layer at all (a pure scan): OCR, if Tesseract is installed.
             let sparse = converted.as_deref().map_or(true, |m| pdf::is_sparse(m, pages));
-            match sparse.then(|| poppler_text(&pdf_path)).flatten() {
-                Some(text) => Ok(pdf::plain::to_markdown(&text)),
-                None => converted,
+            if !sparse {
+                return converted;
+            }
+            if let Some(text) = tools::poppler_text(&pdf_path) {
+                return Ok(pdf::plain::to_markdown(&text));
+            }
+            match tools::ocr_text(&pdf_path, &language) {
+                Ok(Some(text)) => Ok(pdf::plain::to_markdown(&text)),
+                Ok(None) => converted.map_err(|e| {
+                    EngineError::Pdf(format!("{e}; install Tesseract and poppler (pdftoppm) for OCR of scans"))
+                }),
+                Err(error) => Err(error),
             }
         })
         .await
@@ -349,19 +362,4 @@ fn attempt_outcome(reference: &Reference, error: &quire_fetch::FetchError) -> Pd
     } else {
         PdfAttempt::NotFound
     }
-}
-
-/// The text poppler's `pdftotext` reads from `path`, if it is installed and reads more than a
-/// stamp.
-fn poppler_text(path: &Path) -> Option<String> {
-    let output = std::process::Command::new("pdftotext")
-        .args(["-enc", "UTF-8"])
-        .arg(path)
-        .arg("-")
-        .stdin(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .output()
-        .ok()?;
-    let text = String::from_utf8(output.stdout).ok()?;
-    (output.status.success() && text.split_whitespace().count() > 100).then_some(text)
 }

@@ -61,6 +61,11 @@ pub const KEYS: &[KeySpec] = &[
     key("reader.justify", ValueKind::Bool, "reader mode: justified text"),
     key("reader.spacing", ValueKind::Choice(&["1", "2"]), "reader mode: line spacing"),
     key("reader.theme", ValueKind::Choice(&["dark", "light", "sepia", "contrast"]), "reader mode: colors"),
+    key(
+        "reader.ocr_language",
+        ValueKind::Text,
+        "OCR of scanned PDFs: Tesseract language codes, e.g. eng+deu (default: eng)",
+    ),
 ];
 
 /// The spec matching `key`, checking `*` segments are valid names.

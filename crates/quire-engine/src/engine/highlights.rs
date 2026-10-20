@@ -1,7 +1,9 @@
 //! Highlights of [`Engine`]: passages marked in the reader (`quire_core::library::highlights`).
 
-use quire_core::library::highlights;
-use quire_model::{Highlight, HighlightId, Reference};
+use quire_core::ReferenceFilter;
+use quire_core::library::{highlights, projects};
+use quire_core::prelude::*;
+use quire_model::{Highlight, HighlightId, Reference, SlugPath};
 
 use super::Engine;
 use crate::error::Result;
@@ -40,5 +42,34 @@ impl Engine {
         let highlight = self.run(move |lib| highlights::remove(lib, id)).await?;
         self.mark_changed();
         Ok(highlight)
+    }
+
+    /// Each paper in `project` (with subprojects if `recursive`), or the library, that has
+    /// highlights or notes, as a Markdown file for a notes app (`quire_io::annotations`).
+    pub async fn annotations_markdown(
+        &self,
+        project: Option<&SlugPath>,
+        recursive: bool,
+    ) -> Result<Vec<(Reference, String)>> {
+        let project = project.cloned();
+        self.run(move |lib| {
+            let references = match &project {
+                Some(path) => projects::references(lib, path, recursive)?,
+                None => lib.references(&ReferenceFilter::default())?,
+            };
+            let mut files = Vec::new();
+            for reference in references {
+                let highlights = lib.highlights_of(reference.id)?;
+                let notes = lib.notes_of(Some(reference.id))?;
+                if highlights.is_empty() && notes.is_empty() {
+                    continue;
+                }
+                let tags: Vec<String> = lib.tags_of(reference.id)?.into_iter().map(|(t, _)| t.name).collect();
+                let markdown = quire_io::annotations::to_markdown(&reference, &tags, &highlights, &notes);
+                files.push((reference, markdown));
+            }
+            Ok(files)
+        })
+        .await
     }
 }

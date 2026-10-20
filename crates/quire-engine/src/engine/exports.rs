@@ -5,7 +5,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 
 use quire_core::library::projects;
-use quire_core::{AutoExport, Library, ReferenceFilter};
+use quire_core::prelude::*;
+use quire_core::{AutoExport, ReferenceFilter};
 use quire_io::{ExportFormat, ExportOptions, PreprintForm};
 use quire_model::{Reference, SlugPath, Timestamp};
 
