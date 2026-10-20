@@ -24,3 +24,4 @@ file). Change them with `quire config set <key> <value>`; `*` is a name you choo
 | `reader.justify` | reader mode: justified text |
 | `reader.spacing` | reader mode: line spacing |
 | `reader.theme` | reader mode: colors |
+| `reader.ocr_language` | OCR of scanned PDFs: Tesseract language codes, e.g. eng+deu (default: eng) |
