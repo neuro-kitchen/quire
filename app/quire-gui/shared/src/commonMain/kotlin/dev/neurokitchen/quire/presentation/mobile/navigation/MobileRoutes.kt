@@ -32,6 +32,9 @@ sealed interface Route : NavKey {
     /** A paper in the reader. */
     @Serializable data class Reader(val tab: Tab, val id: String, val title: String) : Route
 
+    /** A page of the settings. */
+    @Serializable data class SettingsPage(val tab: Tab, val page: MobileSettingsPage) : Route
+
     /** Adding references (every way in). */
     @Serializable data class Add(val tab: Tab, val projectPath: String? = null) : Route
 }
@@ -66,3 +69,7 @@ internal val routeSavedState = SavedStateConfiguration {
         polymorphic(NavKey::class) { subclassesOfSealed<Route>() }
     }
 }
+
+/** The phone's settings pages (the desktop's shortcuts and config file editor are not among them). */
+@Serializable
+enum class MobileSettingsPage { Appearance, Reading, Account, Libraries, About }
