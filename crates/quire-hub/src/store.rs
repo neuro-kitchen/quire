@@ -488,28 +488,52 @@ impl Store {
         Ok(self.files.join(account.to_string()).join(&id[..2]).join(id))
     }
 
-    /// Stores a sealed file (written to a temporary name, then renamed: never half a file).
-    pub fn put_file(&self, account: i64, id: &str, sealed: &[u8]) -> Result<()> {
+    /// Where to write the sealed file `id` of `account` as it arrives (a name of its own, so two
+    /// uploads of one file do not mix); [`Store::commit_file`] makes it the file. Files are written
+    /// to disk as they come, never held in memory whole.
+    pub fn incoming_file(&self, account: i64, id: &str) -> Result<PathBuf> {
         let path = self.file_path(account, id)?;
         std::fs::create_dir_all(path.parent().expect("files/<account>/<xx>"))?;
-        let partial = path.with_extension("partial");
-        std::fs::write(&partial, sealed)?;
-        std::fs::rename(&partial, &path)?;
+        let mut tag = [0u8; 8];
+        getrandom::fill(&mut tag).map_err(|e| std::io::Error::other(format!("no randomness: {e}")))?;
+        let tag: String = tag.iter().map(|b| format!("{b:02x}")).collect();
+        Ok(path.with_extension(format!("{tag}.partial")))
+    }
+
+    /// Makes the fully written `partial` (from [`Store::incoming_file`]) the file `id` of `account`
+    /// (renamed: never half a file).
+    pub fn commit_file(&self, account: i64, id: &str, partial: &Path) -> Result<()> {
+        let path = self.file_path(account, id)?;
+        let size = std::fs::metadata(partial)?.len();
+        std::fs::rename(partial, &path)?;
         self.with(|c| {
             c.execute(
                 "INSERT OR REPLACE INTO file (account, id, size, created) VALUES (?1, ?2, ?3, ?4)",
-                params![account, id, sealed.len() as i64, now()],
+                params![account, id, size as i64, now()],
             )?;
             Ok(())
         })
     }
 
-    pub fn get_file(&self, account: i64, id: &str) -> Result<Option<Vec<u8>>> {
+    /// The sealed file `id` of `account` and its size, if stored.
+    pub fn stored_file(&self, account: i64, id: &str) -> Result<Option<(PathBuf, u64)>> {
         let path = self.file_path(account, id)?;
-        if !self.has_files(account, &[id.to_string()])?.is_empty() {
-            return Ok(Some(std::fs::read(path)?));
+        if self.has_files(account, &[id.to_string()])?.is_empty() {
+            return Ok(None);
         }
-        Ok(None)
+        let size = std::fs::metadata(&path)?.len();
+        Ok(Some((path, size)))
+    }
+
+    /// Stores a sealed file held in memory (tests, small files).
+    pub fn put_file(&self, account: i64, id: &str, sealed: &[u8]) -> Result<()> {
+        let partial = self.incoming_file(account, id)?;
+        std::fs::write(&partial, sealed)?;
+        self.commit_file(account, id, &partial)
+    }
+
+    pub fn get_file(&self, account: i64, id: &str) -> Result<Option<Vec<u8>>> {
+        self.stored_file(account, id)?.map(|(path, _)| Ok(std::fs::read(path)?)).transpose()
     }
 
     /// Deletes an account and everything it stored (its person's request; GDPR erasure).

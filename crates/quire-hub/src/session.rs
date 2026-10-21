@@ -16,6 +16,9 @@ use crate::store::{Account, HubError, Store};
 
 /// How long a session may stay silent before the hub drops it.
 const IDLE: Duration = Duration::from_secs(120);
+/// The same before the caller has an account: anyone may connect, and silent strangers must not
+/// hold the hub's few session places (a code is typed before connecting, so this is plenty).
+const IDLE_STRANGER: Duration = Duration::from_secs(15);
 
 /// How the hub runs.
 #[derive(Debug, Clone)]
@@ -62,7 +65,8 @@ where
     let mut summary = Summary::default();
     let mut caller: Option<Caller> = None;
     loop {
-        let request: Option<Request> = match tokio::time::timeout(IDLE, protocol::receive(reader)).await {
+        let idle = if caller.as_ref().is_some_and(|c| c.account.is_some()) { IDLE } else { IDLE_STRANGER };
+        let request: Option<Request> = match tokio::time::timeout(idle, protocol::receive(reader)).await {
             Ok(Ok(request)) => request,
             Ok(Err(error)) => {
                 tracing::debug!(%error, "unreadable request");
@@ -171,19 +175,34 @@ where
                 tokio::io::copy(&mut (&mut *reader).take(put.size), &mut tokio::io::sink()).await?;
                 return Err(refusal);
             }
-            let sealed = protocol::receive_bytes(reader, put.size).await.map_err(io)?;
-            blocking(store, move |s| s.put_file(id, &put.id, &sealed)).await?;
+            // Written to disk as it comes (a file may be 2 GB; many sessions run at once).
+            let file_id = put.id.clone();
+            let partial = blocking(store, move |s| s.incoming_file(id, &file_id)).await?;
+            let mut file = tokio::fs::File::create(&partial).await?;
+            let copied = tokio::io::copy(&mut (&mut *reader).take(put.size), &mut file).await;
+            let written = file.sync_all().await.and(copied);
+            drop(file);
+            if !written.as_ref().is_ok_and(|n| *n == put.size) {
+                let _ = tokio::fs::remove_file(&partial).await;
+                return Err(HubError::Io(match written {
+                    Err(error) => error,
+                    Ok(_) => std::io::Error::from(std::io::ErrorKind::UnexpectedEof),
+                }));
+            }
+            blocking(store, move |s| s.commit_file(id, &put.id, &partial)).await?;
             summary.files_in += 1;
             ReplyBody::Ok(protocol::Empty {})
         }
         RequestBody::GetFile(get) => {
             let wanted = get.id.clone();
-            let Some(sealed) = blocking(store, move |s| s.get_file(id, &wanted)).await? else {
+            let Some((path, size)) = blocking(store, move |s| s.stored_file(id, &wanted)).await? else {
                 return Err(HubError::refused(ErrorCode::NotFound, "the hub does not have this file"));
             };
-            let header = Reply::of(ReplyBody::File(FileHeader { id: get.id, size: sealed.len() as u64 }));
+            // Sent from disk as it is read, not loaded whole.
+            let file = tokio::fs::File::open(&path).await?;
+            let header = Reply::of(ReplyBody::File(FileHeader { id: get.id, size }));
             protocol::send(writer, &header).await.map_err(io)?;
-            writer.write_all(&sealed).await?;
+            tokio::io::copy(&mut file.take(size), writer).await?;
             writer.flush().await?;
             summary.files_out += 1;
             return Ok(None);
@@ -275,5 +294,88 @@ fn io(error: quire_sync::SyncError) -> HubError {
         quire_sync::SyncError::Io(e) => HubError::Io(e),
         quire_sync::SyncError::TooLarge => HubError::refused(ErrorCode::TooLarge, "too large"),
         other => HubError::refused(ErrorCode::Protocol, other.to_string()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use quire_sync::hub::protocol::{Request, RequestBody};
+
+    use super::*;
+
+    /// Anyone may connect and say `Hello`; someone without an account once held one of the hub's
+    /// few session places for the full idle time (two minutes), so a handful of idle connections
+    /// kept paying users out. Without an account the hub now waits briefly.
+    #[tokio::test(start_paused = true)]
+    async fn a_silent_stranger_is_dropped_quickly() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(Store::open(dir.path()).unwrap());
+        let settings = Settings { quota: 0 };
+        let (hub_side, mut device_side) = tokio::io::duplex(1 << 16);
+        let device = quire_sync::transport::device_id(&[1; 32]);
+        let hello = Hello {
+            protocol: protocol::PROTOCOL,
+            certificate: Some((&Certificate::issue(&[2; 32], &device)).into()),
+            library: "lib_x".into(),
+            author: device.clone(),
+        };
+        protocol::send(&mut device_side, &Request::of(RequestBody::Hello(hello))).await.unwrap();
+        let started = tokio::time::Instant::now();
+        let (mut reader, mut writer) = tokio::io::split(hub_side);
+        let summary = serve(&store, &settings, None, &mut reader, &mut writer).await.unwrap();
+        assert!(started.elapsed() <= Duration::from_secs(30), "held for {:?}", started.elapsed());
+        assert!(!summary.ended_by_device);
+        drop(device_side);
+    }
+
+    /// A file cut off mid-upload (the device went away) leaves nothing: no file, no partial one.
+    /// Files are now written to disk as they arrive instead of held whole in memory.
+    #[tokio::test]
+    async fn a_cut_upload_leaves_nothing() {
+        use quire_sync::hub::protocol::{PutFile, Register};
+        let dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(Store::open(dir.path()).unwrap());
+        let code = store.owner_code().unwrap().unwrap();
+        let settings = Settings { quota: 0 };
+        let (hub_side, mut device_side) = tokio::io::duplex(1 << 16);
+        let device = quire_sync::transport::device_id(&[1; 32]);
+        let id = "ab".repeat(32);
+        let hello = Hello {
+            protocol: protocol::PROTOCOL,
+            certificate: Some((&Certificate::issue(&[2; 32], &device)).into()),
+            library: "lib_x".into(),
+            author: device.clone(),
+        };
+        let device_task = {
+            let id = id.clone();
+            tokio::spawn(async move {
+                protocol::send(&mut device_side, &Request::of(RequestBody::Hello(hello))).await.unwrap();
+                protocol::send(&mut device_side, &Request::of(RequestBody::Register(Register { code }))).await.unwrap();
+                let put = PutFile { id, size: 100 };
+                protocol::send(&mut device_side, &Request::of(RequestBody::PutFile(put))).await.unwrap();
+                device_side.write_all(&[7; 10]).await.unwrap();
+                device_side.flush().await.unwrap();
+                // Read the replies to Hello and Register, then go away mid-file.
+                for _ in 0..2 {
+                    let _: Option<Reply> = protocol::receive(&mut device_side).await.unwrap();
+                }
+            })
+        };
+        let (mut reader, mut writer) = tokio::io::split(hub_side);
+        let _ = serve(&store, &settings, None, &mut reader, &mut writer).await;
+        device_task.await.unwrap();
+        let account = store.account_of(&quire_sync::identity::user_id(&[2; 32])).unwrap().unwrap();
+        assert!(store.stored_file(account.id, &id).unwrap().is_none());
+        let leftovers: Vec<_> = walk(&dir.path().join("files"));
+        assert!(leftovers.is_empty(), "{leftovers:?}");
+    }
+
+    fn walk(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+        let mut found = Vec::new();
+        for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+            let path = entry.path();
+            if path.is_dir() { found.extend(walk(&path)) } else { found.push(path) }
+        }
+        found
     }
 }
