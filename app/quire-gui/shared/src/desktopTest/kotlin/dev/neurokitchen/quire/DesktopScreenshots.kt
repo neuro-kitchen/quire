@@ -337,7 +337,9 @@ class DesktopScreenshots {
                                 title = "Microstructure of a spatial map in the entorhinal cortex",
                                 creator = "Hafting et al.", year = "2005", dateAdded = "", hasPdf = false,
                             ),
+                            project = "thesis",
                         ),
+                        projects = listOf("thesis" to "Thesis", "thesis/chapter-2" to "Chapter 2"),
                         onEvent = {},
                     )
                 }

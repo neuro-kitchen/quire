@@ -22,6 +22,10 @@ sealed interface LibraryEvent {
     data object OnLookup : LibraryEvent
     data class OnManualChange(val entry: ManualEntry) : LibraryEvent
     data class OnBibtexChange(val text: String) : LibraryEvent
+    data class OnAddPdfsPicked(val paths: List<String>) : LibraryEvent
+    data class OnAddPdfRemove(val path: String) : LibraryEvent
+    data class OnAddFilePicked(val path: String?) : LibraryEvent
+    data class OnAddProjectSelect(val projectPath: String?) : LibraryEvent
     /** Adds what the dialog's tab holds, into the project in view if one is. */
     data object OnAddConfirm : LibraryEvent
     data object OnDismissNotice : LibraryEvent
@@ -68,7 +72,6 @@ sealed interface LibraryEvent {
     data class OnSavedSearchClick(val name: String) : LibraryEvent
     data class OnSavedSearchRemove(val name: String) : LibraryEvent
     /** Adds the paper the PDF at `path` describes, with the PDF, into the project in view. */
-    data class OnImportPdf(val path: String) : LibraryEvent
     /** Colours a tag (`#rrggbb`), or takes its colour away (`null`). */
     data class OnTagColor(val name: String, val color: String?) : LibraryEvent
     data object OnToggleSidebar : LibraryEvent

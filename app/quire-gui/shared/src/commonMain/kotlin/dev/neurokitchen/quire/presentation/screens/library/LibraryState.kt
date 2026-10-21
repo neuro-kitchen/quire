@@ -15,6 +15,8 @@ data class LibraryState(
     val source: LibrarySource = LibrarySource.All,
     /** The project tree, flattened: only rows whose parents are expanded. */
     val projects: List<ProjectRowState> = emptyList(),
+    /** Every project as (path, name), parents first: what the add dialog can add to. */
+    val projectChoices: List<Pair<String, String>> = emptyList(),
     /** The library's coloured tags, then the tags of the references in view; selected ones included. */
     val tags: List<TagState> = emptyList(),
     val sort: SortColumn = SortColumn.Title,
@@ -55,7 +57,8 @@ data class LibraryState(
 data class SavedSearchState(val name: String, val query: String, val isActive: Boolean)
 
 /** The add dialog's tabs: by identifier (looked up), typed in, pasted BibTeX. */
-enum class AddTab { Identifier, Manual, Bibtex }
+/** Every way to add: identifiers, PDF files, a file (`.bib`, a Zotero folder), pasted BibTeX, typed in. */
+enum class AddTab { Identifier, Pdf, File, Bibtex, Manual }
 
 @Immutable
 data class AddDialogState(
@@ -66,6 +69,12 @@ data class AddDialogState(
     val preview: ReferenceCardState? = null,
     val manual: ManualEntry = ManualEntry(),
     val bibtex: String = "",
+    /** PDF files to import, each becoming the paper it is. */
+    val pdfs: List<String> = emptyList(),
+    /** A `.bib` file or a Zotero data folder to import. */
+    val file: String? = null,
+    /** The project to add to; `null`: none. Starts as the project in view. */
+    val project: String? = null,
     /** A lookup or an add is running. */
     val isWorking: Boolean = false,
     /** The engine's message when the last lookup or add failed. */
@@ -74,6 +83,8 @@ data class AddDialogState(
     val canAdd: Boolean
         get() = !isWorking && when (tab) {
             AddTab.Identifier -> identifier.isNotBlank()
+            AddTab.Pdf -> pdfs.isNotEmpty()
+            AddTab.File -> file != null
             AddTab.Manual -> manual.title.isNotBlank()
             AddTab.Bibtex -> bibtex.isNotBlank()
         }

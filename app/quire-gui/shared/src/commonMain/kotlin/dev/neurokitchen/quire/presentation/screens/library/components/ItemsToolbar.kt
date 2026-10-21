@@ -1,9 +1,7 @@
 package dev.neurokitchen.quire.presentation.screens.library.components
 
 import dev.neurokitchen.quire.resources.add_title
-import dev.neurokitchen.quire.resources.pick_pdf
 import dev.neurokitchen.quire.resources.search_save
-import dev.neurokitchen.quire.presentation.platform.pickFile
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.background
@@ -12,23 +10,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,8 +34,6 @@ import dev.neurokitchen.quire.presentation.designsystem.components.CompactTextFi
 import dev.neurokitchen.quire.presentation.designsystem.components.ToolbarIconButton
 import dev.neurokitchen.quire.resources.Res
 import dev.neurokitchen.quire.resources.ic_add
-import dev.neurokitchen.quire.resources.ic_attach_file
-import dev.neurokitchen.quire.resources.ic_expand_more
 import dev.neurokitchen.quire.resources.ic_info
 import dev.neurokitchen.quire.resources.ic_search
 import dev.neurokitchen.quire.resources.ic_sticky_note_2
@@ -71,8 +60,6 @@ fun ItemsToolbar(
     isInspectorCollapsed: Boolean = false,
     /** Saves the search as typed; offered while there is one. */
     onSaveSearch: (() -> Unit)? = null,
-    /** Adds a paper from a PDF the user picks. */
-    onImportPdf: ((String) -> Unit)? = null,
 ) {
     val colors = QuireTheme.colors
     Row(
@@ -84,9 +71,7 @@ fun ItemsToolbar(
             .background(colors.toolbar)
             .padding(horizontal = Dimens.SpaceSm),
     ) {
-        // Unified Primary Add Reference button with integrated dropdown
-        var addMenuOpen by remember { mutableStateOf(false) }
-        val pickTitle = stringResource(Res.string.pick_pdf)
+        // One Add button: the dialog has every way in (identifiers, PDFs, files, BibTeX, typed in).
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -99,7 +84,7 @@ fun ItemsToolbar(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .clickable(onClick = onAddReference)
-                    .padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
             ) {
                 Icon(
                     painterResource(Res.drawable.ic_add),
@@ -124,48 +109,6 @@ fun ItemsToolbar(
                         text = "Ctrl+N",
                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
                         color = colors.onAccent,
-                    )
-                }
-            }
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .clickable { addMenuOpen = true }
-                    .padding(horizontal = 6.dp),
-            ) {
-                Icon(
-                    painterResource(Res.drawable.ic_expand_more),
-                    contentDescription = "Add Options",
-                    tint = colors.onAccent,
-                    modifier = Modifier.size(14.dp),
-                )
-                DropdownMenu(expanded = addMenuOpen, onDismissRequest = { addMenuOpen = false }) {
-                    DropdownMenuItem(
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(painterResource(Res.drawable.ic_search), null, tint = colors.fillSecondary, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text("Add by Identifier (DOI, arXiv)...", style = MaterialTheme.typography.bodyMedium)
-                            }
-                        },
-                        onClick = {
-                            addMenuOpen = false
-                            onAddReference()
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(painterResource(Res.drawable.ic_attach_file), null, tint = colors.fillSecondary, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text("Import PDF File...", style = MaterialTheme.typography.bodyMedium)
-                            }
-                        },
-                        onClick = {
-                            addMenuOpen = false
-                            pickFile(pickTitle, listOf("pdf"))?.let { onImportPdf?.invoke(it) }
-                        },
                     )
                 }
             }
