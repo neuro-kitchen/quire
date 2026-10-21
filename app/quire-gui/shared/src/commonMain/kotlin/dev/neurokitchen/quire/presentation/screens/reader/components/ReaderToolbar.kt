@@ -3,8 +3,10 @@ package dev.neurokitchen.quire.presentation.screens.reader.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,7 +14,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
@@ -47,6 +51,7 @@ import dev.neurokitchen.quire.presentation.designsystem.ReaderTheme
 import dev.neurokitchen.quire.presentation.designsystem.readerColors
 import dev.neurokitchen.quire.presentation.screens.reader.ReaderMode
 import dev.neurokitchen.quire.resources.Res
+import dev.neurokitchen.quire.resources.ic_arrow_back
 import dev.neurokitchen.quire.resources.ic_auto_fix_high
 import dev.neurokitchen.quire.resources.ic_expand_more
 import dev.neurokitchen.quire.resources.ic_inventory_2
@@ -66,6 +71,7 @@ import org.jetbrains.compose.resources.stringResource
 
 /**
  * Quire Reader Toolbar:
+ * - Back button (mobile drill-down)
  * - Panel toggles on the left: Annotations toggle, Notes toggle
  * - Mode switch (PDF / Text)
  * - Zoom controls for PDF / Highlight for text
@@ -80,8 +86,8 @@ fun ReaderToolbar(
     canHighlight: Boolean,
     reading: ReadingStatus,
     zoomPercent: Int = 100,
-    isAnnotationsCollapsed: Boolean = false,
-    isNotesCollapsed: Boolean = false,
+    isAnnotationsCollapsed: Boolean = true,
+    isNotesCollapsed: Boolean = true,
     isFigureDrawerOpen: Boolean = false,
     isSnapshotMode: Boolean = false,
     isSearchOpen: Boolean = false,
@@ -102,21 +108,48 @@ fun ReaderToolbar(
     onSetReaderTheme: (ReaderTheme) -> Unit = {},
     onSetReaderFont: (ReaderFont) -> Unit = {},
     onChangeFontSize: (Int) -> Unit = {},
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val colors = QuireTheme.colors
     var typographyMenuOpen by remember { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .height(Dimens.ToolbarHeight)
             .background(colors.toolbar)
-            .padding(horizontal = Dimens.SpaceSm),
+            .statusBarsPadding(),
     ) {
-        // Toggle Annotations Sidebar (Left side)
+        val isNarrow = maxWidth < 640.dp
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(if (isNarrow) 48.dp else Dimens.ToolbarHeight)
+                .then(if (isNarrow) Modifier.horizontalScroll(scrollState) else Modifier)
+                .padding(horizontal = Dimens.SpaceSm),
+        ) {
+            // Optional Back Navigation Button (Mobile drill-down)
+            if (onBack != null) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(Dimens.ToolbarButton)
+                        .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                        .clickable(onClick = onBack),
+                ) {
+                    Icon(
+                        painterResource(Res.drawable.ic_arrow_back),
+                        contentDescription = "Back to Library",
+                        tint = colors.fillPrimary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+
+            // Toggle Annotations Sidebar (Left side)
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
@@ -438,7 +471,11 @@ fun ReaderToolbar(
             )
         }
 
-        Spacer(Modifier.weight(1f))
+        if (isNarrow) {
+            Spacer(Modifier.width(8.dp))
+        } else {
+            Spacer(Modifier.weight(1f))
+        }
 
         // Reading Status Selector (Single compact dropdown pill, eliminates button squashing)
         var readingMenuOpen by remember { mutableStateOf(false) }
@@ -543,6 +580,7 @@ fun ReaderToolbar(
                 modifier = Modifier.size(16.dp),
             )
         }
+    }
     }
 }
 

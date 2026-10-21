@@ -105,6 +105,7 @@ fun PdfPagesView(
     onAddNote: (body: String) -> Unit = {},
     onAddSnapshot: (rect: PageRect, pageIndex: Int) -> Unit = { _, _ -> },
     onProgressChange: (page: Int, total: Int) -> Unit = { _, _ -> },
+    onTapPage: () -> Unit = {},
 ) {
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -148,6 +149,7 @@ fun PdfPagesView(
                     onAddSnapshot = { rect -> onAddSnapshot(rect, index) },
                     loadPage = loadPage,
                     renderedNear = renderedNear,
+                    onTapPage = onTapPage,
                 )
             }
         }
@@ -204,6 +206,7 @@ private fun PageItem(
     onAddSnapshot: (PageRect) -> Unit = {},
     loadPage: suspend (Int, Int) -> ImageBitmap?,
     renderedNear: (Int, Int) -> ImageBitmap?,
+    onTapPage: () -> Unit = {},
 ) {
     val widthPx = with(LocalDensity.current) { width.toPx() }.roundToInt()
     // A page rendered at another width (before a zoom or resize) stands in until the sharp one is
@@ -260,7 +263,10 @@ private fun PageItem(
                     )
                 } else {
                     detectTapGestures(
-                        onTap = { onSelect(null) },
+                        onTap = {
+                            onSelect(null)
+                            onTapPage()
+                        },
                         onDoubleTap = { offset ->
                             val at = points(offset)
                             scope.launch {
