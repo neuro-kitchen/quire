@@ -19,6 +19,13 @@ pub enum PdfKind {
     Mixed,
 }
 
+/// Whether `text` is a content hash as the file store names files: BLAKE3, 64 lowercase hex
+/// digits. Attachments arrive from other devices; a hash is used to build a file's path, so
+/// anything else (`../..`) is refused.
+pub fn is_content_hash(text: &str) -> bool {
+    text.len() == 64 && text.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Attachment {
     pub id: AttachmentId,

@@ -186,6 +186,8 @@ fn reference(
             references::update(conn, &other)?;
         }
     }
+    // One identifier named twice (only a crafted row does) would fail the whole batch.
+    result.data.dedup_identifiers();
     // An identifier another reference here holds stays with it (a possible duplicate to merge).
     let mut kept_ids = Vec::new();
     for identifier in std::mem::take(&mut result.data.identifiers) {
@@ -431,6 +433,12 @@ fn highlight(conn: &Connection, mut h: Highlight, merged: &mut MergeSummary) -> 
 }
 
 fn attachment(conn: &Connection, mut a: Attachment, merged: &mut MergeSummary) -> Result<()> {
+    // The hash names the file and builds its path: only a content hash (a crafted row's `../..`
+    // is refused, without failing the rest of the batch).
+    if !quire_model::is_content_hash(&a.hash) {
+        merged.refused += 1;
+        return Ok(());
+    }
     a.reference = alias(conn, a.reference)?;
     if !reference_exists(conn, a.reference)? {
         merged.kept += 1;

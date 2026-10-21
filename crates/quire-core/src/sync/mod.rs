@@ -123,7 +123,8 @@ pub struct MergeSummary {
     /// Rows older than (or the same as) what was here.
     pub kept: usize,
     /// Rows refused: stamped more than a day ahead of this device's clock (the sender's clock is
-    /// wrong; taking them would let them win over every later change).
+    /// wrong; taking them would let them win over every later change), or not valid (an
+    /// attachment whose hash is not a content hash).
     pub refused: usize,
     /// References given another cite key (theirs was taken here by another paper).
     pub renamed: Vec<(String, String)>,
