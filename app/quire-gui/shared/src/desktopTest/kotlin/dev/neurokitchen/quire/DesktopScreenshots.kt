@@ -1,5 +1,10 @@
 package dev.neurokitchen.quire
 
+import dev.neurokitchen.quire.domain.model.PaperTabKind
+import dev.neurokitchen.quire.domain.model.PaperTab
+import dev.neurokitchen.quire.domain.model.BlockKind
+import dev.neurokitchen.quire.domain.model.Word
+import dev.neurokitchen.quire.domain.model.TextBlock
 import dev.neurokitchen.quire.presentation.mapping.toImageBitmap
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -156,6 +161,32 @@ class DesktopScreenshots {
         val vm = ReaderViewModel("3", "The hippocampus as a spatial map", reader, SamplePdfRepository())
         val state = runBlocking { vm.state.first { !it.isLoading && it.highlights.isNotEmpty() } }
         render("desktop-reader-text.png") {
+            QuireTheme(darkTheme = false, desktop = true) { Surface { ReaderScreen(state, {}, { _, _ -> null }, { null }) } }
+        }
+    }
+
+    /** A table as a grid: columns as wide as their cells, the header bold, numbers aligned right. */
+    @Test
+    fun readerShowsATable() {
+        fun row(vararg cells: String) = TextBlock(BlockKind.TableRow, cells.map { Word(it) })
+        val blocks = listOf(
+            TextBlock(BlockKind.Heading(2), "Temperature sensing".split(" ").map { Word(it) }),
+            TextBlock(BlockKind.Paragraph, "Table 1 compares the probes measured in living cells.".split(" ").map { Word(it) }),
+            row("Probe", "Sensitivity (mK Hz⁻½)", "Accuracy (mK)", "Cells (n)"),
+            row("Nitrogen-vacancy centre in nanodiamond", "9 ± 2", "44", "12"),
+            row("Gold nanoparticle", "—", "100", "8"),
+            row("Fluorescent polymer thermometer", "180", "250 ± 30", "21"),
+            TextBlock(BlockKind.Paragraph, "The nanodiamond probes were the most accurate.".split(" ").map { Word(it) }),
+        )
+        val state = ReaderState(
+            referenceId = "t",
+            title = "Nanometre-scale thermometry in a living cell",
+            isLoading = false,
+            mode = ReaderMode.Text,
+            tabs = listOf(PaperTab(PaperTabKind.Paper, blocks)),
+            pdf = PdfViewState(isLoading = false),
+        )
+        render("desktop-reader-table.png") {
             QuireTheme(darkTheme = false, desktop = true) { Surface { ReaderScreen(state, {}, { _, _ -> null }, { null }) } }
         }
     }
