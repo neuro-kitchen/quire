@@ -106,6 +106,10 @@ fun PdfPagesView(
     onAddSnapshot: (rect: PageRect, pageIndex: Int) -> Unit = { _, _ -> },
     onProgressChange: (page: Int, total: Int) -> Unit = { _, _ -> },
     onTapPage: () -> Unit = {},
+    /** Room for bars drawn over the pages (the phone's frosted bars): the pages scroll under them. */
+    contentPadding: PaddingValues = PaddingValues(),
+    /** A page to bring to the top (the phone's page slider); `null`: none. */
+    jumpToPage: Int? = null,
 ) {
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -114,6 +118,7 @@ fun PdfPagesView(
     LaunchedEffect(focusedPage) { if (focusedPage != null) list.animateScrollToItem(focusedPage) }
     val current = matches.getOrNull(currentMatch)
     LaunchedEffect(current) { if (current != null) list.animateScrollToItem(current.page) }
+    LaunchedEffect(jumpToPage) { if (jumpToPage != null) list.scrollToItem(jumpToPage) }
 
     var selection by remember { mutableStateOf<ActivePdfSelection?>(null) }
     val firstVisiblePage by remember { derivedStateOf { list.firstVisibleItemIndex + 1 } }
@@ -130,7 +135,12 @@ fun PdfPagesView(
             state = list,
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(Dimens.SpaceMd),
-            contentPadding = PaddingValues(horizontal = Dimens.SpaceMd, vertical = Dimens.SpaceLg),
+            contentPadding = PaddingValues(
+                start = Dimens.SpaceMd,
+                end = Dimens.SpaceMd,
+                top = Dimens.SpaceLg + contentPadding.calculateTopPadding(),
+                bottom = Dimens.SpaceLg + contentPadding.calculateBottomPadding(),
+            ),
             modifier = Modifier.fillMaxSize(),
         ) {
             itemsIndexed(pages) { index, size ->
@@ -179,7 +189,7 @@ fun PdfPagesView(
                 },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = Dimens.SpaceLg),
+                    .padding(bottom = Dimens.SpaceLg + contentPadding.calculateBottomPadding()),
             )
         }
     }

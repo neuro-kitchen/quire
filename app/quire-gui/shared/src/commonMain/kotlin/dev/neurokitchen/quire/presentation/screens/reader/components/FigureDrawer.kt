@@ -110,8 +110,13 @@ fun FigureDrawer(
     loadPdfFigure: suspend (PdfFigure) -> ImageBitmap? = { null },
     /** Opens a figure or table in its own pane beside the text or the PDF. */
     onPin: (Pinned) -> Unit = {},
+    /** The label of the action opening a figure or table ([onPin]); "Open Beside" if `null`. */
+    pinLabel: String? = null,
+    /** The desktop's dock-left/right toggle (not on a phone). */
+    showDockToggle: Boolean = true,
 ) {
     if (!isOpen) return
+    val openLabel = pinLabel ?: stringResource(Res.string.reader_open_beside)
 
     val colors = QuireTheme.colors
     var selectedTab by remember { mutableStateOf(0) } // 0: Figures, 1: Tables
@@ -246,7 +251,7 @@ fun FigureDrawer(
 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 // Dock Toggle button (VS Code style movable dock)
-                Box(
+                if (showDockToggle) Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .height(24.dp)
@@ -314,6 +319,7 @@ fun FigureDrawer(
                             loadImage = loadImage,
                             onEnlarge = { enlarged = fig },
                             onPin = { onPin(Pinned.Figure(fig)) },
+                            openLabel = openLabel,
                         )
                     }
                 }
@@ -331,7 +337,7 @@ fun FigureDrawer(
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     itemsIndexed(tables) { _, tbl ->
-                        TableCard(table = tbl, onPin = { onPin(Pinned.Table(tbl)) })
+                        TableCard(table = tbl, onPin = { onPin(Pinned.Table(tbl)) }, openLabel = openLabel)
                     }
                 }
             }
@@ -401,6 +407,7 @@ private fun FigureCard(
     loadImage: suspend (ExtractedFigure) -> ImageBitmap?,
     onEnlarge: () -> Unit,
     onPin: () -> Unit,
+    openLabel: String,
 ) {
     val colors = QuireTheme.colors
     val image: ImageBitmap? by produceState<ImageBitmap?>(null, figure) { value = loadImage(figure) }
@@ -424,7 +431,7 @@ private fun FigureCard(
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
                 color = colors.accent,
             )
-            OpenBeside(onPin)
+            OpenBeside(openLabel, onPin)
         }
 
         Spacer(Modifier.height(6.dp))
@@ -468,7 +475,7 @@ private fun FigureCard(
 }
 
 @Composable
-private fun TableCard(table: ExtractedTable, onPin: () -> Unit) {
+private fun TableCard(table: ExtractedTable, onPin: () -> Unit, openLabel: String) {
     val colors = QuireTheme.colors
     Column(
         modifier = Modifier
@@ -498,7 +505,7 @@ private fun TableCard(table: ExtractedTable, onPin: () -> Unit) {
                 color = colors.fillTertiary,
             )
             Spacer(Modifier.weight(1f))
-            OpenBeside(onPin)
+            OpenBeside(openLabel, onPin)
         }
         Spacer(Modifier.height(Dimens.SpaceXs))
         PaperTable(
@@ -586,10 +593,10 @@ internal suspend fun figureImage(
     else -> null
 }
 
-/** "Open Beside": the figure or table in its own pane beside the text or the PDF. */
+/** Opens the figure or table: in a pane beside the text or PDF (desktop), full screen (phone). */
 @Composable
-private fun OpenBeside(onClick: () -> Unit) {
-    TextButton(onClick = onClick, contentPadding = PaddingValues(horizontal = Dimens.SpaceXs), modifier = Modifier.height(24.dp)) {
-        Text(stringResource(Res.string.reader_open_beside), style = MaterialTheme.typography.labelSmall)
+private fun OpenBeside(label: String, onClick: () -> Unit) {
+    TextButton(onClick = onClick, contentPadding = PaddingValues(horizontal = Dimens.SpaceXs), modifier = Modifier.height(32.dp)) {
+        Text(label, style = MaterialTheme.typography.labelMedium)
     }
 }
