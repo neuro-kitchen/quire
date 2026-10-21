@@ -15,7 +15,8 @@ subscribed ones). PubMed Central copies need a browser (`--browser`, below).
 
 Every file is checked before it is attached: that it really is a PDF (not a "verify you are
 human" page saved as `.pdf`), whether it has text or is a scan, and whether the DOI it prints
-matches the reference.
+matches the reference. Downloads stop at 200 MB (pages and API answers at 50 MB), however the
+server sends them.
 
 ## Paywalls and bot checks: `--browser`
 

@@ -41,6 +41,8 @@ fn record(entry: &Entry) -> BibRecord {
     }
     data.issued = issued(entry);
     data.identifiers = identifiers(entry);
+    // `pmid` and a PubMed `eprint` (or `doi` and an arXiv `eprint`) can name the same paper.
+    data.dedup_identifiers();
     // quire writes preprints (CSL `article`) as `@online` with an arXiv `eprint`; read them back
     // as preprints, not web pages.
     if bib_type == "online" && data.identifiers.iter().any(|id| matches!(id, Identifier::Arxiv(_))) {
@@ -190,6 +192,15 @@ mod tests {
     fn math_round_trips() {
         let records = from_bib("@article{m, title = {Spectra on $T^2$}}").unwrap();
         assert_eq!(records[0].data.title(), Some("Spectra on $T^2$"));
+    }
+
+    /// `pmid` and a PubMed `eprint` naming the same paper: one identifier (twice, the store refused
+    /// the whole import with a UNIQUE error).
+    #[test]
+    fn an_identifier_given_twice_is_kept_once() {
+        let bib = "@article{d, title = {T}, pmid = {31452104}, eprint = {31452104}, eprinttype = {pubmed}, pmcid = {PMC7614242}}";
+        let ids = &from_bib(bib).unwrap()[0].data.identifiers;
+        assert_eq!(ids.iter().map(Identifier::key).collect::<Vec<_>>(), ["31452104", "PMC7614242"]);
     }
 
     #[test]

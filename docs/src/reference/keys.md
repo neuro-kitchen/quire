@@ -48,7 +48,7 @@ The keys of `quire tui`. `?` shows the first table inside the program.
 | `f` | follow a figure or table mentioned in the text |
 | `v` | select sentences to highlight (below) |
 | `a` | write a note on the paper |
-| `+` `-` | wider, narrower column |
+| `+` (or `=`) `-` | wider, narrower column |
 | `J` `L` `T` | justified text, line spacing, colors |
 | `R` | extract the text again |
 | `q` `Esc` | back to the library |

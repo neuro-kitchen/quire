@@ -53,14 +53,14 @@ pub(super) async fn run(context: &Context, args: &CheckArgs) -> anyhow::Result<(
                 format!("did you mean {}?", unknown.suggestions.join(", "))
             };
             let key = style::paint(style::ERROR, format!("{:<width$}", unknown.key));
-            anstream::println!("{}", format!("  {key}  {}  {hint}", place(&unknown.uses)).trim_end());
+            crate::out!("{}", format!("  {key}  {}  {hint}", place(&unknown.uses)).trim_end());
         }
     }
     if let (false, Some(project)) = (check.outside.is_empty(), &project) {
         heading(&format!("not in project {project} (so not in its bibliography)"), check.outside.len());
         for (reference, uses) in &check.outside {
             let key = style::paint(style::WARN, format!("{:<width$}", reference.cite_key.as_str()));
-            anstream::println!("  {key}  {}", place(uses));
+            crate::out!("  {key}  {}", place(uses));
         }
         if args.link {
             for (reference, _) in &check.outside {
@@ -75,7 +75,7 @@ pub(super) async fn run(context: &Context, args: &CheckArgs) -> anyhow::Result<(
         if args.uncited {
             heading("never cited", check.uncited.len());
             for reference in &check.uncited {
-                anstream::println!("  {}", output::summary(reference));
+                crate::out!("  {}", output::summary(reference));
             }
         } else {
             output::hint(format!(
@@ -88,7 +88,7 @@ pub(super) async fn run(context: &Context, args: &CheckArgs) -> anyhow::Result<(
 }
 
 fn heading(text: &str, count: usize) {
-    anstream::println!("\n{} {}", style::paint(style::LABEL, text), style::paint(style::DIM, format!("({count})")));
+    crate::out!("\n{} {}", style::paint(style::LABEL, text), style::paint(style::DIM, format!("({count})")));
 }
 
 /// Fails (exit status 1, for CI and hooks) while a cited key has no reference in the bibliography.

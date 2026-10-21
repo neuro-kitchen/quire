@@ -69,8 +69,11 @@ pub struct Alert {
 impl Alert {
     pub fn new(name: &str, source: AlertSource, query: &str, device: DeviceId) -> Result<Self> {
         let name = name.trim();
-        if name.is_empty() || query.trim().is_empty() {
+        if name.is_empty() {
             return Err(ModelError::InvalidSearchName(name.into()));
+        }
+        if query.trim().is_empty() {
+            return Err(ModelError::EmptyAlertQuery(name.into()));
         }
         Ok(Self {
             id: AlertId::new(),
@@ -84,5 +87,20 @@ impl Alert {
 
     pub fn key(&self) -> String {
         name_key(&self.name)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_alert_without_a_query_says_so() {
+        let error = Alert::new("pacing", AlertSource::Arxiv, "  ", DeviceId::new()).unwrap_err();
+        assert!(matches!(error, ModelError::EmptyAlertQuery(_)), "{error}");
+        assert!(matches!(
+            Alert::new(" ", AlertSource::Arxiv, "q", DeviceId::new()),
+            Err(ModelError::InvalidSearchName(_))
+        ));
     }
 }

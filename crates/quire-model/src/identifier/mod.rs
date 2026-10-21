@@ -120,6 +120,12 @@ fn strip_any_prefix<'a>(text: &'a str, prefixes: &[&str]) -> Option<&'a str> {
     })
 }
 
+/// `text` up to a URL's query (`?`) or fragment (`#`): browsers copy links with them, and the IDs
+/// that come from URLs (arXiv, PubMed) never contain either. Not for DOIs, which may.
+fn before_query(text: &str) -> &str {
+    text.split(['?', '#']).next().unwrap_or(text)
+}
+
 /// Decodes `%XX` escapes (as in DOIs copied from URLs); returns `text` unchanged if the result
 /// would not be UTF-8.
 fn percent_decode(text: &str) -> String {
@@ -162,6 +168,23 @@ mod tests {
     #[test]
     fn arxiv_doi_and_arxiv_id_have_the_same_key() {
         assert_eq!(kind_and_key("https://doi.org/10.48550/arXiv.1706.03762"), kind_and_key("arXiv:1706.03762"));
+    }
+
+    /// Links as browsers copy them: a query or fragment after the ID, `www.` or `export.` hosts.
+    #[test]
+    fn links_with_queries_fragments_and_other_hosts() {
+        for (input, kind, key) in [
+            ("https://arxiv.org/abs/2101.00001?context=cs", IdentifierKind::Arxiv, "2101.00001"),
+            ("https://arxiv.org/abs/2101.00001v3#S2", IdentifierKind::Arxiv, "2101.00001"),
+            ("https://www.arxiv.org/abs/2101.00001", IdentifierKind::Arxiv, "2101.00001"),
+            ("https://export.arxiv.org/abs/hep-th/9901001", IdentifierKind::Arxiv, "hep-th/9901001"),
+            ("https://pubmed.ncbi.nlm.nih.gov/31452104/?from_term=pacing", IdentifierKind::Pmid, "31452104"),
+            ("https://pmc.ncbi.nlm.nih.gov/articles/PMC7614242/#sec1", IdentifierKind::Pmcid, "PMC7614242"),
+        ] {
+            assert_eq!(kind_and_key(input), (kind, key.to_string()), "{input}");
+        }
+        // A DOI may contain `?` and `#`: kept.
+        assert_eq!(Identifier::parse("10.1000/a?b#c").unwrap().key(), "10.1000/A?B#C");
     }
 
     #[test]

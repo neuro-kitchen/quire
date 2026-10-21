@@ -11,7 +11,7 @@
 //! format = "hayagriva"     # optional, overrides the profile's
 //! ```
 
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use quire_model::SlugPath;
 use serde::Deserialize;
@@ -20,6 +20,20 @@ use crate::error::{EngineError, Result};
 
 /// The file's name.
 pub const FILE_NAME: &str = "quire.toml";
+
+/// `output` must name a file in the folder or below it: `quire.toml` comes with folders people
+/// download or clone, and `quire export` there writes the file it names.
+fn check_output(output: &Path) -> std::result::Result<(), String> {
+    let inside = output.components().all(|c| matches!(c, Component::Normal(_) | Component::CurDir));
+    if inside && output.file_name().is_some() {
+        Ok(())
+    } else {
+        Err(format!(
+            "`output = {:?}` must be a file in this folder or below it (for elsewhere, `quire export -o`)",
+            output.display().to_string()
+        ))
+    }
+}
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -52,6 +66,9 @@ impl FolderFile {
                 let mut file: Self =
                     toml::from_str(&text).map_err(|e| EngineError::Config(format!("{}: {e}", path.display())))?;
                 file.folder = folder.to_path_buf();
+                if let Some(output) = &file.output {
+                    check_output(output).map_err(|e| EngineError::Config(format!("{}: {e}", path.display())))?;
+                }
                 return Ok(Some(file));
             }
         }
@@ -68,6 +85,9 @@ impl FolderFile {
         let path = folder.join(FILE_NAME);
         if path.exists() {
             return Err(EngineError::Config(format!("{} already exists", path.display())));
+        }
+        if let Some(output) = &file.output {
+            check_output(output).map_err(EngineError::Config)?;
         }
         let mut document = toml_edit::DocumentMut::new();
         if let Some(library) = &file.library {
@@ -115,6 +135,21 @@ mod tests {
         assert_eq!(found.project, file.project);
         assert!(found.recursive);
         assert_eq!(found.output_path().unwrap(), dir.path().join("refs.bib"));
+    }
+
+    /// `quire.toml` comes with folders people download or clone: its `output` once could name any
+    /// file (`/home/you/.bashrc`, `../../x`), which `quire export` there then overwrote.
+    #[test]
+    fn output_stays_inside_the_folder() {
+        for bad in ["/etc/x.bib", "../outside.bib", "sub/../../outside.bib"] {
+            let dir = tempfile::tempdir().unwrap();
+            std::fs::write(dir.path().join(FILE_NAME), format!("output = {bad:?}")).unwrap();
+            assert!(FolderFile::find(dir.path()).is_err(), "{bad}");
+        }
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join(FILE_NAME), "output = \"bib/refs.bib\"").unwrap();
+        let found = FolderFile::find(dir.path()).unwrap().unwrap();
+        assert_eq!(found.output_path().unwrap(), dir.path().join("bib/refs.bib"));
     }
 
     #[test]

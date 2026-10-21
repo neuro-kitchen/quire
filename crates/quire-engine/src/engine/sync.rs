@@ -298,7 +298,7 @@ impl Replica for LibraryReplica<'_> {
 
     async fn read_file(&self, hash: &str, to: &Peer) -> quire_sync::Result<Option<Vec<u8>>> {
         // Only files of the file store, named by a well-formed hash (not a path).
-        if !hash.chars().all(|c| c.is_ascii_hexdigit()) || hash.len() != 64 {
+        if !quire_model::is_content_hash(hash) {
             return Ok(None);
         }
         // A collaborator: only the PDFs of references shared with them.

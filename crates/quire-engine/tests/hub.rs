@@ -324,3 +324,33 @@ async fn without_a_hub_copy_nothing_is_evicted() {
     assert_eq!(eviction.removed, 0, "this device may hold the only copies: {eviction:?}");
     assert!(eviction.kept > 1024 * 1024);
 }
+
+/// A file once confirmed on the hub stayed "on the hub" for good: after the hub lost it (a reset,
+/// a restore from an older backup) and had no room to take it again, eviction removed what had
+/// become the last copy. A session where the hub lacks a file here, and does not take it, clears
+/// the mark.
+#[tokio::test]
+async fn a_file_the_hub_no_longer_holds_is_not_evicted() {
+    let dir = tempfile::tempdir().unwrap();
+    // Room for both while syncing (no eviction yet); reopened below with room for one.
+    let b = lazy_engine(dir.path(), 4).await;
+    let bib = dir.path().join("refs.bib");
+    std::fs::write(&bib, "@article{one, title = {One}, year = {2020}}\n@article{two, title = {Two}, year = {2021}}")
+        .unwrap();
+    b.import_bib(&bib, None).await.unwrap();
+    for key in ["one", "two"] {
+        let (reference, _) = b.show(key).await.unwrap();
+        b.attach_bytes(&reference, &big_pdf(key), "test", false).await.unwrap();
+    }
+    // Confirmed on a hub, then that hub's files are gone and the one met now has no room for them.
+    let first = Hub::new(0);
+    let uploaded = first.sync(&b, options(Some(&first.setup_code()))).await.unwrap();
+    assert_eq!(uploaded.files_uploaded, 2, "{uploaded:?}");
+    let full = Hub::new(256 * 1024);
+    let refused = full.sync(&b, options(Some(&full.setup_code()))).await.unwrap();
+    assert!(refused.over_quota == 2 && refused.files_uploaded == 0, "{refused:?}");
+    drop(b);
+    let b = lazy_engine(dir.path(), 1).await;
+    let eviction = b.evict_pdfs().await.unwrap();
+    assert_eq!(eviction.removed, 0, "no hub holds them now: {eviction:?}");
+}

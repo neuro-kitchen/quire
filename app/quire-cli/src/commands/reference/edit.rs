@@ -29,7 +29,7 @@ pub struct EditArgs {
 pub async fn run(engine: &Engine, args: &EditArgs) -> anyhow::Result<()> {
     let (id, original) = engine.edit_document(&args.query).await?;
     if args.print {
-        print!("{original}");
+        crate::data!("{original}");
         return Ok(());
     }
     if let Some(file) = &args.file {
@@ -78,7 +78,7 @@ fn report(updated: &quire_engine::Updated, dry_run: bool) -> anyhow::Result<()> 
     };
     output::report(if updated.changed() { Tone::Ok } else { Tone::Info }, label, output::summary(&updated.reference));
     for line in changes::lines(updated) {
-        anstream::println!("{line}");
+        crate::out!("{line}");
     }
     Ok(())
 }

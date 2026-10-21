@@ -48,7 +48,7 @@ pub async fn run(context: &Context, args: &RefetchArgs) -> anyhow::Result<ExitCo
                 };
                 output::report(tone, label, output::summary(&updated.reference));
                 for line in changes::lines(&updated) {
-                    anstream::println!("{line}");
+                    crate::out!("{line}");
                 }
             }
             Err(error) => {

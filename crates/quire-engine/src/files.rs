@@ -23,8 +23,13 @@ impl FileStore {
         blake3::hash(bytes).to_hex().to_string()
     }
 
-    /// Where the file with `hash` and `extension` is (or would be) stored.
+    /// Where the file with `hash` and `extension` is (or would be) stored. Something that is not
+    /// a content hash (from a crafted or corrupted row) names a file that never exists, inside the
+    /// store.
     pub fn path(&self, hash: &str, extension: &str) -> PathBuf {
+        if !quire_model::is_content_hash(hash) {
+            return self.root.join("invalid");
+        }
         self.root.join(&hash[..2]).join(format!("{hash}.{extension}"))
     }
 
@@ -48,6 +53,19 @@ impl FileStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// An attachment's hash comes from other devices: one that is not a hash (`../..`, too short)
+    /// must not name a path outside the store, nor panic (`&hash[..2]` did on one byte).
+    #[test]
+    fn a_hash_that_is_not_one_stays_inside_the_store() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = FileStore::new(dir.path());
+        for bad in ["../../../../etc/passwd", "a", "", "é", &"g".repeat(64)] {
+            let path = store.path(bad, "pdf");
+            assert!(path.starts_with(dir.path().join("files")), "{bad}: {}", path.display());
+            assert!(!path.components().any(|c| c == std::path::Component::ParentDir), "{bad}");
+        }
+    }
 
     #[test]
     fn same_content_is_stored_once() {

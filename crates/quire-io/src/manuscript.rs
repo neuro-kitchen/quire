@@ -143,7 +143,7 @@ fn command_arguments(text: &str, wanted: impl Fn(&str) -> bool) -> Vec<(usize, S
                 Some(b'(') => j = closing(bytes, j, b'(', b')'),
                 Some(b'{') => {
                     let end = closing(bytes, j, b'{', b'}');
-                    arguments.push((j + 1, text[j + 1..end.saturating_sub(1).max(j + 1)].to_string()));
+                    arguments.push((j + 1, text[j + 1..inner_end(bytes, j, end)].to_string()));
                     j = end;
                     if !several {
                         break;
@@ -171,6 +171,13 @@ fn closing(bytes: &[u8], open_at: usize, open: u8, close: u8) -> usize {
         }
     }
     bytes.len()
+}
+
+/// Where the content of a `{` group opened at `open_at` ends, given [`closing`]'s `end`: before the
+/// closer, or at the end of the text when the group is never closed.
+fn inner_end(bytes: &[u8], open_at: usize, end: usize) -> usize {
+    let closed = end > open_at + 1 && bytes.get(end - 1) == Some(&b'}');
+    if closed { end - 1 } else { end }
 }
 
 /// `a, b ,c` → the keys with their offsets in `group`.
@@ -205,7 +212,7 @@ fn markdown(text: &str) -> Found {
                 let start = i + 1;
                 if bytes.get(start) == Some(&b'{') {
                     let end = closing(bytes, start, b'{', b'}');
-                    let key = text[start + 1..end.saturating_sub(1).max(start + 1)].trim();
+                    let key = text[start + 1..inner_end(bytes, start, end)].trim();
                     if !key.is_empty() {
                         found.push((start + 1, key.to_string()));
                     }
@@ -308,6 +315,16 @@ impl LineIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// An unclosed group (a manuscript being typed) lost its last character, and panicked when that
+    /// character was not ASCII (the cut fell inside it).
+    #[test]
+    fn unclosed_groups_at_the_end() {
+        assert_eq!(citations("\\cite{müller", Markup::Latex)[0].key, "müller");
+        assert_eq!(citations("see @{müller", Markup::Markdown)[0].key, "müller");
+        assert_eq!(citations("\\cite{café", Markup::Latex)[0].key, "café");
+        assert_eq!(citations("\\cite{a, b}", Markup::Latex).len(), 2);
+    }
 
     fn keys(text: &str, markup: Markup) -> Vec<String> {
         citations(text, markup).into_iter().map(|c| c.key).collect()

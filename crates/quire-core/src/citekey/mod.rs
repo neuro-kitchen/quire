@@ -17,13 +17,20 @@ pub(crate) fn unique_key(data: &ReferenceData, taken: impl Fn(&str) -> Result<bo
     free_key(&base_key(data), taken)
 }
 
-/// The first free key starting from `base` (used as is when free).
+/// The first free key starting from `base` (used as is when free; postfixed keys are cut to the
+/// longest length allowed).
 pub fn free_key(base: &str, taken: impl Fn(&str) -> Result<bool>) -> Result<CiteKey> {
     if !taken(base)? {
         return Ok(CiteKey::parse(base)?);
     }
     for n in 0.. {
-        let candidate = format!("{base}{}", postfix(n));
+        // The postfix replaces the base's end when the two would be too long together.
+        let postfix = postfix(n);
+        let mut keep = base.len().min(CiteKey::MAX_LEN - postfix.len());
+        while !base.is_char_boundary(keep) {
+            keep -= 1;
+        }
+        let candidate = format!("{}{postfix}", &base[..keep]);
         if !taken(&candidate)? {
             return Ok(CiteKey::parse(&candidate)?);
         }
@@ -48,6 +55,17 @@ fn postfix(mut n: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A taken key of the longest length allowed (a `.bib` file's own key) once failed: its
+    /// postfixed form was too long, so the whole import stopped.
+    #[test]
+    fn a_long_taken_key_still_gets_a_free_one() {
+        let long = "k".repeat(100);
+        let key = free_key(&long, |k| Ok(k == long)).unwrap();
+        assert_eq!((key.as_str().len(), key.as_str().ends_with('a')), (100, true));
+        let shorter = free_key(&long[..99], |k| Ok(k.len() == 99)).unwrap();
+        assert_eq!(shorter.as_str(), format!("{}a", &long[..99]));
+    }
     use std::collections::HashSet;
 
     #[test]

@@ -54,7 +54,7 @@ pub async fn run(context: &Context, args: &ListArgs) -> anyhow::Result<()> {
         Default::default()
     };
     let extras = table::Extras { pdfs, tags };
-    anstream::println!("{}", table::references(&references, columns, &extras));
+    crate::out!("{}", table::references(&references, columns, &extras));
     let pdfs = extras.pdfs;
     if terminal::stdout_is_terminal() {
         let count = references.len();

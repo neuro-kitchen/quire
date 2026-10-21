@@ -48,6 +48,9 @@ pub enum ModelError {
     #[error("invalid saved search name `{0}`: it must not be empty")]
     InvalidSearchName(String),
 
+    #[error("the alert `{0}` needs a query (what to search the source for)")]
+    EmptyAlertQuery(String),
+
     #[error("unknown alert source `{0}` (arxiv, pubmed, crossref)")]
     UnknownAlertSource(String),
 

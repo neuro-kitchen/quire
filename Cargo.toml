@@ -102,9 +102,10 @@ prost = "0.14.4"
 # Library backups (`quire library backup`): one .tar.gz
 tar = "0.4.46"
 flate2 = "1.1.10"
-# EPUB containers (`quire-document::epub`): deflate only, through flate2 (pure Rust); no C codecs
-# or crypto.
-zip = { version = "9.0.5", default-features = false, features = ["deflate-flate2"] }
+# EPUB containers (`quire-document::epub`): deflate only, through flate2 with zlib-rs (pure Rust; a
+# backend must be named: `deflate-flate2` alone left crates built on their own without one); no C
+# codecs or crypto.
+zip = { version = "9.0.5", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 pdf-inspector = "1.25.2"
 # PDF objects (the parser pdf-inspector uses): revealing invisible OCR text layers
 lopdf = "0.45.0"
@@ -148,6 +149,13 @@ uniffi = "0.32.2"
 # The apps' native library (`app/`, `quire-ffi`), without debug info (with it the library is
 # ~500 MB inside the app's jar). Symbols stay: UniFFI reads its metadata from them.
 # `app-dev` for development builds; `-Pquire.release` builds `app-release`.
+# Debug builds and tests: line tables only (panics and backtraces still name file and line), not
+# full debug info. Full debug info made the ~40 test binaries (each linking iroh, reqwest, hayro,
+# SQLite) slow and memory-hungry to link and filled `target/` (73 GB in one checkout, 2026-10-21).
+# Use `CARGO_PROFILE_DEV_DEBUG=full` for a debugger session.
+[profile.dev]
+debug = "line-tables-only"
+
 [profile.app-dev]
 inherits = "dev"
 debug = false
