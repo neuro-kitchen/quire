@@ -25,11 +25,8 @@ data class ToolsState(
     val duplicates: List<DuplicateGroupState>? = null,
     val checks: List<CheckedState>? = null,
     val retractions: List<RetractionState>? = null,
-    val export: ExportForm = ExportForm(),
-    val formats: List<String> = emptyList(),
-    /** The export as text, to look at before saving, and how many references. */
-    val exportPreview: String? = null,
-    val exportCount: Int = 0,
+    /** The export dialog is open. */
+    val isExportOpen: Boolean = false,
     val autoExports: List<AutoExport> = emptyList(),
     /** The project imports go into (`null`: none). */
     val importInto: String? = null,
@@ -59,9 +56,6 @@ data class CheckedState(val id: String, val citeKey: String, val issues: List<St
 @Immutable
 data class RetractionState(val reference: ReferenceLine, val notices: List<String>, val error: String?)
 
-/** What to export: a project (with its subprojects if [recursive]) or the library, in a format. */
-@Immutable
-data class ExportForm(val projectPath: String? = null, val recursive: Boolean = true, val format: String = "biblatex")
 
 @Immutable
 data class SyncState(

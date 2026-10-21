@@ -1,5 +1,7 @@
 package dev.neurokitchen.quire.presentation.screens.library.components
 
+import dev.neurokitchen.quire.presentation.designsystem.components.projectChoices
+import dev.neurokitchen.quire.presentation.designsystem.components.ChoiceMenu
 import dev.neurokitchen.quire.resources.add_remove
 import dev.neurokitchen.quire.resources.add_project_none
 import dev.neurokitchen.quire.resources.add_project
@@ -11,16 +13,9 @@ import dev.neurokitchen.quire.resources.add_pdf_pick
 import dev.neurokitchen.quire.resources.add_pdf_hint
 import dev.neurokitchen.quire.resources.add_tab_file
 import dev.neurokitchen.quire.resources.add_tab_pdf
-import dev.neurokitchen.quire.resources.ic_expand_more
 import dev.neurokitchen.quire.presentation.platform.pickFolder
 import dev.neurokitchen.quire.presentation.platform.pickFile
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -105,7 +100,12 @@ fun AddReferenceDialog(
             Column(Modifier.padding(Dimens.SpaceMd)) {
                 Header()
                 Spacer(Modifier.height(Dimens.SpaceSm))
-                ProjectPicker(state.project, projects) { onEvent(LibraryEvent.OnAddProjectSelect(it)) }
+                ChoiceMenu(
+                    label = stringResource(Res.string.add_project),
+                    selected = state.project,
+                    choices = projectChoices(stringResource(Res.string.add_project_none), projects),
+                    onSelect = { onEvent(LibraryEvent.OnAddProjectSelect(it)) },
+                )
                 Spacer(Modifier.height(Dimens.SpaceSm))
                 PrimaryTabRow(
                     selectedTabIndex = state.tab.ordinal,
@@ -293,32 +293,6 @@ private fun AddTab.label() = when (this) {
     AddTab.File -> Res.string.add_tab_file
     AddTab.Manual -> Res.string.add_tab_manual
     AddTab.Bibtex -> Res.string.add_tab_bibtex
-}
-
-/** "Add to": no project, or one of the library's (indented by depth). */
-@Composable
-private fun ProjectPicker(selected: String?, projects: List<Pair<String, String>>, onSelect: (String?) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    val none = stringResource(Res.string.add_project_none)
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceXs)) {
-        Text(stringResource(Res.string.add_project), style = MaterialTheme.typography.labelMedium, color = QuireTheme.colors.fillSecondary)
-        Box {
-            OutlinedButton(onClick = { open = true }) {
-                Text(projects.firstOrNull { it.first == selected }?.second ?: none, maxLines = 1)
-                Icon(painterResource(Res.drawable.ic_expand_more), contentDescription = null, modifier = Modifier.size(16.dp))
-            }
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                DropdownMenuItem(text = { Text(none) }, onClick = { open = false; onSelect(null) })
-                projects.forEach { (path, name) ->
-                    val depth = path.count { it == '/' }
-                    DropdownMenuItem(
-                        text = { Text(name, modifier = Modifier.padding(start = Dimens.SpaceSm * depth)) },
-                        onClick = { open = false; onSelect(path) },
-                    )
-                }
-            }
-        }
-    }
 }
 
 /** PDF files: each becomes the paper it is. Chosen one at a time; each can be taken off again. */

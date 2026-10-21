@@ -1,5 +1,6 @@
 package dev.neurokitchen.quire.presentation.screens.library
 
+import dev.neurokitchen.quire.presentation.components.export_dialog.ExportTarget
 import androidx.compose.runtime.Immutable
 import dev.neurokitchen.quire.domain.model.LibrarySource
 import dev.neurokitchen.quire.domain.model.ReadingStatus
@@ -36,6 +37,8 @@ data class LibraryState(
     val pageToOpen: String? = null,
     val isSidebarCollapsed: Boolean = false,
     val isInspectorCollapsed: Boolean = false,
+    /** What the export dialog exports, when open. */
+    val exportDialog: ExportTarget? = null,
     /** The add dialog, when open. */
     val addDialog: AddDialogState? = null,
     /** The dialog asking for a name (new project, rename), when open. */

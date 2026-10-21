@@ -1,5 +1,7 @@
 package dev.neurokitchen.quire.presentation.screens.library
 
+import dev.neurokitchen.quire.presentation.components.export_dialog.ExportTarget
+import dev.neurokitchen.quire.presentation.components.export_dialog.ExportDialog
 import dev.neurokitchen.quire.presentation.components.notice.Notice
 import dev.neurokitchen.quire.presentation.components.notice.NoticeBar
 import dev.neurokitchen.quire.resources.search_invalid
@@ -183,6 +185,14 @@ fun LibraryScreen(
     }
 
     state.addDialog?.let { dialog -> AddReferenceDialog(dialog, onEvent, projects = state.projectChoices) }
+    state.exportDialog?.let { target ->
+        ExportDialog(
+            target = target,
+            projects = state.projectChoices,
+            onDismiss = { onEvent(LibraryEvent.OnShowExport(null)) },
+            onDone = { onEvent(LibraryEvent.OnExportDone(it)) },
+        )
+    }
 
     val uriHandler = LocalUriHandler.current
     LaunchedEffect(state.pageToOpen) {
@@ -299,6 +309,7 @@ private fun ThreePanes(
                     onSelectAll = { onEvent(LibraryEvent.OnSelectAll) },
                     onClearSelection = { onEvent(LibraryEvent.OnClearSelection) },
                     onCreateCollectionFromSelected = { onEvent(LibraryEvent.OnNameDialog(NameDialog.NewProject(withIds = state.selectedIds))) },
+                    onExportSelected = { onEvent(LibraryEvent.OnShowExport(ExportTarget(references = state.selectedIds.toList()))) },
                     onQuickLook = { onEvent(LibraryEvent.OnToggleQuickLook(true)) },
                     drag = drag,
                     onDropOnProject = { ids, path -> onEvent(LibraryEvent.OnBatchAddToProject(ids, path)) },
