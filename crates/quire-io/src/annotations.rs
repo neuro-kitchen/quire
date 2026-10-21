@@ -64,6 +64,7 @@ fn yaml(text: &str) -> String {
     let plain = !text.is_empty()
         && !text.starts_with(|c: char| "-?:,[]{}#&*!|>'\"%@`".contains(c) || c.is_whitespace())
         && !text.ends_with(char::is_whitespace)
+        && !text.contains(char::is_control)
         && !text.contains(": ")
         && !text.contains(" #")
         && !matches!(text.to_ascii_lowercase().as_str(), "true" | "false" | "null" | "yes" | "no" | "~")
@@ -71,7 +72,19 @@ fn yaml(text: &str) -> String {
     if plain {
         return text.to_string();
     }
-    format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n"))
+    let mut quoted = String::with_capacity(text.len() + 2);
+    for c in text.chars() {
+        match c {
+            '\\' => quoted.push_str("\\\\"),
+            '"' => quoted.push_str("\\\""),
+            '\n' => quoted.push_str("\\n"),
+            '\r' => quoted.push_str("\\r"),
+            '\t' => quoted.push_str("\\t"),
+            c if c.is_control() => quoted.push_str(&format!("\\u{:04X}", c as u32)),
+            c => quoted.push(c),
+        }
+    }
+    format!("\"{quoted}\"")
 }
 
 #[cfg(test)]
@@ -79,6 +92,15 @@ mod tests {
     use quire_model::{CiteKey, Creator, CreatorRole, Date, DeviceId, EntryKind, Identifier, Origin, ReferenceData};
 
     use super::*;
+
+    /// A line break or tab in a value (a title pasted with its wrap) was written plain, which ends
+    /// the YAML value early or breaks the front matter.
+    #[test]
+    fn control_characters_are_quoted() {
+        assert_eq!(yaml("Line one\nLine two"), "\"Line one\\nLine two\"");
+        assert_eq!(yaml("a\tb\r"), "\"a\\tb\\r\"");
+        assert_eq!(yaml("Plain title"), "Plain title");
+    }
 
     #[test]
     fn front_matter_highlights_notes() {
