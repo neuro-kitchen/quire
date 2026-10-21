@@ -134,3 +134,63 @@ async fn collaborators_see_only_what_is_shared() {
     assert!(bob.tags().await.unwrap().is_empty(), "Alice's tag stays hers");
     assert_eq!(on_alice.id, bob.show(&key).await.unwrap().0.id);
 }
+
+/// The key sealing data for a hub: the same on one person's devices of one library (derived, never
+/// carried), different for another person; the recovery kit holds what recovers it.
+#[tokio::test]
+async fn one_persons_devices_share_the_library_key() {
+    let (dir_a, dir_b, dir_c) =
+        (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let (a, b, c) =
+        (engine(dir_a.path(), None).await, engine(dir_b.path(), None).await, engine(dir_c.path(), None).await);
+    b.import_user_key(&a.export_user_key().unwrap()).unwrap();
+    let bib = dir_a.path().join("refs.bib");
+    std::fs::write(&bib, BIB).unwrap();
+    a.import_bib(&bib, None).await.unwrap();
+    assert_ne!(
+        a.library_key().await.unwrap().file_id("h"),
+        b.library_key().await.unwrap().file_id("h"),
+        "not joined yet"
+    );
+    sync(&b, &a).await;
+    assert_eq!(a.library_key().await.unwrap().file_id("h"), b.library_key().await.unwrap().file_id("h"));
+    assert_ne!(
+        a.library_key().await.unwrap().file_id("h"),
+        c.library_key().await.unwrap().file_id("h"),
+        "another person"
+    );
+    assert!(a.recovery_kit().unwrap().contains(&a.export_user_key().unwrap()));
+}
+
+/// With PDFs loading as they are opened, a direct sync with another device brings no file; asking
+/// for one brings that one only.
+#[tokio::test]
+async fn an_on_open_device_gets_one_file_from_another_device_when_asked() {
+    let (dir_a, dir_b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let a = engine(dir_a.path(), None).await;
+    std::fs::write(dir_b.path().join("config.toml"), "[files]\ndownload = \"on-open\"\n").unwrap();
+    let b = engine(dir_b.path(), None).await;
+    b.import_user_key(&a.export_user_key().unwrap()).unwrap();
+    let bib = dir_a.path().join("refs.bib");
+    std::fs::write(&bib, "@article{one, title = {One}, year = {2020}}\n@article{two, title = {Two}, year = {2021}}")
+        .unwrap();
+    a.import_bib(&bib, None).await.unwrap();
+    for key in ["one", "two"] {
+        let (reference, _) = a.show(key).await.unwrap();
+        a.attach_bytes(&reference, &tiny_pdf(key), "test", false).await.unwrap();
+    }
+    let (client, _) = sync(&b, &a).await;
+    assert_eq!(client.files_received, 0, "{client:?}");
+
+    let hash = b.pdfs_of("one").await.unwrap().1[0].0.hash.clone();
+    let (left, right) = tokio::io::duplex(64 * 1024);
+    let (mut left_read, mut left_write) = tokio::io::split(left);
+    let (mut right_read, mut right_write) = tokio::io::split(right);
+    let (got, served) = tokio::join!(
+        b.fetch_session(&hash, SyncSide::Client, &mut left_read, &mut left_write),
+        a.sync_session(SyncSide::Server, &mut right_read, &mut right_write),
+    );
+    assert!(got.unwrap());
+    assert_eq!(served.unwrap().files_sent, 1, "only the file asked for");
+    assert!(!b.pdfs_of("two").await.unwrap().1[0].1.is_file());
+}

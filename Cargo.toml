@@ -7,8 +7,9 @@ members = [
     "crates/quire-store",
     "crates/quire-fetch",
     "crates/quire-engine",
-    "crates/quire-server",
+    "crates/quire-connector",
     "crates/quire-sync",
+    "crates/quire-hub",
     "crates/quire-ffi",
     "crates/quire-document",
     "crates/quire-testkit",
@@ -35,8 +36,9 @@ quire-core = { path = "crates/quire-core" }
 quire-store = { path = "crates/quire-store" }
 quire-fetch = { path = "crates/quire-fetch" }
 quire-engine = { path = "crates/quire-engine" }
-quire-server = { path = "crates/quire-server" }
+quire-connector = { path = "crates/quire-connector" }
 quire-sync = { path = "crates/quire-sync" }
+quire-hub = { path = "crates/quire-hub" }
 quire-document = { path = "crates/quire-document" }
 quire-testkit = { path = "crates/quire-testkit" }   # dev-dependency only
 quire-tui = { path = "app/quire-tui" }
@@ -93,6 +95,10 @@ hayagriva = { version = "0.10.1", default-features = false, features = ["biblate
 
 # Files (content-addressed attachments; PDF checks)
 blake3 = "1.8.7"
+# Sealing sync data for a hub (XChaCha20-Poly1305; RustCrypto, NCC-audited line; `.knowledge/sync-hub.md`)
+chacha20poly1305 = { version = "0.11.0", default-features = false, features = ["alloc"] }
+# Hub messages as Protocol Buffers (derive only, no protoc): the same schema serves a gRPC service later
+prost = "0.14.4"
 # Library backups (`quire library backup`): one .tar.gz
 tar = "0.4.46"
 flate2 = "1.1.10"

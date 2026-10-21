@@ -90,12 +90,61 @@ pub async fn verify(context: &Context, args: &ListArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Opens the PDF, fetching it first if it is not on this device (the hub, another of your
+/// devices, then the source: lazy PDFs, `.knowledge/sync-hub.md`).
 pub async fn open(engine: &Engine, args: &QueryArgs) -> anyhow::Result<()> {
-    let (reference, pdfs) = engine.pdfs_of(&args.query).await?;
-    let (_, path) = pdfs.first().ok_or_else(|| {
-        anyhow::anyhow!("`{}` has no PDF; `quire pdf get {}` looks for one", reference.cite_key, reference.cite_key)
-    })?;
-    Ok(quire_engine::tools::open(&path.display().to_string())?)
+    let opened = engine.open_pdf(&args.query).await?;
+    match &opened.source {
+        quire_engine::PdfSource::Here => {}
+        quire_engine::PdfSource::Hub => output::hint("downloaded from your sync hub"),
+        quire_engine::PdfSource::Peer(name) => output::hint(format!("fetched from your device {name}")),
+        quire_engine::PdfSource::Found(source) => output::hint(format!("found again ({source}) and attached")),
+    }
+    Ok(quire_engine::tools::open(&opened.path.display().to_string())?)
+}
+
+#[derive(Args, Debug)]
+pub struct KeepArgs {
+    /// Cite key, DOI / arXiv ID / PMID, or reference ID; with --project, a project path
+    target: String,
+    /// TARGET is a project (its subprojects too)
+    #[arg(long)]
+    project: bool,
+    /// Stop keeping it downloaded
+    #[arg(long)]
+    off: bool,
+}
+
+/// Keeps a paper's (or a project's) PDFs downloaded on this device, whatever `files.download`.
+pub async fn keep(engine: &Engine, args: &KeepArgs) -> anyhow::Result<()> {
+    let changed = if args.project {
+        engine.keep_project_offline(&args.target.parse()?, !args.off).await?
+    } else {
+        engine.keep_reference_offline(&args.target, !args.off).await?
+    };
+    let what = if args.off { "no longer kept offline" } else { "kept offline (downloaded at the next sync)" };
+    output::report(
+        if changed { Tone::Ok } else { Tone::Info },
+        if changed { "done" } else { "unchanged" },
+        format!("{}: {what}", args.target),
+    );
+    Ok(())
+}
+
+/// Removes PDFs past `files.cache_mb` (only those your sync hub holds; never one kept offline).
+pub async fn evict(engine: &Engine) -> anyhow::Result<()> {
+    let eviction = engine.evict_pdfs().await?;
+    output::report(
+        Tone::Ok,
+        "evicted",
+        format!(
+            "{} PDF(s), {} MB freed; {} MB of PDFs here",
+            eviction.removed,
+            eviction.freed / (1024 * 1024),
+            eviction.kept / (1024 * 1024)
+        ),
+    );
+    Ok(())
 }
 
 pub async fn path(engine: &Engine, args: &QueryArgs) -> anyhow::Result<()> {

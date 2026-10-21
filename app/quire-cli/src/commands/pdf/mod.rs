@@ -45,6 +45,10 @@ enum Action {
     Ocr(ocr::OcrArgs),
     /// Remove a reference's PDFs (the files stay in the store)
     Rm(files::QueryArgs),
+    /// Keep a paper's or project's PDFs downloaded on this device (`files.download = "on-open"`)
+    Keep(files::KeepArgs),
+    /// Remove PDFs past `files.cache_mb` (only those your sync hub holds)
+    Evict,
 }
 
 pub async fn run(context: &Context, args: &PdfArgs) -> anyhow::Result<ExitCode> {
@@ -61,5 +65,7 @@ pub async fn run(context: &Context, args: &PdfArgs) -> anyhow::Result<ExitCode> 
         Action::Verify(args) => files::verify(context, args).await.and(done),
         Action::Ocr(args) => ocr::run(engine, args).await,
         Action::Rm(args) => files::remove(engine, args).await.and(done),
+        Action::Keep(args) => files::keep(engine, args).await.and(done),
+        Action::Evict => files::evict(engine).await.and(done),
     }
 }

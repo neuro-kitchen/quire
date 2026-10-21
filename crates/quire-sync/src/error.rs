@@ -27,6 +27,15 @@ pub enum SyncError {
     #[error("device {0} is not one of your peers (`quire sync peer add`)")]
     NotAPeer(String),
 
+    /// The hub does not know this person yet: register with a code (the hub's setup code, an
+    /// invitation, or the cloud account's link code).
+    #[error("the sync hub does not know you yet: add it with its setup or link code")]
+    NotRegistered,
+
+    /// The hub refused a request (`code`: `hub::protocol::ErrorCode`).
+    #[error("sync hub: {message}")]
+    Hub { code: i32, message: String },
+
     #[error("network: {0}")]
     Network(String),
 
