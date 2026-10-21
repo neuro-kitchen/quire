@@ -160,6 +160,14 @@ debug = "line-tables-only"
 inherits = "dev"
 debug = false
 strip = "debuginfo"
+# The app's development build (`./gradlew :desktopApp:run`). Unoptimized, PDF pages took 0.2-7.7 s
+# to render instead of 9-72 ms, and every query was ~6x slower (T10, 2026-10-21). Dependencies
+# (hayro, SQLite, iroh, …) are fully optimized: built once, then cached. quire's own crates are
+# lightly optimized, so rebuilding after a change to them stays quick.
+opt-level = 1
+
+[profile.app-dev.package."*"]
+opt-level = 3
 
 [profile.app-release]
 inherits = "release"
