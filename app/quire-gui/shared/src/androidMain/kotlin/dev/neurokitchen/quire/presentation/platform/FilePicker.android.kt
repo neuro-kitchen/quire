@@ -32,7 +32,7 @@ actual fun rememberFilePicker(onPicked: (PickKind, List<String>) -> Unit): FileP
         if (uris.isEmpty()) return@rememberLauncherForActivityResult
         val kind = pending
         scope.launch {
-            val paths = withContext(Dispatchers.IO) { uris.mapNotNull { copyToCache(context, it) } }
+            val paths = withContext(Dispatchers.IO) { uris.mapNotNull { copyDocumentToCache(context, it) } }
             if (paths.isNotEmpty()) callback(kind, if (kind == PickKind.Bib) paths.take(1) else paths)
         }
     }
@@ -52,8 +52,11 @@ actual fun rememberFilePicker(onPicked: (PickKind, List<String>) -> Unit): FileP
     }
 }
 
-/** The document at [uri] copied to the cache, as a file with its display name; `null` if unreadable. */
-private fun copyToCache(context: Context, uri: Uri): String? = runCatching {
+/**
+ * The document at [uri] copied to the cache, as a file with its display name; `null` if unreadable.
+ * (Picked files, and files shared with Quire or opened in it.)
+ */
+fun copyDocumentToCache(context: Context, uri: Uri): String? = runCatching {
     val name = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
         if (cursor.moveToFirst()) cursor.getString(0) else null
     } ?: "picked-${System.currentTimeMillis()}"

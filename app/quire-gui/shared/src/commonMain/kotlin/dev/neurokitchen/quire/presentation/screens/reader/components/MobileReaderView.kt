@@ -1,5 +1,9 @@
 package dev.neurokitchen.quire.presentation.screens.reader.components
 
+import dev.neurokitchen.quire.resources.reader_to_pdf
+import dev.neurokitchen.quire.resources.reader_to_text
+import dev.neurokitchen.quire.resources.ic_picture_as_pdf
+import dev.neurokitchen.quire.resources.ic_subject
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -35,7 +39,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -101,14 +104,8 @@ import dev.neurokitchen.quire.resources.ic_search
 import dev.neurokitchen.quire.resources.ic_sticky_note_2
 import dev.neurokitchen.quire.resources.reader_display
 import dev.neurokitchen.quire.resources.reader_display_font
-import dev.neurokitchen.quire.resources.reader_display_page
-import dev.neurokitchen.quire.resources.reader_display_pdf
 import dev.neurokitchen.quire.resources.reader_display_size
-import dev.neurokitchen.quire.resources.reader_display_text
 import dev.neurokitchen.quire.resources.reader_display_theme
-import dev.neurokitchen.quire.resources.reader_display_view
-import dev.neurokitchen.quire.resources.reader_display_zoom
-import dev.neurokitchen.quire.resources.reader_display_zoom_fit
 import dev.neurokitchen.quire.resources.reader_figures
 import dev.neurokitchen.quire.resources.reader_find_count
 import dev.neurokitchen.quire.resources.reader_find_next
@@ -185,6 +182,8 @@ fun MobileReaderView(
                     onTapPage = toggleChrome,
                     contentPadding = padding,
                     jumpToPage = jump,
+                    onPinchZoom = { onEvent(ReaderEvent.OnSetZoom(it)) },
+                    selectAfterLongPress = true,
                 )
                 state.isLoading && state.tabs.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(stringResource(Res.string.reader_loading), color = QuireTheme.colors.fillSecondary, style = MaterialTheme.typography.bodyLarge)
@@ -246,10 +245,14 @@ fun MobileReaderView(
                 onFigures = { onEvent(ReaderEvent.OnToggleFigureDrawer) },
                 onNotes = { onEvent(ReaderEvent.OnToggleNotes) },
                 onDisplay = { isDisplayOpen = true },
+                // With a PDF: one tap between the page as printed and the reflowed text.
+                onToggleMode = if (state.pdf.path != null) {
+                    { onEvent(ReaderEvent.OnModeChange(if (isPdf) ReaderMode.Text else ReaderMode.Pdf)) }
+                } else null,
             )
         }
 
-        if (isDisplayOpen) DisplaySheet(state, isPdf, onEvent, onDismiss = { isDisplayOpen = false })
+        if (isDisplayOpen && !isPdf) DisplaySheet(state, onEvent, onDismiss = { isDisplayOpen = false })
         if (!state.isAnnotationsCollapsed) {
             PanelSheet(onDismiss = { onEvent(ReaderEvent.OnToggleAnnotations) }) {
                 val located = state.pdf.locations.map { it.highlightId }.toSet()
@@ -422,6 +425,7 @@ private fun BottomControls(
     onFigures: () -> Unit,
     onNotes: () -> Unit,
     onDisplay: () -> Unit,
+    onToggleMode: (() -> Unit)?,
 ) {
     val colors = QuireTheme.colors
     val last = total.coerceAtLeast(1)
@@ -471,12 +475,17 @@ private fun BottomControls(
                 ToolbarAction(Res.drawable.ic_sticky_note_2, stringResource(Res.string.reader_highlights), highlights, onHighlights)
                 ToolbarAction(Res.drawable.ic_inventory_2, stringResource(Res.string.reader_figures), null, onFigures)
                 ToolbarAction(Res.drawable.ic_description, stringResource(Res.string.reader_notes), notes, onNotes)
-                Box(
-                    Modifier.size(48.dp).clip(CircleShape).clickable(onClick = onDisplay),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("Aa", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = colors.accent)
+                // Aa: how the text shows (a PDF's pages cannot be restyled, so not in PDF mode).
+                if (!isPdf) {
+                    val displayLabel = stringResource(Res.string.reader_display)
+                    Box(
+                        Modifier.size(48.dp).clip(CircleShape).clickable(onClickLabel = displayLabel, onClick = onDisplay),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("Aa", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = colors.accent)
+                    }
                 }
+                if (onToggleMode != null) ModeToggle(isPdf, onToggleMode)
             }
         }
     }
@@ -504,6 +513,34 @@ private fun ToolbarAction(icon: org.jetbrains.compose.resources.DrawableResource
     }
 }
 
+/**
+ * PDF ⇄ reading mode: a pill naming the mode it switches to ("Read mode" on the PDF, "PDF" on the
+ * text), so what a tap does is plain.
+ */
+@Composable
+private fun ModeToggle(isPdf: Boolean, onClick: () -> Unit) {
+    val colors = QuireTheme.colors
+    val label = stringResource(if (isPdf) Res.string.reader_to_text else Res.string.reader_to_pdf)
+    Row(
+        Modifier
+            .heightIn(min = 48.dp)
+            .clip(CircleShape)
+            .background(colors.accent)
+            .clickable(onClickLabel = label, onClick = onClick)
+            .padding(horizontal = Dimens.SpaceMd),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
+    ) {
+        Icon(
+            painterResource(if (isPdf) Res.drawable.ic_subject else Res.drawable.ic_picture_as_pdf),
+            contentDescription = null,
+            tint = colors.onAccent,
+            modifier = Modifier.size(20.dp),
+        )
+        Text(label, style = MaterialTheme.typography.labelLarge, color = colors.onAccent)
+    }
+}
+
 /** A reader panel (highlights, figures, notes) as a bottom sheet, most of the screen tall. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -518,12 +555,12 @@ private fun PanelSheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
 }
 
 /**
- * Aa: how the paper shows. PDF or text; for the PDF, zoom; for the text, size and typeface; the
- * page colours for both. (Reading status is on the paper's details.)
+ * Aa, in reading mode: text size, typeface and colours. (The PDF's pages cannot be restyled; the
+ * toolbar switches modes; reading status is on the paper's details.)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DisplaySheet(state: ReaderState, isPdf: Boolean, onEvent: (ReaderEvent) -> Unit, onDismiss: () -> Unit) {
+private fun DisplaySheet(state: ReaderState, onEvent: (ReaderEvent) -> Unit, onDismiss: () -> Unit) {
     val colors = QuireTheme.colors
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -535,62 +572,39 @@ private fun DisplaySheet(state: ReaderState, isPdf: Boolean, onEvent: (ReaderEve
             verticalArrangement = Arrangement.spacedBy(Dimens.SpaceSm),
         ) {
             Text(stringResource(Res.string.reader_display), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = colors.fillPrimary)
-            if (state.pdf.path != null) {
-                Label(stringResource(Res.string.reader_display_view))
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    listOf(ReaderMode.Pdf to Res.string.reader_display_pdf, ReaderMode.Text to Res.string.reader_display_text).forEachIndexed { i, (mode, label) ->
-                        SegmentedButton(
-                            selected = (state.mode == ReaderMode.Text) == (mode == ReaderMode.Text),
-                            onClick = { onEvent(ReaderEvent.OnModeChange(mode)) },
-                            shape = SegmentedButtonDefaults.itemShape(i, 2),
-                        ) { Text(stringResource(label)) }
+            Label(stringResource(Res.string.reader_display_size))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("A", style = MaterialTheme.typography.bodySmall, color = colors.fillSecondary)
+                Slider(
+                    value = state.fontSizeSp.toFloat(),
+                    onValueChange = { onEvent(ReaderEvent.OnChangeFontSize(it.roundToInt() - state.fontSizeSp)) },
+                    valueRange = 12f..28f,
+                    steps = 7,
+                    colors = SliderDefaults.colors(thumbColor = colors.accent, activeTrackColor = colors.accent, inactiveTrackColor = colors.fillTertiary),
+                    modifier = Modifier.weight(1f).padding(horizontal = Dimens.SpaceSm),
+                )
+                Text("A", style = MaterialTheme.typography.titleLarge, color = colors.fillPrimary)
+            }
+            Label(stringResource(Res.string.reader_display_font))
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                ReaderFont.entries.forEachIndexed { i, font ->
+                    SegmentedButton(
+                        selected = font == state.readerFont,
+                        onClick = { onEvent(ReaderEvent.OnSetReaderFont(font)) },
+                        shape = SegmentedButtonDefaults.itemShape(i, ReaderFont.entries.size),
+                    ) {
+                        Text(
+                            font.title,
+                            fontFamily = when (font) {
+                                ReaderFont.Serif -> FontFamily.Serif
+                                ReaderFont.Sans -> FontFamily.SansSerif
+                                ReaderFont.Mono -> FontFamily.Monospace
+                            },
+                        )
                     }
                 }
             }
-            if (isPdf) {
-                Label(stringResource(Res.string.reader_display_zoom))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceXs)) {
-                    FilterChip(selected = false, onClick = { onEvent(ReaderEvent.OnZoomOut) }, label = { Text("−") })
-                    Text("${(state.pdf.zoom * 100).roundToInt()}%", style = MaterialTheme.typography.titleMedium, color = colors.fillPrimary, modifier = Modifier.widthIn(min = 56.dp))
-                    FilterChip(selected = false, onClick = { onEvent(ReaderEvent.OnZoomIn) }, label = { Text("+") })
-                    Spacer(Modifier.weight(1f))
-                    FilterChip(selected = state.pdf.zoom == 1f, onClick = { onEvent(ReaderEvent.OnZoomReset) }, label = { Text(stringResource(Res.string.reader_display_zoom_fit)) })
-                }
-            } else {
-                Label(stringResource(Res.string.reader_display_size))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("A", style = MaterialTheme.typography.bodySmall, color = colors.fillSecondary)
-                    Slider(
-                        value = state.fontSizeSp.toFloat(),
-                        onValueChange = { onEvent(ReaderEvent.OnChangeFontSize(it.roundToInt() - state.fontSizeSp)) },
-                        valueRange = 12f..28f,
-                        steps = 7,
-                        colors = SliderDefaults.colors(thumbColor = colors.accent, activeTrackColor = colors.accent, inactiveTrackColor = colors.fillTertiary),
-                        modifier = Modifier.weight(1f).padding(horizontal = Dimens.SpaceSm),
-                    )
-                    Text("A", style = MaterialTheme.typography.titleLarge, color = colors.fillPrimary)
-                }
-                Label(stringResource(Res.string.reader_display_font))
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    ReaderFont.entries.forEachIndexed { i, font ->
-                        SegmentedButton(
-                            selected = font == state.readerFont,
-                            onClick = { onEvent(ReaderEvent.OnSetReaderFont(font)) },
-                            shape = SegmentedButtonDefaults.itemShape(i, ReaderFont.entries.size),
-                        ) {
-                            Text(
-                                font.title,
-                                fontFamily = when (font) {
-                                    ReaderFont.Serif -> FontFamily.Serif
-                                    ReaderFont.Sans -> FontFamily.SansSerif
-                                    ReaderFont.Mono -> FontFamily.Monospace
-                                },
-                            )
-                        }
-                    }
-                }
-            }
-            Label(stringResource(if (isPdf) Res.string.reader_display_page else Res.string.reader_display_theme))
+            Label(stringResource(Res.string.reader_display_theme))
             Row(horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceSm)) {
                 ReaderTheme.entries.forEach { theme ->
                     val themeColors = readerColors(theme)
@@ -608,11 +622,7 @@ private fun DisplaySheet(state: ReaderState, isPdf: Boolean, onEvent: (ReaderEve
                     }
                 }
             }
-            Text(
-                ReaderTheme.entries.first { it == state.readerTheme }.title,
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.fillSecondary,
-            )
+            Text(state.readerTheme.title, style = MaterialTheme.typography.bodySmall, color = colors.fillSecondary)
         }
     }
 }

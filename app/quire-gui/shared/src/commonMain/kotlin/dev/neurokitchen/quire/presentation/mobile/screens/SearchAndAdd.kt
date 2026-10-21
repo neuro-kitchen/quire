@@ -1,5 +1,6 @@
 package dev.neurokitchen.quire.presentation.mobile.screens
 
+import dev.neurokitchen.quire.presentation.screens.library.AddTab
 import org.jetbrains.compose.resources.stringResource
 import dev.neurokitchen.quire.resources.add_confirm_short
 import dev.neurokitchen.quire.resources.add_subtitle_phone
@@ -71,12 +72,21 @@ fun SearchTab(
 fun AddScreen(
     projectPath: String?,
     onDone: () -> Unit,
+    /** What was shared with Quire: identifiers (one per line) or PDF files. */
+    identifiers: String = "",
+    pdfs: List<String> = emptyList(),
     viewModel: LibraryViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         viewModel.onEvent(LibraryEvent.OnShowAddDialog(true))
         projectPath?.let { viewModel.onEvent(LibraryEvent.OnAddProjectSelect(it)) }
+        if (pdfs.isNotEmpty()) {
+            viewModel.onEvent(LibraryEvent.OnAddTabSelect(AddTab.Pdf))
+            viewModel.onEvent(LibraryEvent.OnAddPdfsPicked(pdfs))
+        } else if (identifiers.isNotBlank()) {
+            viewModel.onEvent(LibraryEvent.OnIdentifierChange(identifiers))
+        }
     }
     val dialog = state.addDialog
     // The add went through: its state, once shown, is cleared; back to where Add was opened.
