@@ -64,6 +64,12 @@ impl Engine {
         if !present.is_empty() {
             return Ok(PdfOutcome::Present(Box::new(reference), present));
         }
+        self.download_pdf(reference).await
+    }
+
+    /// Finds the PDF of `reference` (open access, Unpaywall, the publisher) and attaches it if it is
+    /// this paper's; a failed attempt is recorded (a blocked site as an issue, for the browser).
+    pub(super) async fn download_pdf(&self, reference: Reference) -> Result<PdfOutcome> {
         let found = match self.fetcher.find_pdf(&reference.data).await {
             Ok(found) => found,
             Err(error) => {

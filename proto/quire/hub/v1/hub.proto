@@ -1,0 +1,128 @@
+// quire's sync hub protocol (`.knowledge/sync-hub.md`). The source of truth is the `prost` derive in
+// `crates/quire-sync/src/hub/protocol.rs`; this file mirrors it for a gRPC service later (`tonic`)
+// and other clients. Tags must agree (`quire-sync` test `hub_proto_matches_the_derive`).
+//
+// Over iroh (ALPN `quire/hub/1`) each message travels with a 4-byte big-endian length in front; a
+// file's bytes follow its `PutFile` request or `FileHeader` reply raw. Batches and files are sealed
+// by the devices: the hub cannot read them.
+syntax = "proto3";
+
+package quire.hub.v1;
+
+message Certificate {
+  string user = 1;
+  string device = 2;
+  string signature = 3;
+}
+
+enum BatchKind {
+  CHANGES = 0;
+  SNAPSHOT = 1;
+}
+
+message Batch {
+  string author = 1;
+  uint64 number = 2;
+  BatchKind kind = 3;
+  bytes sealed = 4;
+  uint64 covers = 5;
+  uint64 seq = 6;
+}
+
+message Hello {
+  uint32 protocol = 1;
+  Certificate certificate = 2;
+  string library = 3;
+  string author = 4;
+}
+
+message Register { string code = 1; }
+message Push { repeated Batch batches = 1; }
+message Pull {
+  uint64 after = 1;
+  uint32 limit = 2;
+}
+message FileIds { repeated string ids = 1; }
+message PutFile {
+  string id = 1;
+  uint64 size = 2;
+}
+message GetFile { string id = 1; }
+message Revoke { string device = 1; }
+message Empty {}
+
+message Request {
+  oneof body {
+    Hello hello = 1;
+    Register register = 2;
+    Push push = 3;
+    Pull pull = 4;
+    FileIds has_files = 5;
+    PutFile put_file = 6;
+    GetFile get_file = 7;
+    Empty devices = 8;
+    Revoke revoke = 9;
+    Empty bye = 10;
+  }
+}
+
+enum ErrorCode {
+  PROTOCOL = 0;
+  NOT_REGISTERED = 1;
+  BAD_CODE = 2;
+  REVOKED = 3;
+  QUOTA = 4;
+  NOT_FOUND = 5;
+  TOO_LARGE = 6;
+  BUSY = 7;
+}
+
+message Error {
+  ErrorCode code = 1;
+  string message = 2;
+}
+
+message Welcome {
+  bool registered = 1;
+  uint64 last_number = 2;
+  uint64 hub_seq = 3;
+  uint64 used = 4;
+  uint64 quota = 5;
+  repeated string libraries = 6;
+}
+
+message Pushed { uint64 hub_seq = 1; }
+
+message Batches {
+  repeated Batch batches = 1;
+  uint64 up_to = 2;
+  bool more = 3;
+  uint64 since_snapshot = 4;
+}
+
+message FileHeader {
+  string id = 1;
+  uint64 size = 2;
+}
+
+message DeviceInfo {
+  string device = 1;
+  int64 first_seen = 2;
+  int64 last_seen = 3;
+  bool revoked = 4;
+}
+
+message DeviceList { repeated DeviceInfo devices = 1; }
+
+message Reply {
+  oneof body {
+    Error error = 1;
+    Welcome welcome = 2;
+    Empty ok = 3;
+    Pushed pushed = 4;
+    Batches batches = 5;
+    FileIds present = 6;
+    FileHeader file = 7;
+    DeviceList devices = 8;
+  }
+}

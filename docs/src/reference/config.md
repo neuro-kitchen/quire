@@ -13,6 +13,9 @@ file). Change them with `quire config set <key> <value>`; `*` is a name you choo
 | `library.default` | library used when none is chosen |
 | `libraries.*.path` | folder of a registered library (see `quire library new`) |
 | `peers.*.id` | a device to sync with: its ID (`quire sync id` on it) |
+| `hub.id` | the sync hub this device syncs through: its ID (`quire-hub id`) |
+| `files.download` | download every PDF at sync (all), or as they are opened (on-open) |
+| `files.cache_mb` | space for PDFs in MB; past it, files the hub holds are removed here (0: no limit) |
 | `access.downloads` | folder your browser saves downloads to (default: ~/Downloads) |
 | `export.*.format` | export profile: output format |
 | `export.*.omit` | export profile: fields left out, e.g. abstract,file,note |

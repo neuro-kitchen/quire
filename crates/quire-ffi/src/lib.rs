@@ -27,6 +27,7 @@ mod config;
 mod curation;
 mod discovery;
 mod exchange;
+mod hub;
 mod libraries;
 mod pdf;
 mod projects;
@@ -57,6 +58,7 @@ pub use exchange::{
     AnnotationsRecord, AutoExportRecord, AutoExportRun, CiteUseRecord, ExportSelection, ExportedText, ManuscriptRecord,
     UnknownKeyRecord, ZoteroImportRecord, export_formats,
 };
+pub use hub::{EvictionRecord, HubDeviceRecord, HubReportRecord, OpenedPdfRecord};
 pub use libraries::{
     BackupRecord, LibraryEntryRecord, list_libraries, register_library, rename_library, set_default_library,
     unregister_library,

@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use quire_core::library::sharing;
 use quire_model::{ProjectMember, Role as MemberRole, SlugPath, UserId};
 use quire_sync::identity::{self, Certificate};
+use quire_sync::seal::LibraryKey;
 use quire_sync::transport::{self, Device};
 use quire_sync::{Peer, Replica, Report, Side, SyncError};
 
@@ -24,12 +25,12 @@ const USER_SECRET: &str = "sync-user-key";
 
 impl Engine {
     /// This device's sync key, created on first use, and where it is kept.
-    fn sync_key(&self) -> Result<([u8; 32], Store)> {
+    pub(super) fn sync_key(&self) -> Result<([u8; 32], Store)> {
         self.key(SECRET)
     }
 
     /// The user's key, created on first use, and where it is kept.
-    fn user_key(&self) -> Result<([u8; 32], Store)> {
+    pub(super) fn user_key(&self) -> Result<([u8; 32], Store)> {
         self.key(USER_SECRET)
     }
 
@@ -61,6 +62,32 @@ impl Engine {
         let fallback = self.config_file().with_file_name(USER_SECRET);
         let store = secrets::set(USER_SECRET, hex.trim(), &fallback)?;
         Ok((UserId::parse(&identity::user_id(&key))?, store))
+    }
+
+    /// The key this library's data is sealed with on its way to a hub: derived from the user key
+    /// and the library ID, so all of this person's devices hold it without passing it around.
+    pub async fn library_key(&self) -> Result<LibraryKey> {
+        let (key, _) = self.user_key()?;
+        let library = self.run(|lib| lib.library_id()).await?;
+        Ok(LibraryKey::derive(&key, &library))
+    }
+
+    /// What to keep somewhere safe before syncing through a hub: the user key alone recovers every
+    /// library from the hub on a new device (the hub cannot read them, so it cannot help otherwise).
+    pub fn recovery_kit(&self) -> Result<String> {
+        let (user, _) = self.user_id()?;
+        let key = self.export_user_key()?;
+        Ok(format!(
+            "quire recovery kit\n\
+             \n\
+             User ID:  {user}\n\
+             User key: {key}\n\
+             \n\
+             Keep this offline (printed, or in a password manager). On a new device:\n\
+             `quire user key import <user key>`, then add your sync hub and sync.\n\
+             Whoever has this key can read your libraries and act as you; nobody, not the hub, can\n\
+             recover your data without it.\n"
+        ))
     }
 
     /// Shares the project at `path` with `user` (named `name`) as `role`.
@@ -141,6 +168,31 @@ impl Engine {
 }
 
 impl Engine {
+    /// Gets the file `hash` from the device `peer` with a sync that asks for that file only (the
+    /// rows are exchanged as in any sync); `false` if the device does not have it.
+    pub async fn fetch_from_peer(&self, peer: &str, hash: &str) -> Result<bool> {
+        let id = self.peer_id(peer)?;
+        let (key, _) = self.sync_key()?;
+        let device = Device::bind(&key).await?;
+        let report = device.sync_with(&Wanting { inner: LibraryReplica(self), hash: hash.to_string() }, &id).await;
+        device.close().await;
+        self.mark_changed();
+        report?;
+        Ok(self.files().path(hash, "pdf").is_file())
+    }
+
+    /// [`Engine::fetch_from_peer`] over `reader`/`writer` (tests).
+    pub async fn fetch_session<Rd, Wr>(&self, hash: &str, side: Side, reader: &mut Rd, writer: &mut Wr) -> Result<bool>
+    where
+        Rd: tokio::io::AsyncRead + Unpin,
+        Wr: tokio::io::AsyncWrite + Unpin,
+    {
+        let wanting = Wanting { inner: LibraryReplica(self), hash: hash.to_string() };
+        quire_sync::session::run(&wanting, side, None, reader, writer).await?;
+        self.mark_changed();
+        Ok(self.files().path(hash, "pdf").is_file())
+    }
+
     /// One sync session over `reader`/`writer` (any stream: QUIC in use, a pipe in tests).
     pub async fn sync_session<Rd, Wr>(&self, side: Side, reader: &mut Rd, writer: &mut Wr) -> Result<Report>
     where
@@ -154,14 +206,14 @@ impl Engine {
 }
 
 /// The open library as one side of a sync session.
-struct LibraryReplica<'a>(&'a Engine);
+pub(super) struct LibraryReplica<'a>(pub(super) &'a Engine);
 
 fn replica<T>(result: Result<T>) -> quire_sync::Result<T> {
     result.map_err(|e| SyncError::Replica(e.to_string()))
 }
 
 impl LibraryReplica<'_> {
-    fn pdf(&self, hash: &str) -> PathBuf {
+    pub(super) fn pdf(&self, hash: &str) -> PathBuf {
         self.0.files().path(hash, "pdf")
     }
 }
@@ -240,8 +292,8 @@ impl Replica for LibraryReplica<'_> {
     }
 
     async fn missing_files(&self) -> quire_sync::Result<Vec<String>> {
-        let hashes = replica(self.0.run(|lib| lib.attachment_hashes()).await)?;
-        Ok(hashes.into_iter().filter(|hash| !self.pdf(hash).is_file()).collect())
+        // All missing files, or with `files.download = "on-open"` only those kept offline.
+        replica(self.0.wanted_files().await)
     }
 
     async fn read_file(&self, hash: &str, to: &Peer) -> quire_sync::Result<Option<Vec<u8>>> {
@@ -273,4 +325,65 @@ fn collaborator(peer: &Peer) -> quire_sync::Result<Option<UserId>> {
         return Ok(None);
     }
     UserId::parse(&peer.user).map(Some).map_err(|e| SyncError::Protocol(e.to_string()))
+}
+
+/// The library as a session side that asks the other device for one file only (lazy PDFs: the
+/// rest stays on the other device until opened).
+struct Wanting<'a> {
+    inner: LibraryReplica<'a>,
+    hash: String,
+}
+
+impl Replica for Wanting<'_> {
+    async fn library_id(&self) -> quire_sync::Result<String> {
+        self.inner.library_id().await
+    }
+
+    fn device(&self) -> String {
+        self.inner.device()
+    }
+
+    fn certificate(&self) -> Certificate {
+        self.inner.certificate()
+    }
+
+    async fn is_new(&self) -> quire_sync::Result<bool> {
+        self.inner.is_new().await
+    }
+
+    async fn adopt(&self, library: &str) -> quire_sync::Result<()> {
+        self.inner.adopt(library).await
+    }
+
+    async fn received_from(&self, device: &str) -> quire_sync::Result<i64> {
+        self.inner.received_from(device).await
+    }
+
+    async fn changes_for(&self, seq: i64, to: &Peer) -> quire_sync::Result<(Vec<quire_core::sync::Row>, i64)> {
+        self.inner.changes_for(seq, to).await
+    }
+
+    async fn merge(
+        &self,
+        rows: Vec<quire_core::sync::Row>,
+        from: &Peer,
+    ) -> quire_sync::Result<quire_core::sync::MergeSummary> {
+        self.inner.merge(rows, from).await
+    }
+
+    async fn record_received(&self, device: &str, seq: i64) -> quire_sync::Result<()> {
+        self.inner.record_received(device, seq).await
+    }
+
+    async fn missing_files(&self) -> quire_sync::Result<Vec<String>> {
+        Ok(if self.inner.pdf(&self.hash).is_file() { Vec::new() } else { vec![self.hash.clone()] })
+    }
+
+    async fn read_file(&self, hash: &str, to: &Peer) -> quire_sync::Result<Option<Vec<u8>>> {
+        self.inner.read_file(hash, to).await
+    }
+
+    async fn write_file(&self, hash: &str, bytes: Vec<u8>) -> quire_sync::Result<()> {
+        self.inner.write_file(hash, bytes).await
+    }
 }

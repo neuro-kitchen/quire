@@ -1,0 +1,82 @@
+# quire's hosted sync hub (`.knowledge/sync-hub.md`, "the cloud"): the same hub image as for
+# self-hosting, with continuous backups to S3-compatible object storage and our own iroh relay.
+# One small server runs all of it. See README.md in this folder.
+services:
+  hub:
+    image: ghcr.io/neuro-kitchen/quire-hub:${QUIRE_HUB_VERSION:-latest}
+    restart: unless-stopped
+    volumes:
+      - hub-data:/data
+    environment:
+      QUIRE_HUB_QUOTA_MB: ${QUIRE_HUB_QUOTA_MB:-1024}
+      QUIRE_HUB_RELAY: https://${RELAY_HOSTNAME}
+      QUIRE_HUB_MAX_SESSIONS: ${QUIRE_HUB_MAX_SESSIONS:-256}
+      RUST_LOG: quire_hub=info,warn
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/quire-hub", "health"]
+      interval: 30s
+      timeout: 5s
+
+  # The hub's database, replicated continuously (WAL frames, every second).
+  litestream:
+    image: docker.io/litestream/litestream:0.5.17
+    restart: unless-stopped
+    # The hub's user: files Litestream creates next to the database stay writable by the hub.
+    user: "65532:65532"
+    command: ["replicate"]
+    volumes:
+      - hub-data:/data
+      - ./litestream.yml:/etc/litestream.yml:ro
+    environment:
+      LITESTREAM_ACCESS_KEY_ID: ${BACKUP_ACCESS_KEY_ID}
+      LITESTREAM_SECRET_ACCESS_KEY: ${BACKUP_SECRET_ACCESS_KEY}
+      BACKUP_ENDPOINT: ${BACKUP_ENDPOINT}
+      BACKUP_BUCKET: ${BACKUP_BUCKET}
+      BACKUP_FORCE_PATH_STYLE: ${BACKUP_FORCE_PATH_STYLE:-false}
+
+  # The sealed files, copied to the same storage every 10 minutes (they never change once written).
+  files-backup:
+    image: docker.io/rclone/rclone:1.75.1
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c", "while true; do rclone copy /data/files backup:$${BACKUP_BUCKET}/files --immutable; sleep 600; done"]
+    volumes:
+      - hub-data:/data:ro
+    environment:
+      RCLONE_CONFIG_BACKUP_TYPE: s3
+      RCLONE_CONFIG_BACKUP_PROVIDER: ${BACKUP_PROVIDER:-Other}
+      RCLONE_CONFIG_BACKUP_ENDPOINT: ${BACKUP_ENDPOINT}
+      RCLONE_CONFIG_BACKUP_ACCESS_KEY_ID: ${BACKUP_ACCESS_KEY_ID}
+      RCLONE_CONFIG_BACKUP_SECRET_ACCESS_KEY: ${BACKUP_SECRET_ACCESS_KEY}
+      BACKUP_BUCKET: ${BACKUP_BUCKET}
+
+  # Only for restoring (README.md, "Restore"): rclone with the volume writable. Not started by
+  # `up`; run with `docker compose run --rm restore …`.
+  restore:
+    image: docker.io/rclone/rclone:1.75.1
+    profiles: ["restore"]
+    volumes:
+      - hub-data:/data
+    environment:
+      RCLONE_CONFIG_BACKUP_TYPE: s3
+      RCLONE_CONFIG_BACKUP_PROVIDER: ${BACKUP_PROVIDER:-Other}
+      RCLONE_CONFIG_BACKUP_ENDPOINT: ${BACKUP_ENDPOINT}
+      RCLONE_CONFIG_BACKUP_ACCESS_KEY_ID: ${BACKUP_ACCESS_KEY_ID}
+      RCLONE_CONFIG_BACKUP_SECRET_ACCESS_KEY: ${BACKUP_SECRET_ACCESS_KEY}
+
+  # Our own iroh relay: devices that cannot reach the hub directly pass through it (encrypted end
+  # to end; it relays QUIC packets it cannot read). Needs ports 80/443 TCP and 7842 UDP.
+  relay:
+    image: docker.io/n0computer/iroh-relay:v1.3.0
+    restart: unless-stopped
+    command: ["--config-path", "/etc/iroh-relay.toml"]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "7842:7842/udp"
+    volumes:
+      - ./iroh-relay.toml:/etc/iroh-relay.toml:ro
+      - relay-certs:/certs
+
+volumes:
+  hub-data:
+  relay-certs:
