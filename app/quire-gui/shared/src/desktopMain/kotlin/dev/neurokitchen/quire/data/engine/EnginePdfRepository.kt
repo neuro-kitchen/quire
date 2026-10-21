@@ -19,7 +19,6 @@ import dev.neurokitchen.quire.ffi.pdfTextRange
 import dev.neurokitchen.quire.ffi.pdfWordAt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.util.Collections
 import java.util.LinkedHashMap
 
 /**
@@ -28,26 +27,15 @@ import java.util.LinkedHashMap
  * Offloaded to Dispatchers.IO with a bounded LRU memory cache for seamless scrolling.
  */
 class EnginePdfRepository : PdfRepository {
-    private val maxCacheEntries = 40
-    private val pageCache = Collections.synchronizedMap(
-        object : LinkedHashMap<String, PageImage>(maxCacheEntries, 0.75f, true) {
-            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, PageImage>?): Boolean {
-                return size > maxCacheEntries
-            }
-        }
-    )
-
     override suspend fun pageSizes(path: String): List<PageSize> = withContext(Dispatchers.IO) {
         pdfPageSizes(path).map { PageSize(it.width, it.height) }
     }
 
+    // Not cached here: the reader keeps the converted images (a cache of raw pixels here held
+    // 10-44 MB per page, twice over).
     override suspend fun render(path: String, index: Int, width: Int): PageImage = withContext(Dispatchers.IO) {
-        val cacheKey = "$path:$index:$width"
-        pageCache[cacheKey]?.let { return@withContext it }
         val page = pdfRenderPage(path, index.toUInt(), width.toUInt())
-        val image = PageImage(page.width.toInt(), page.height.toInt(), page.pixels)
-        pageCache[cacheKey] = image
-        image
+        PageImage(page.width.toInt(), page.height.toInt(), page.pixels)
     }
 
     override suspend fun locate(path: String, highlights: List<Highlight>): List<QuoteLocation> = withContext(Dispatchers.IO) {

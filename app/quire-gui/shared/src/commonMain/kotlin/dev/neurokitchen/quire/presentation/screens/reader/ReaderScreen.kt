@@ -42,7 +42,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.neurokitchen.quire.domain.model.PageImage
+import androidx.compose.ui.graphics.ImageBitmap
 import dev.neurokitchen.quire.presentation.designsystem.Dimens
 import dev.neurokitchen.quire.presentation.designsystem.QuireTheme
 import dev.neurokitchen.quire.presentation.designsystem.components.DraggableSplitter
@@ -74,7 +74,7 @@ fun ReaderRoute(
     viewModel: ReaderViewModel = koinViewModel(key = "reader-$id") { parametersOf(id, title) },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    ReaderScreen(state, viewModel::onEvent, loadPage = viewModel::page, loadFigure = viewModel::figure, textLayer = viewModel)
+    ReaderScreen(state, viewModel::onEvent, loadPage = viewModel::page, renderedNear = viewModel::renderedNear, loadFigure = viewModel::figure, textLayer = viewModel)
 }
 
 /**
@@ -85,10 +85,12 @@ fun ReaderRoute(
 fun ReaderScreen(
     state: ReaderState,
     onEvent: (ReaderEvent) -> Unit,
-    loadPage: suspend (Int, Int) -> PageImage?,
+    loadPage: suspend (Int, Int) -> ImageBitmap?,
     loadFigure: suspend (String) -> String?,
     modifier: Modifier = Modifier,
     textLayer: PdfTextLayer = PdfTextLayer.None,
+    /** A page already rendered at another width, shown while the sharp one renders. */
+    renderedNear: (Int, Int) -> ImageBitmap? = { _, _ -> null },
 ) {
     val colors = QuireTheme.colors
     var selection by remember(state.referenceId) { mutableStateOf<Pair<String, String>?>(null) }
@@ -321,6 +323,7 @@ fun ReaderScreen(
                                         locations = state.pdf.locations,
                                         focused = state.focusedHighlight,
                                         loadPage = loadPage,
+                            renderedNear = renderedNear,
                                         readerTheme = state.readerTheme,
                                         textLayer = textLayer,
                                         matches = if (state.find.isOpen) state.find.pdfMatches else emptyList(),
@@ -351,6 +354,7 @@ fun ReaderScreen(
                             locations = state.pdf.locations,
                             focused = state.focusedHighlight,
                             loadPage = loadPage,
+                            renderedNear = renderedNear,
                             readerTheme = state.readerTheme,
                             textLayer = textLayer,
                             matches = if (state.find.isOpen) state.find.pdfMatches else emptyList(),
@@ -473,7 +477,7 @@ private fun StatusLine(state: ReaderState) {
         state.mode == ReaderMode.Pdf && state.pdf.error != null -> state.pdf.error to true
         state.mode == ReaderMode.Text && state.textError != null -> stringResource(Res.string.reader_no_text, state.textError) to false
         state.mode == ReaderMode.Text && state.source != null -> stringResource(Res.string.reader_source, state.source) to false
-        state.mode == ReaderMode.Pdf && state.pdf.path == null && !state.isLoading -> stringResource(Res.string.reader_no_pdf) to false
+        state.mode == ReaderMode.Pdf && state.pdf.path == null && !state.pdf.isLoading -> stringResource(Res.string.reader_no_pdf) to false
         else -> return
     }
     Text(
