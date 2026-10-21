@@ -44,7 +44,10 @@ pub async fn run(context: &Context, args: &CheckArgs) -> anyhow::Result<()> {
             );
         }
         let flagged = found.iter().filter(|f| f.error.is_none()).count();
-        output::hint(format!("Crossref: {flagged} references with notices (corrections included)"));
+        output::hint(format!(
+            "Crossref: {} with notices (corrections included)",
+            output::count(flagged, "reference", "references")
+        ));
     }
     let mut checked = engine.check(project.as_ref(), recursive).await?;
     if args.errors {
