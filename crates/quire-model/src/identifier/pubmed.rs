@@ -39,7 +39,7 @@ impl Pmid {
     /// Parses digits, `pmid:<digits>` or a PubMed URL.
     pub fn parse(input: &str) -> Result<Self> {
         let text = input.trim();
-        let text = strip_any_prefix(text, PMID_PREFIXES).unwrap_or(text).trim().trim_end_matches('/');
+        let text = strip_any_prefix(text, PMID_PREFIXES).map_or(text, super::before_query).trim().trim_end_matches('/');
         number(text).map(Self).ok_or_else(|| ModelError::InvalidIdentifier {
             kind: "PMID",
             input: input.into(),
@@ -62,7 +62,8 @@ impl Pmcid {
     /// Parses `PMC<digits>`, `pmcid:PMC<digits>` or a PubMed Central URL.
     pub fn parse(input: &str) -> Result<Self> {
         let text = input.trim();
-        let text = strip_any_prefix(text, PMCID_PREFIXES).unwrap_or(text).trim().trim_end_matches('/');
+        let text =
+            strip_any_prefix(text, PMCID_PREFIXES).map_or(text, super::before_query).trim().trim_end_matches('/');
         strip_any_prefix(text, &["PMC"]).and_then(number).map(Self).ok_or_else(|| ModelError::InvalidIdentifier {
             kind: "PMCID",
             input: input.into(),
