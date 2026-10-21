@@ -1,5 +1,9 @@
 package dev.neurokitchen.quire.presentation.screens.reader.components
 
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.ui.platform.LocalLayoutDirection
 import dev.neurokitchen.quire.presentation.screens.reader.TextMatch
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -100,8 +104,13 @@ fun TextReaderView(
     currentFind: Int = 0,
     onProgressChange: (currentBlock: Int, totalBlocks: Int) -> Unit = { _, _ -> },
     onTapPage: () -> Unit = {},
+    /** Room for bars drawn over the text (the phone's frosted bars): the text scrolls under them. */
+    contentPadding: PaddingValues = PaddingValues(),
+    /** A block to bring to the top (the phone's progress slider); `null`: none. */
+    jumpToBlock: Int? = null,
 ) {
     val tab = tabs.getOrNull(selectedTab) ?: return
+    // Item 0 of the list is the tabs row (empty when the tabs sit above it): block items start at 1.
     val list = rememberLazyListState()
     val focusedQuote = highlights.firstOrNull { it.id == focused }?.quote
     val themeColors = readerColors(readerTheme)
@@ -111,14 +120,14 @@ fun TextReaderView(
     val items = remember(tab) { readerItems(tab.blocks) }
     val itemOfBlock = remember(items, tab) { itemOfBlock(items, tab.blocks.size) }
     val firstVisibleBlock by remember(items, list) {
-        derivedStateOf { (items.getOrNull(list.firstVisibleItemIndex)?.first ?: 0) + 1 }
+        derivedStateOf { (items.getOrNull((list.firstVisibleItemIndex - 1).coerceAtLeast(0))?.first ?: 0) + 1 }
     }
     LaunchedEffect(firstVisibleBlock, tab.blocks.size) {
         onProgressChange(firstVisibleBlock, tab.blocks.size)
     }
 
     val current = findMatches.getOrNull(currentFind)
-    LaunchedEffect(current) { if (current != null) list.animateScrollToItem(itemOfBlock[current.block]) }
+    LaunchedEffect(current) { if (current != null) list.animateScrollToItem(itemOfBlock[current.block] + 1) }
 
     LaunchedEffect(focusedQuote, selectedTab) {
         val index = focusedQuote?.let { q ->
@@ -128,23 +137,32 @@ fun TextReaderView(
                 clean in blockText || blockText in clean
             }
         } ?: -1
-        if (index >= 0) list.animateScrollToItem(itemOfBlock[index])
+        if (index >= 0) list.animateScrollToItem(itemOfBlock[index] + 1)
     }
 
+    LaunchedEffect(jumpToBlock) { if (jumpToBlock != null) list.scrollToItem(itemOfBlock.getOrElse(jumpToBlock) { 0 } + 1) }
+    val layoutDirection = LocalLayoutDirection.current
+    val focusManager = LocalFocusManager.current
+
     Column(modifier.fillMaxSize().background(themeColors.background)) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .background(themeColors.surface)
-                .padding(Dimens.SpaceXs),
-            horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceMin),
-        ) {
-            tabs.forEachIndexed { index, t ->
-                val label = stringResource(t.kind.label) + (t.count?.let { " ($it)" } ?: "")
-                TabChip(label, selected = index == selectedTab) { onTabClick(index) }
+        val tabRow: @Composable () -> Unit = {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .background(themeColors.surface)
+                    .padding(Dimens.SpaceXs),
+                horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceMin),
+            ) {
+                tabs.forEachIndexed { index, t ->
+                    val label = stringResource(t.kind.label) + (t.count?.let { " ($it)" } ?: "")
+                    TabChip(label, selected = index == selectedTab) { onTabClick(index) }
+                }
             }
         }
+        // Under bars drawn over the text, the tabs scroll with it; otherwise they stay at the top.
+        val tabsInList = contentPadding.calculateTopPadding() > 0.dp
+        if (!tabsInList) tabRow()
 
         Box(
             Modifier
@@ -157,9 +175,16 @@ fun TextReaderView(
             LazyColumn(
                 state = list,
                 verticalArrangement = Arrangement.spacedBy(Dimens.SpaceSm),
-                contentPadding = PaddingValues(vertical = Dimens.SpaceMd, horizontal = Dimens.SpaceLg),
+                contentPadding = PaddingValues(
+                    start = Dimens.SpaceLg + contentPadding.calculateStartPadding(layoutDirection),
+                    end = Dimens.SpaceLg + contentPadding.calculateEndPadding(layoutDirection),
+                    top = Dimens.SpaceMd + contentPadding.calculateTopPadding(),
+                    bottom = Dimens.SpaceMd + contentPadding.calculateBottomPadding(),
+                ),
                 modifier = Modifier.widthIn(max = ReadingWidth).fillMaxSize(),
             ) {
+                // Item 0: the tabs when they scroll with the text (jumps count it).
+                item { if (tabsInList) tabRow() }
                 items(items) { item ->
                     val blockIndex = item.first
                     val block = tab.blocks[blockIndex]
@@ -196,24 +221,32 @@ fun TextReaderView(
                     onHighlight = { colorName ->
                         onHighlight(sel.first, sel.second, colorName)
                         localSelection = null
+                        // Ends the selection (and the system's text toolbar with it).
+                        focusManager.clearFocus()
                         onSelection(null)
                     },
                     onAddNote = {
                         onAddNote(sel.first)
                         localSelection = null
+                        // Ends the selection (and the system's text toolbar with it).
+                        focusManager.clearFocus()
                         onSelection(null)
                     },
                     onCopy = {
                         localSelection = null
+                        // Ends the selection (and the system's text toolbar with it).
+                        focusManager.clearFocus()
                         onSelection(null)
                     },
                     onCopyCitation = {
                         localSelection = null
+                        // Ends the selection (and the system's text toolbar with it).
+                        focusManager.clearFocus()
                         onSelection(null)
                     },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = Dimens.SpaceLg),
+                        .padding(bottom = Dimens.SpaceLg + contentPadding.calculateBottomPadding()),
                 )
             }
         }

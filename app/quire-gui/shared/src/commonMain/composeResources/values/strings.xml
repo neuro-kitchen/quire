@@ -470,4 +470,22 @@
         <item quantity="one">%1$d paper</item>
         <item quantity="other">%1$d papers</item>
     </plurals>
+    <string name="reader_display">Display</string>
+    <string name="reader_display_view">View</string>
+    <string name="reader_display_pdf">PDF</string>
+    <string name="reader_display_text">Text</string>
+    <string name="reader_display_zoom">Zoom</string>
+    <string name="reader_display_zoom_fit">Fit width</string>
+    <string name="reader_display_size">Text size</string>
+    <string name="reader_display_font">Typeface</string>
+    <string name="reader_display_theme">Colours</string>
+    <string name="reader_display_page">Page colours</string>
+    <string name="reader_figures">Figures</string>
+    <string name="reader_highlights">Highlights</string>
+    <string name="reader_find_count">%1$s of %2$s</string>
+    <string name="reader_find_previous">Previous match</string>
+    <string name="reader_find_next">Next match</string>
+    <string name="reader_percent_read">%1$s% read</string>
+    <string name="reader_view_figure">View</string>
+    <string name="reader_page_n_of">Page %1$s of %2$s</string>
 </resources>
