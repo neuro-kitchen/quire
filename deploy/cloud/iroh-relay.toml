@@ -1,0 +1,15 @@
+# iroh-relay 1.3 (fields from its source, `src/main.rs` `Config`/`TlsConfig`).
+enable_relay = true
+http_bind_addr = "[::]:80"
+enable_quic_addr_discovery = true
+# Who may relay: everyone for now (traffic is end-to-end encrypted). Later: an HTTP check that
+# admits only devices registered on the hub (`[access.http]`).
+access = "everyone"
+
+[tls]
+cert_mode = "LetsEncrypt"
+hostname = ["relay.example.org"]   # RELAY_HOSTNAME: replace with ours
+contact = "ops@example.org"         # replace with ours
+prod_tls = true
+cert_dir = "/certs"
+quic_bind_addr = "[::]:7842"

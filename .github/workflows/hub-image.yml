@@ -1,0 +1,52 @@
+# The sync hub's container image (`deploy/hub/Dockerfile`, `.knowledge/sync-hub.md`): built for
+# amd64 and arm64 on pull requests that touch the hub (a check, nothing published); published to
+# GitHub's container registry only on a `hub-v*` tag (the owner decides when: no releases before
+# 0.5).
+name: Hub image
+
+on:
+  push:
+    tags: ["hub-v*"]
+  pull_request:
+    paths: ["crates/quire-hub/**", "crates/quire-sync/**", "deploy/hub/**", ".github/workflows/hub-image.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: hub-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/quire-hub
+          tags: |
+            type=match,pattern=hub-v(.*),group=1
+            type=match,pattern=hub-v(\d+\.\d+),group=1
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/hub-v') }}
+      - if: startsWith(github.ref, 'refs/tags/hub-v')
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: deploy/hub/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ startsWith(github.ref, 'refs/tags/hub-v') }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
