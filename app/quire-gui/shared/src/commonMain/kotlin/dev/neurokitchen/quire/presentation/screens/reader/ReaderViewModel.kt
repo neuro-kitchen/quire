@@ -55,9 +55,9 @@ class ReaderViewModel(
 
     fun onEvent(event: ReaderEvent) {
         when (event) {
-            is ReaderEvent.OnModeChange -> _state.update { it.copy(mode = event.mode) }
+            is ReaderEvent.OnModeChange -> _state.update { it.copy(mode = event.mode, error = null, pdf = it.pdf.copy(error = null)) }
             is ReaderEvent.OnTabClick -> {
-                _state.update { it.copy(selectedTab = event.index.coerceIn(0, (it.tabs.size - 1).coerceAtLeast(0))) }
+                _state.update { it.copy(selectedTab = event.index.coerceIn(0, (it.tabs.size - 1).coerceAtLeast(0)), error = null) }
                 _state.update { it.copy(find = it.find.copy(textMatches = textMatches(it, it.find.query), current = 0)) }
             }
             ReaderEvent.OnFindToggle -> _state.update { it.copy(find = it.find.copy(isOpen = !it.find.isOpen)) }
@@ -71,8 +71,9 @@ class ReaderViewModel(
             ReaderEvent.OnZoomOut -> zoom { it / ZOOM_STEP }
             ReaderEvent.OnZoomReset -> zoom { 1f }
             is ReaderEvent.OnHighlight -> act {
-                val quote = event.quote.trim()
-                if (quote.isNotEmpty()) reader.addHighlight(referenceId, quote, event.prefix.takeLast(PREFIX_LENGTH), color = event.color)
+                val quote = event.quote.replace(Regex("\\s+"), " ").trim()
+                val prefix = event.prefix.replace(Regex("\\s+"), " ").trim()
+                if (quote.isNotEmpty()) reader.addHighlight(referenceId, quote, prefix.takeLast(PREFIX_LENGTH), color = event.color)
             }
             is ReaderEvent.OnHighlightClick -> _state.update { it.copy(focusedHighlight = event.id) }
             is ReaderEvent.OnHighlightComment -> act { reader.commentHighlight(event.id, event.comment) }
@@ -109,7 +110,11 @@ class ReaderViewModel(
         val key = index to width
         pages.remove(key)?.let { pages[key] = it; return it }
         return runCatching { pdf.render(path, index, width) }
-            .onFailure { e -> _state.update { it.copy(pdf = it.pdf.copy(error = e.message)) } }
+            .onFailure { e ->
+                if (e !is kotlinx.coroutines.CancellationException && !e.message.orEmpty().contains("left the composition")) {
+                    _state.update { it.copy(pdf = it.pdf.copy(error = e.message)) }
+                }
+            }
             .getOrNull()
             ?.also {
                 pages[key] = it
@@ -183,7 +188,10 @@ class ReaderViewModel(
         runCatching { block() }.onFailure { fail(it) }
     }
 
-    private fun fail(e: Throwable) = _state.update { it.copy(error = e.message ?: e.toString()) }
+    private fun fail(e: Throwable) {
+        if (e is kotlinx.coroutines.CancellationException || e.message.orEmpty().contains("left the composition")) return
+        _state.update { it.copy(error = e.message ?: e.toString()) }
+    }
 
     private companion object {
         const val PAGE_CACHE = 12

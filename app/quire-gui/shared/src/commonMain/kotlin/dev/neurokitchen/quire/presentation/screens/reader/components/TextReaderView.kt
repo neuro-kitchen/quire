@@ -4,25 +4,30 @@ import dev.neurokitchen.quire.presentation.screens.reader.TextMatch
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -102,7 +107,13 @@ fun TextReaderView(
     LaunchedEffect(current) { if (current != null) list.animateScrollToItem(current.block) }
 
     LaunchedEffect(focusedQuote, selectedTab) {
-        val index = focusedQuote?.let { q -> tab.blocks.indexOfFirst { q in it.text } } ?: -1
+        val index = focusedQuote?.let { q ->
+            val clean = q.replace(Regex("\\s+"), " ").trim().lowercase()
+            tab.blocks.indexOfFirst { block ->
+                val blockText = block.text.replace(Regex("\\s+"), " ").lowercase()
+                clean in blockText || blockText in clean
+            }
+        } ?: -1
         if (index >= 0) list.animateScrollToItem(index)
     }
 
@@ -110,6 +121,7 @@ fun TextReaderView(
         Row(
             Modifier
                 .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
                 .background(themeColors.surface)
                 .padding(Dimens.SpaceXs),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -118,6 +130,28 @@ fun TextReaderView(
                 val label = stringResource(t.kind.label) + (t.count?.let { " ($it)" } ?: "")
                 TabChip(label, selected = index == selectedTab) { onTabClick(index) }
             }
+        }
+
+        // Reading Progress Bar at the top of the Text viewport
+        val textProgress by remember(tab, list) {
+            derivedStateOf {
+                if (tab.blocks.isNotEmpty()) {
+                    ((list.firstVisibleItemIndex + 1).toFloat() / tab.blocks.size.toFloat()).coerceIn(0f, 1f)
+                } else 0f
+            }
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(3.dp)
+                .background(QuireTheme.colors.border.copy(alpha = 0.25f)),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(textProgress)
+                    .fillMaxHeight()
+                    .background(QuireTheme.colors.accent),
+            )
         }
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             LazyColumn(
@@ -245,8 +279,10 @@ private fun annotate(
 ): AnnotatedString = buildAnnotatedString {
     val prefix = if (block.kind == BlockKind.ListItem) "• " else ""
     append(prefix)
+    val wordRanges = mutableListOf<Pair<Int, Int>>()
     block.words.forEachIndexed { i, word ->
         if (i > 0) append(' ')
+        val start = length
         val style = SpanStyle(
             fontWeight = if (word.bold) FontWeight.Bold else null,
             fontStyle = if (word.italic) FontStyle.Italic else null,
@@ -255,6 +291,7 @@ private fun annotate(
         pushStyle(style)
         append(word.text)
         pop()
+        wordRanges.add(start to length)
     }
     val text = prefix + block.words.joinToString(" ") { it.text }
     for (highlight in highlights) {
@@ -265,10 +302,36 @@ private fun annotate(
             "red" -> colors.highlightRed
             else -> colors.highlightYellow
         }
-        var from = text.indexOf(highlight.quote)
-        while (from >= 0) {
-            addStyle(SpanStyle(background = hlColor.copy(alpha = 0.45f)), from, from + highlight.quote.length)
-            from = text.indexOf(highlight.quote, from + highlight.quote.length)
+        val cleanQuote = highlight.quote.replace(Regex("\\s+"), " ").trim()
+        if (cleanQuote.isEmpty()) continue
+
+        // 1. Exact or whitespace-normalized substring matching
+        var from = text.indexOf(cleanQuote, ignoreCase = true)
+        if (from >= 0) {
+            while (from >= 0) {
+                addStyle(SpanStyle(background = hlColor.copy(alpha = 0.45f)), from, from + cleanQuote.length)
+                from = text.indexOf(cleanQuote, from + cleanQuote.length, ignoreCase = true)
+            }
+        } else {
+            // 2. Tokenized word sequence matching (resilient to hyphenation and PDF text extraction line breaks)
+            val quoteTokens = cleanQuote.split(" ").map { it.trim().trim { c -> !c.isLetterOrDigit() }.lowercase() }.filter { it.isNotEmpty() }
+            if (quoteTokens.isNotEmpty() && block.words.isNotEmpty() && block.words.size >= quoteTokens.size) {
+                val blockTokens = block.words.map { it.text.trim().trim { c -> !c.isLetterOrDigit() }.lowercase() }
+                for (i in 0..blockTokens.size - quoteTokens.size) {
+                    var matches = true
+                    for (j in quoteTokens.indices) {
+                        if (blockTokens[i + j] != quoteTokens[j]) {
+                            matches = false
+                            break
+                        }
+                    }
+                    if (matches) {
+                        val startPos = wordRanges[i].first
+                        val endPos = wordRanges[i + quoteTokens.size - 1].second
+                        addStyle(SpanStyle(background = hlColor.copy(alpha = 0.45f)), startPos, endPos)
+                    }
+                }
+            }
         }
     }
     // Find matches: offsets in the block's text, after the list marker.

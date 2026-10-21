@@ -21,6 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -125,23 +126,6 @@ fun ReaderToolbar(
                 painterResource(Res.drawable.ic_inventory_2),
                 contentDescription = "Toggle Annotations Panel",
                 tint = if (!isAnnotationsCollapsed) colors.accent else colors.fillSecondary,
-                modifier = Modifier.size(16.dp),
-            )
-        }
-
-        // Toggle Notes Panel (Moved to the LEFT side per user request)
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(Dimens.ToolbarButton)
-                .clip(RoundedCornerShape(Dimens.RadiusSmall))
-                .background(if (!isNotesCollapsed) colors.accent.copy(alpha = 0.15f) else Color.Transparent)
-                .clickable(onClick = onToggleNotes),
-        ) {
-            Icon(
-                painterResource(Res.drawable.ic_sticky_note_2),
-                contentDescription = "Toggle Notes Panel",
-                tint = if (!isNotesCollapsed) colors.accent else colors.fillSecondary,
                 modifier = Modifier.size(16.dp),
             )
         }
@@ -415,6 +399,25 @@ fun ReaderToolbar(
         }
 
         Spacer(Modifier.weight(1f))
+
+        // Toggle Notes Panel (Placed on the RIGHT side by the notes panel)
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(Dimens.ToolbarButton)
+                .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                .background(if (!isNotesCollapsed) colors.accent.copy(alpha = 0.15f) else Color.Transparent)
+                .clickable(onClick = onToggleNotes),
+        ) {
+            Icon(
+                painterResource(Res.drawable.ic_sticky_note_2),
+                contentDescription = "Toggle Notes Panel",
+                tint = if (!isNotesCollapsed) colors.accent else colors.fillSecondary,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+
+        VerticalDivider(color = colors.fillQuarternary, modifier = Modifier.height(16.dp).padding(horizontal = 2.dp))
 
         // Reading Status (far right)
         listOf(
