@@ -55,8 +55,9 @@ pub use curation::{
 };
 pub use discovery::{AlertCheckRecord, AlertRecord, GraphWorkRecord, SavedSearchRecord, SearchHitRecord};
 pub use exchange::{
-    AnnotationsRecord, AutoExportRecord, AutoExportRun, CiteUseRecord, ExportSelection, ExportedText, ManuscriptRecord,
-    UnknownKeyRecord, ZoteroImportRecord, export_formats,
+    AnnotationsRecord, AutoExportRecord, AutoExportRun, CiteUseRecord, ExportOptionsRecord, ExportProfileRecord,
+    ExportSelection, ExportedText, ManuscriptRecord, UnknownKeyRecord, ZoteroImportRecord, export_encodings,
+    export_formats,
 };
 pub use hub::{EvictionRecord, HubDeviceRecord, HubReportRecord, OpenedPdfRecord};
 pub use libraries::{

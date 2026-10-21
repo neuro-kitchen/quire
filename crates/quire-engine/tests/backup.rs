@@ -48,7 +48,7 @@ async fn backup_and_restore() {
 async fn a_restored_library_has_no_automatic_exports() {
     let dir = tempfile::tempdir().unwrap();
     let original = engine(dir.path(), None).await;
-    let request = quire_engine::ExportRequest { project: None, recursive: false, profile: None, format: None };
+    let request = quire_engine::ExportRequest::default();
     original.keep_updated(&request, &dir.path().join("kept.bib")).await.unwrap();
     assert_eq!(original.auto_exports().await.unwrap().len(), 1);
     let archive = dir.path().join("library.tar.gz");

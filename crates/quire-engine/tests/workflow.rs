@@ -4,6 +4,7 @@
 mod common;
 use common::{engine, fixture};
 
+use quire_engine::config::ExportProfile;
 use quire_engine::{Added, AutoExportOutcome, Engine, ExportFormat, ExportRequest, OpenOptions, SlugPath};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -260,6 +261,61 @@ async fn profiles_and_automatic_exports() {
     assert_eq!(results[0].1, AutoExportOutcome::Written(0));
     assert!(!std::fs::read_to_string(&out).unwrap().contains("TeXbook"));
     assert!(engine.stop_auto_export(&out).await.unwrap());
+}
+
+/// The app's export dialog: options chosen there (no profile), a selection, the file's encoding;
+/// a file kept updated keeps those options when it is rewritten.
+#[tokio::test]
+async fn options_given_directly_encodings_and_a_selection() {
+    let server = MockServer::start().await;
+    let dir = tempfile::tempdir().unwrap();
+    let engine = engine(dir.path(), Some(&server)).await;
+    let bib = dir.path().join("in.bib");
+    std::fs::write(
+        &bib,
+        "@book{muller2001, author = {Müller, Jürgen}, title = {Łódź €}, year = {2001}, note = {x}}\n\
+         @book{roe2002, author = {Roe, R.}, title = {Other}, year = {2002}}",
+    )
+    .unwrap();
+    engine.import_bib(&bib, None).await.unwrap();
+
+    let options = ExportProfile {
+        format: Some("bibtex".into()),
+        omit: vec!["note".into()],
+        encoding: Some("windows-1252".into()),
+        ..ExportProfile::default()
+    };
+    let request = ExportRequest {
+        references: vec!["muller2001".into()],
+        options: Some(options.clone()),
+        ..ExportRequest::default()
+    };
+    let out = dir.path().join("cp1252.bib");
+    let (_, count, _) = engine.export_to(&request, &out).await.unwrap();
+    assert_eq!(count, 1, "only the selection");
+    let bytes = std::fs::read(&out).unwrap();
+    let text = String::from_utf8_lossy(&bytes);
+    let contains = |part: &[u8]| bytes.windows(part.len()).any(|w| w == part);
+    assert!(contains(b"M\xFCller"), "ü as one Windows-1252 byte: {text}");
+    // Ł and ź are not in the code page: LaTeX; ó and € are (0xF3, 0x80).
+    assert!(contains(b"{\\L}\xF3d{\\'z} \x80"), "{text}");
+    assert!(!text.contains("note") && !text.contains("Other") && text.starts_with("@book"), "{text}");
+
+    // Kept updated with the dialog's options: rewritten with them (UTF-8 with a BOM here).
+    let kept = ExportRequest {
+        options: Some(ExportProfile { encoding: Some("utf-8-bom".into()), ..options }),
+        ..ExportRequest::default()
+    };
+    let out = dir.path().join("kept.bib");
+    engine.keep_updated(&kept, &out).await.unwrap();
+    engine.trash("roe2002").await.unwrap();
+    assert_eq!(engine.run_auto_exports(false).await.unwrap()[0].1, AutoExportOutcome::Written(1));
+    let bytes = std::fs::read(&out).unwrap();
+    assert!(bytes.starts_with(b"\xEF\xBB\xBF@book{muller2001"), "{:?}", String::from_utf8_lossy(&bytes[..20]));
+    assert!(!String::from_utf8_lossy(&bytes).contains("note"), "the options were kept");
+
+    // A selection cannot be kept updated (what to add later is not known).
+    assert!(engine.keep_updated(&request, &dir.path().join("x.bib")).await.is_err());
 }
 
 #[tokio::test]

@@ -22,6 +22,7 @@ file). Change them with `quire config set <key> <value>`; `*` is a name you choo
 | `export.*.ascii` | export profile: non-ASCII as LaTeX commands (.bib) |
 | `export.*.months` | export profile: BibTeX months as 7 or jul |
 | `export.*.preprints` | export profile: preprints as @online (Biber) or @article (Typst) |
+| `export.*.encoding` | export profile: the file's encoding (windows-1252: .bib, other characters as LaTeX) |
 | `reader.width` | reader mode: text column width |
 | `reader.justify` | reader mode: justified text |
 | `reader.spacing` | reader mode: line spacing |
