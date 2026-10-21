@@ -16,7 +16,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import dev.neurokitchen.quire.domain.model.PageImage
+import kotlin.test.assertNotNull
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -130,5 +134,60 @@ class ReaderViewModelTest {
         vm.onEvent(ReaderEvent.OnFindNext)
         assertEquals(1, vm.state.value.find.current)
         assertEquals(7, vm.glyphAt(0, 80f, 66f))
+    }
+
+    private val withPdf = object : ReaderRepository by reader {
+        override suspend fun pdfFiles(id: String) = listOf("/papers/okeefe.pdf")
+    }
+
+    /** A PDF of `pages` pages whose renders are counted, as (page, width). */
+    private class CountingPdf(private val pages: Int = 5, private val sizesDelay: Long = 0) : PdfRepository by SamplePdfRepository() {
+        val renders = mutableListOf<Pair<Int, Int>>()
+        override suspend fun pageSizes(path: String): List<PageSize> {
+            delay(sizesDelay)
+            return List(pages) { PageSize(612f, 792f) }
+        }
+        override suspend fun locate(path: String, highlights: List<Highlight>) = emptyList<QuoteLocation>()
+        override suspend fun render(path: String, index: Int, width: Int): PageImage {
+            renders += index to width
+            val height = width * 792 / 612
+            return PageImage(width, height, ByteArray(width * height * 4))
+        }
+    }
+
+    /** The text once waited for the PDF's page sizes (and the highlights' places) before loading. */
+    @Test
+    fun theTextDoesNotWaitForThePdf() = runTest(dispatcher) {
+        val vm = ReaderViewModel("3", "The hippocampus as a spatial map", withPdf, CountingPdf(sizesDelay = 5_000), dispatcher)
+        advanceTimeBy(100)
+        assertTrue(vm.state.value.tabs.isNotEmpty(), "the text is there while the PDF is still opening")
+        assertTrue(vm.state.value.pdf.isLoading)
+        advanceUntilIdle()
+        assertEquals(5, vm.state.value.pdf.pages.size)
+        assertEquals(false, vm.state.value.pdf.isLoading)
+    }
+
+    /** A page was rendered again for every pixel of width (each resize, each zoom step). */
+    @Test
+    fun nearbyWidthsShareOneRenderAndLaterPagesRenderAhead() = runTest(dispatcher) {
+        val pdf = CountingPdf()
+        val vm = ReaderViewModel("3", "The hippocampus as a spatial map", withPdf, pdf, dispatcher).also { advanceUntilIdle() }
+        assertNotNull(vm.page(0, 1000))
+        assertNotNull(vm.page(0, 1013))
+        advanceUntilIdle()
+        assertEquals(1, pdf.renders.count { it.first == 0 }, "one render for both widths: ${pdf.renders}")
+        assertEquals(setOf(0, 1, 2), pdf.renders.map { it.first }.toSet(), "the next two pages rendered ahead")
+        assertNotNull(vm.page(1, 1000))
+        advanceUntilIdle()
+        assertEquals(1, pdf.renders.count { it.first == 1 }, "page 2 came from the render ahead")
+    }
+
+    /** While a page renders at a new width (zooming in), the nearest width already rendered shows. */
+    @Test
+    fun aRenderedWidthStandsInForAnother() = runTest(dispatcher) {
+        val vm = ReaderViewModel("3", "The hippocampus as a spatial map", withPdf, CountingPdf(), dispatcher).also { advanceUntilIdle() }
+        kotlin.test.assertNull(vm.renderedNear(0, 2000))
+        vm.page(0, 1000)
+        assertNotNull(vm.renderedNear(0, 2000))
     }
 }

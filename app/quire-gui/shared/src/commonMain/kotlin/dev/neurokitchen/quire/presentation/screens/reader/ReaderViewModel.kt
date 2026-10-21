@@ -6,8 +6,14 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.neurokitchen.quire.domain.model.PageImage
+import androidx.compose.ui.graphics.ImageBitmap
 import dev.neurokitchen.quire.domain.repository.PdfRepository
+import dev.neurokitchen.quire.presentation.mapping.toImageBitmap
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.withContext
 import dev.neurokitchen.quire.domain.repository.ReaderRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,12 +31,20 @@ class ReaderViewModel(
     title: String,
     private val reader: ReaderRepository,
     private val pdf: PdfRepository,
+    /** Where rendered pixels become images (off the UI thread). */
+    private val work: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel(), PdfTextLayer {
     private val _state = MutableStateFlow(ReaderState(referenceId = referenceId, title = title))
     val state: StateFlow<ReaderState> = _state.asStateFlow()
 
-    /** Rendered pages by (index, width), most recent last: the PDF view asks as pages scroll in. */
-    private val pages = LinkedHashMap<Pair<Int, Int>, PageImage>()
+    /**
+     * Rendered pages as images by (index, width step), most recently used last, within
+     * [PAGE_CACHE_BYTES]. Widths are rounded up to [WIDTH_STEP], so resizing a little or zooming
+     * back reuses a render; renders in progress are shared, not started twice.
+     */
+    private val pages = LinkedHashMap<Pair<Int, Int>, ImageBitmap>()
+    private var pageBytes = 0L
+    private val rendering = HashMap<Pair<Int, Int>, Deferred<ImageBitmap?>>()
 
     /** What is typed in the find bar; searched a moment after typing stops. */
     private val findQuery = MutableStateFlow("")
@@ -39,7 +53,7 @@ class ReaderViewModel(
         viewModelScope.launch {
             findQuery.debounce(FIND_DELAY_MS).collectLatest { query -> find(query) }
         }
-        viewModelScope.launch { load() }
+        load()
         viewModelScope.launch {
             reader.highlights(referenceId)
                 .catch { e -> fail(e) }
@@ -104,23 +118,52 @@ class ReaderViewModel(
         }
     }
 
-    /** Page `index` of the PDF, `width` pixels wide (cached). */
-    suspend fun page(index: Int, width: Int): PageImage? {
+    /**
+     * Page `index` of the PDF, at least `width` pixels wide (drawn scaled to fit); the next pages
+     * are rendered ahead, so scrolling finds them ready.
+     */
+    suspend fun page(index: Int, width: Int): ImageBitmap? {
+        val image = render(index, width)
+        val count = _state.value.pdf.pages.size
+        for (next in index + 1..minOf(index + AHEAD, count - 1)) {
+            viewModelScope.launch { render(next, width) }
+        }
+        return image
+    }
+
+    /** The rendered page `index` nearest to `width`, if any: shown while a sharp one renders. */
+    fun renderedNear(index: Int, width: Int): ImageBitmap? =
+        pages.entries.filter { it.key.first == index }.minByOrNull { kotlin.math.abs(it.key.second - width) }?.value
+
+    private suspend fun render(index: Int, width: Int): ImageBitmap? {
         val path = _state.value.pdf.path ?: return null
-        val key = index to width
+        val key = index to stepped(width)
         pages.remove(key)?.let { pages[key] = it; return it }
-        return runCatching { pdf.render(path, index, width) }
-            .onFailure { e ->
-                if (e !is kotlinx.coroutines.CancellationException && !e.message.orEmpty().contains("left the composition")) {
-                    _state.update { it.copy(pdf = it.pdf.copy(error = e.message)) }
-                }
+        val job = rendering.getOrPut(key) {
+            viewModelScope.async {
+                runCatching { withContext(work) { pdf.render(path, index, key.second).toImageBitmap() } }
+                    .onFailure { e ->
+                        if (e !is kotlinx.coroutines.CancellationException && !e.message.orEmpty().contains("left the composition")) {
+                            _state.update { it.copy(pdf = it.pdf.copy(error = e.message)) }
+                        }
+                    }
+                    .getOrNull()
+                    ?.also { keep(key, it) }
+                    .also { rendering.remove(key) }
             }
-            .getOrNull()
-            ?.also {
-                pages[key] = it
-                // Insertion order is common stdlib (an access-ordered map is JVM-only).
-                while (pages.size > PAGE_CACHE) pages.remove(pages.keys.first())
-            }
+        }
+        return job.await()
+    }
+
+    private fun keep(key: Pair<Int, Int>, image: ImageBitmap) {
+        pages.remove(key)?.let { pageBytes -= it.bytes }
+        pages[key] = image
+        pageBytes += image.bytes
+        // Least recently used first (insertion order is common stdlib; an access-ordered map is JVM-only).
+        while (pageBytes > PAGE_CACHE_BYTES && pages.size > 1) {
+            val oldest = pages.keys.first()
+            pages.remove(oldest)?.let { pageBytes -= it.bytes }
+        }
     }
 
     override suspend fun glyphAt(page: Int, x: Float, y: Float): Int? =
@@ -149,15 +192,31 @@ class ReaderViewModel(
     /** The local file of a figure image, `null` if it cannot be had. */
     suspend fun figure(url: String): String? = runCatching { reader.figure(url) }.getOrNull()
 
-    private suspend fun load() {
-        runCatching { reader.opened(referenceId) }.onSuccess { status -> _state.update { it.copy(reading = status) } }
-        val path = runCatching { reader.pdfFiles(referenceId).firstOrNull() }.getOrNull()
-        if (path != null) {
-            runCatching { pdf.pageSizes(path) }
-                .onSuccess { sizes -> _state.update { it.copy(mode = ReaderMode.Pdf, pdf = it.pdf.copy(path = path, pages = sizes)) } }
-                .onFailure { e -> _state.update { it.copy(pdf = it.pdf.copy(error = e.message ?: e.toString())) } }
-            locateHighlights()
+    /** The PDF, the text and the reading status load at once: none waits for another. */
+    private fun load() {
+        viewModelScope.launch {
+            runCatching { reader.opened(referenceId) }.onSuccess { status -> _state.update { it.copy(reading = status) } }
         }
+        viewModelScope.launch { loadPdf() }
+        viewModelScope.launch { loadText() }
+    }
+
+    private suspend fun loadPdf() {
+        val path = runCatching { reader.pdfFiles(referenceId).firstOrNull() }.getOrNull()
+        if (path == null) {
+            _state.update { it.copy(pdf = it.pdf.copy(isLoading = false)) }
+            return
+        }
+        runCatching { pdf.pageSizes(path) }
+            .onSuccess { sizes ->
+                _state.update { it.copy(mode = ReaderMode.Pdf, pdf = it.pdf.copy(path = path, pages = sizes, isLoading = false)) }
+            }
+            .onFailure { e -> _state.update { it.copy(pdf = it.pdf.copy(error = e.message ?: e.toString(), isLoading = false)) } }
+        // The pages are on screen already; the highlights' places follow.
+        locateHighlights()
+    }
+
+    private suspend fun loadText() {
         runCatching { reader.paper(referenceId) }
             .onSuccess { paper ->
                 _state.update {
@@ -194,7 +253,10 @@ class ReaderViewModel(
     }
 
     private companion object {
-        const val PAGE_CACHE = 12
+        /** Rendered pages kept, in bytes of pixels (~10 pages at 1400 px, ~3 at 2800 px). */
+        const val PAGE_CACHE_BYTES = 128L * 1024 * 1024
+        /** Pages rendered ahead of the one asked for. */
+        const val AHEAD = 2
         const val ZOOM_STEP = 1.25f
         const val MIN_ZOOM = 0.5f
         const val MAX_ZOOM = 4f
@@ -216,3 +278,12 @@ private fun textMatches(state: ReaderState, query: String): List<TextMatch> {
         }.map { TextMatch(index, it, it + needle.length) }.toList()
     }
 }
+
+/** Widths of rendered pages go in steps of this many pixels. */
+private const val WIDTH_STEP = 256
+
+/** `width` rounded up to the next [WIDTH_STEP]. */
+private fun stepped(width: Int): Int = ((width.coerceAtLeast(1) + WIDTH_STEP - 1) / WIDTH_STEP) * WIDTH_STEP
+
+/** Bytes of pixels the image holds (RGBA). */
+private val ImageBitmap.bytes: Long get() = width.toLong() * height * 4

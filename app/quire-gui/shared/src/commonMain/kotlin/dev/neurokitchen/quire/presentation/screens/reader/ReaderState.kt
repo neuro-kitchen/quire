@@ -73,4 +73,6 @@ data class PdfViewState(
     val zoom: Float = 1f,
     val locations: List<QuoteLocation> = emptyList(),
     val error: String? = null,
+    /** Still finding the PDF and its pages (the text loads on its own). */
+    val isLoading: Boolean = true,
 )
