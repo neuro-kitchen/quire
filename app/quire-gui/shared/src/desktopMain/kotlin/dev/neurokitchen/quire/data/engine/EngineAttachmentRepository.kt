@@ -1,5 +1,8 @@
 package dev.neurokitchen.quire.data.engine
 
+import dev.neurokitchen.quire.domain.model.Eviction
+import dev.neurokitchen.quire.domain.model.OpenedPdf
+import dev.neurokitchen.quire.domain.model.PdfSource
 import dev.neurokitchen.quire.domain.model.AttachedPdf
 import dev.neurokitchen.quire.domain.model.ImportedPdf
 import dev.neurokitchen.quire.domain.model.PdfCheck
@@ -47,5 +50,24 @@ class EngineAttachmentRepository(private val session: EngineSession) : Attachmen
         "different" -> PdfVerdict.Different
         "unlikely" -> PdfVerdict.Unlikely
         else -> PdfVerdict.Unknown
+    }
+
+    override suspend fun openPdf(id: String): OpenedPdf {
+        val o = session.library().openPdf(id)
+        val source = when (o.source) {
+            "hub" -> PdfSource.Hub
+            "peer" -> PdfSource.Peer(o.detail.orEmpty())
+            "found" -> PdfSource.Found(o.detail.orEmpty())
+            else -> PdfSource.Here
+        }
+        return OpenedPdf(o.path, o.hash, source)
+    }
+
+    override suspend fun keepOffline(id: String, keep: Boolean) = session.library().keepReferenceOffline(id, keep)
+    override suspend fun keepProjectOffline(path: String, keep: Boolean) = session.library().keepProjectOffline(path, keep)
+
+    override suspend fun evictPdfs(): Eviction {
+        val e = session.library().evictPdfs()
+        return Eviction(e.removed.toInt(), e.freed.toLong(), e.kept.toLong())
     }
 }

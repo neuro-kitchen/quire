@@ -6,6 +6,10 @@ a public key, connections are end-to-end encrypted, and when two devices cannot 
 directly (different networks, firewalls) the encrypted traffic passes through a public relay
 that cannot read it.
 
+Both devices must be online at once. For a library that is always reachable, and PDFs that wait
+until a device needs them, use a [sync hub](sync-hub.md): an always-on store, run by you or by us,
+that holds your library encrypted and cannot read it.
+
 ## Pairing two devices
 
 On each device:

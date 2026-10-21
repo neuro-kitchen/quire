@@ -1,0 +1,11 @@
+# Litestream 0.5 (https://litestream.io/reference/config/): the hub's database, continuously to
+# S3-compatible storage. Credentials come from LITESTREAM_ACCESS_KEY_ID / _SECRET_ACCESS_KEY.
+dbs:
+  - path: /data/hub.sqlite
+    replica:
+      type: s3
+      endpoint: ${BACKUP_ENDPOINT}
+      bucket: ${BACKUP_BUCKET}
+      path: hub.sqlite
+      # true for storage that needs path-style addresses (some S3-compatible servers); AWS: false.
+      force-path-style: ${BACKUP_FORCE_PATH_STYLE}

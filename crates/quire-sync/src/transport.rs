@@ -9,6 +9,8 @@ use iroh::endpoint::presets;
 use iroh::{Endpoint, EndpointId, SecretKey};
 
 use crate::error::{Result, SyncError};
+use crate::hub::protocol::DeviceInfo;
+use crate::hub::{HubReplica, HubReport, SyncOptions};
 use crate::session::{self, Replica, Report, Side};
 
 /// How long to wait to get online (a relay connection) before giving up.
@@ -66,22 +68,68 @@ impl Device {
         self.endpoint.id().to_string()
     }
 
-    /// Syncs `replica` with the device `peer` (its ID).
-    pub async fn sync_with<R: Replica>(&self, replica: &R, peer: &str) -> Result<Report> {
+    /// A connection to `peer` (a device or hub ID) speaking `alpn`.
+    async fn connect(&self, peer: &str, alpn: &[u8]) -> Result<(EndpointId, iroh::endpoint::Connection)> {
         let id = EndpointId::from_str(peer.trim()).map_err(|e| SyncError::Network(format!("`{peer}`: {e}")))?;
         // A peer that just came online may not have published its address yet: ask again for a
         // while (seen live: ~10 s after `sync serve` started, none was found yet).
         let started = std::time::Instant::now();
-        let connection = loop {
-            match self.endpoint.connect(id, ALPN).await {
-                Ok(connection) => break connection,
+        loop {
+            match self.endpoint.connect(id, alpn).await {
+                Ok(connection) => return Ok((id, connection)),
                 Err(error) if started.elapsed() < ADDRESS_WAIT && is_not_found(&error.to_string()) => {
                     tracing::debug!(%error, "no address for the peer yet");
                     tokio::time::sleep(ADDRESS_RETRY).await;
                 }
                 Err(error) => return Err(SyncError::Network(error.to_string())),
             }
-        };
+        }
+    }
+
+    /// Syncs `replica` through the hub `hub` (its ID).
+    pub async fn sync_with_hub<R: HubReplica>(
+        &self,
+        replica: &R,
+        hub: &str,
+        options: &SyncOptions,
+    ) -> Result<HubReport> {
+        let (id, connection) = self.connect(hub, crate::hub::ALPN).await?;
+        let (mut send, mut receive) = connection.open_bi().await.map_err(|e| SyncError::Network(e.to_string()))?;
+        let report = crate::hub::sync(replica, &id.to_string(), options, &mut receive, &mut send).await;
+        finish(connection, send, report.is_ok()).await;
+        report
+    }
+
+    /// Downloads the file `hash` from the hub `hub`; `false` if the hub does not have it.
+    pub async fn fetch_from_hub<R: HubReplica>(&self, replica: &R, hub: &str, hash: &str) -> Result<bool> {
+        let (id, connection) = self.connect(hub, crate::hub::ALPN).await?;
+        let (mut send, mut receive) = connection.open_bi().await.map_err(|e| SyncError::Network(e.to_string()))?;
+        let found = crate::hub::fetch_file(replica, &id.to_string(), hash, &mut receive, &mut send).await;
+        finish(connection, send, found.is_ok()).await;
+        found
+    }
+
+    /// This person's devices known to the hub `hub`.
+    pub async fn hub_devices<R: HubReplica>(&self, replica: &R, hub: &str) -> Result<Vec<DeviceInfo>> {
+        let (id, connection) = self.connect(hub, crate::hub::ALPN).await?;
+        let (mut send, mut receive) = connection.open_bi().await.map_err(|e| SyncError::Network(e.to_string()))?;
+        let devices = crate::hub::devices(replica, &id.to_string(), &mut receive, &mut send).await;
+        finish(connection, send, devices.is_ok()).await;
+        devices
+    }
+
+    /// Makes the hub `hub` refuse `device` of this person from now on.
+    pub async fn hub_revoke<R: HubReplica>(&self, replica: &R, hub: &str, device: &str) -> Result<()> {
+        let (id, connection) = self.connect(hub, crate::hub::ALPN).await?;
+        let (mut send, mut receive) = connection.open_bi().await.map_err(|e| SyncError::Network(e.to_string()))?;
+        let revoked = crate::hub::revoke(replica, &id.to_string(), device, &mut receive, &mut send).await;
+        finish(connection, send, revoked.is_ok()).await;
+        revoked
+    }
+
+    /// Syncs `replica` with the device `peer` (its ID).
+    pub async fn sync_with<R: Replica>(&self, replica: &R, peer: &str) -> Result<Report> {
+        let (id, connection) = self.connect(peer, ALPN).await?;
         let (mut send, mut receive) = connection.open_bi().await.map_err(|e| SyncError::Network(e.to_string()))?;
         let report = session::run(replica, Side::Client, Some(&id.to_string()), &mut receive, &mut send).await;
         let _ = send.finish();
@@ -139,5 +187,16 @@ impl Device {
 
     pub async fn close(self) {
         self.endpoint.close().await;
+    }
+}
+
+/// Ends a client's stream: the other side closes once it has read everything (closing first
+/// could drop the last bytes); after a failure, closes at once.
+async fn finish(connection: iroh::endpoint::Connection, mut send: iroh::endpoint::SendStream, ok: bool) {
+    let _ = send.finish();
+    if ok {
+        connection.closed().await;
+    } else {
+        connection.close(1u8.into(), b"failed");
     }
 }

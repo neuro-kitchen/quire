@@ -1,0 +1,15 @@
+# The hub's image needs the Rust workspace only.
+target/
+.git/
+app/quire-gui/
+docs/book/
+**/node_modules/
+**/build/
+**/.gradle/
+*.sqlite
+*.pdf
+!crates/**/tests/fixtures/*.pdf
+.env
+.env.*
+.knowledge
+.tasks

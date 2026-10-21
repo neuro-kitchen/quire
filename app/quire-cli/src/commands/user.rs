@@ -22,6 +22,8 @@ enum Action {
         #[command(subcommand)]
         action: KeyAction,
     },
+    /// What to keep safe before syncing through a hub (the hub cannot recover your library)
+    RecoveryKit,
 }
 
 #[derive(Subcommand, Debug)]
@@ -46,6 +48,10 @@ pub fn run(engine: &Engine, args: &UserArgs) -> anyhow::Result<()> {
                 "anyone with this key can act as you; copy it to your own devices only",
             );
             println!("{}", engine.export_user_key()?);
+        }
+        Action::RecoveryKit => {
+            output::report(Tone::Warn, "secret", "print it or keep it in a password manager; never share it");
+            print!("{}", engine.recovery_kit()?);
         }
         Action::Key { action: KeyAction::Import { key } } => {
             let (id, store) = engine.import_user_key(key)?;

@@ -18,7 +18,7 @@ async fn start(dir: &tempfile::TempDir) -> String {
     let engine = Arc::new(Engine::open(options).await.unwrap());
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
-    tokio::spawn(quire_server::run(listener, engine, TOKEN.into()));
+    tokio::spawn(quire_connector::run(listener, engine, TOKEN.into()));
     format!("http://{address}")
 }
 

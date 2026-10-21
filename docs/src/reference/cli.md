@@ -1126,9 +1126,10 @@ Who you are to collaborators: your user ID, your key for your other devices
 Usage: quire user [OPTIONS] <COMMAND>
 
 Commands:
-  id    Your user ID: what others share projects with
-  key   Your user key, to give your other devices (keep it secret)
-  help  Print this message or the help of the given subcommand(s)
+  id            Your user ID: what others share projects with
+  key           Your user key, to give your other devices (keep it secret)
+  recovery-kit  What to keep safe before syncing through a hub (the hub cannot recover your library)
+  help          Print this message or the help of the given subcommand(s)
 
 Options:
       --lib <NAME>      Use this registered library [env: QUIRE_LIB]
@@ -1206,6 +1207,21 @@ Options:
   -h, --help            Print help
 ```
 
+### quire user recovery-kit
+
+```text
+What to keep safe before syncing through a hub (the hub cannot recover your library)
+
+Usage: quire user recovery-kit [OPTIONS]
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
 ## quire sync
 
 ```text
@@ -1218,6 +1234,7 @@ Commands:
   peer   Your other devices
   with   Sync with a device now (it must be running `quire sync serve`)
   serve  Wait for your devices to sync with this one (Ctrl-C stops)
+  hub    Sync through a hub (self-hosted container or the cloud) that stores your encrypted library
   help   Print this message or the help of the given subcommand(s)
 
 Options:
@@ -1349,6 +1366,111 @@ Options:
   -h, --help            Print help
 ```
 
+### quire sync hub
+
+```text
+Sync through a hub (self-hosted container or the cloud) that stores your encrypted library
+
+Usage: quire sync hub [OPTIONS] <COMMAND>
+
+Commands:
+  add      Use a hub: its ID (`quire-hub id`, or its log) and, the first time, its setup or link code
+  now      Sync through the hub now
+  devices  This person's devices the hub knows
+  revoke   Make the hub refuse a device from now on (a lost phone): its device ID
+  rm       Stop using the hub (it keeps your encrypted data until you delete your account there)
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+#### quire sync hub add
+
+```text
+Use a hub: its ID (`quire-hub id`, or its log) and, the first time, its setup or link code
+
+Usage: quire sync hub add [OPTIONS] <ID> [CODE]
+
+Arguments:
+  <ID>    
+  [CODE]  
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+#### quire sync hub now
+
+```text
+Sync through the hub now
+
+Usage: quire sync hub now [OPTIONS]
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+#### quire sync hub devices
+
+```text
+This person's devices the hub knows
+
+Usage: quire sync hub devices [OPTIONS]
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+#### quire sync hub revoke
+
+```text
+Make the hub refuse a device from now on (a lost phone): its device ID
+
+Usage: quire sync hub revoke [OPTIONS] <DEVICE>
+
+Arguments:
+  <DEVICE>  
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+#### quire sync hub rm
+
+```text
+Stop using the hub (it keeps your encrypted data until you delete your account there)
+
+Usage: quire sync hub rm [OPTIONS]
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
 ## quire highlight
 
 ```text
@@ -1462,6 +1584,8 @@ Commands:
   verify   Re-check attached PDFs against their references (DOI or title); changes nothing
   ocr      OCR of scanned PDFs (OCRmyPDF, or Tesseract with poppler, when installed)
   rm       Remove a reference's PDFs (the files stay in the store)
+  keep     Keep a paper's or project's PDFs downloaded on this device (`files.download = "on-open"`)
+  evict    Remove PDFs past `files.cache_mb` (only those your sync hub holds)
   help     Print this message or the help of the given subcommand(s)
 
 Options:
@@ -1654,6 +1778,41 @@ Usage: quire pdf rm [OPTIONS] <QUERY>
 
 Arguments:
   <QUERY>  Cite key, DOI / arXiv ID / PMID, or reference ID
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+### quire pdf keep
+
+```text
+Keep a paper's or project's PDFs downloaded on this device (`files.download = "on-open"`)
+
+Usage: quire pdf keep [OPTIONS] <TARGET>
+
+Arguments:
+  <TARGET>  Cite key, DOI / arXiv ID / PMID, or reference ID; with --project, a project path
+
+Options:
+      --lib <NAME>      Use this registered library [env: QUIRE_LIB]
+      --project         TARGET is a project (its subprojects too)
+      --library <PATH>  Use the library in this folder, registered or not [env: QUIRE_LIBRARY]
+      --off             Stop keeping it downloaded
+      --config <FILE>   Config file (default: ~/.config/quire/config.toml) [env: QUIRE_CONFIG=]
+  -v, --verbose         Show debug logs (requests, database)
+  -h, --help            Print help
+```
+
+### quire pdf evict
+
+```text
+Remove PDFs past `files.cache_mb` (only those your sync hub holds)
+
+Usage: quire pdf evict [OPTIONS]
 
 Options:
       --lib <NAME>      Use this registered library [env: QUIRE_LIB]

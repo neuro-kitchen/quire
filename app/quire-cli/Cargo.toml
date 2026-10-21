@@ -19,7 +19,7 @@ tui = ["dep:quire-tui"]
 
 [dependencies]
 quire-engine.workspace = true
-quire-server.workspace = true
+quire-connector.workspace = true
 quire-tui = { workspace = true, optional = true }
 quire-model.workspace = true
 anyhow.workspace = true
