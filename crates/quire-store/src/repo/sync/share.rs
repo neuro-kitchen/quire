@@ -39,6 +39,7 @@ impl SqliteLibrary<'_> {
         let mut granted: Vec<ProjectId> = Vec::new();
         let mut linked: Vec<ReferenceId> = Vec::new();
         for row in rows {
+            let row = as_seen(row, &visible);
             let keep = match &row {
                 Row::Project(p) => visible.contains(&p.id),
                 Row::Member(m) => {
@@ -64,7 +65,7 @@ impl SqliteLibrary<'_> {
         for project in granted {
             for id in quire_core::library::projects::with_descendants(self, project, true)? {
                 if let Some(found) = projects::by_id(self.conn, id)? {
-                    push(Row::Project(found), &mut out);
+                    push(as_seen(Row::Project(found), &visible), &mut out);
                 }
                 for member in self.members_of(id)? {
                     push(Row::Member(member), &mut out);
@@ -98,6 +99,7 @@ impl SqliteLibrary<'_> {
     /// from the shared project instead): the trash state of references stays this library's.
     pub fn authorize(&self, rows: Vec<Row>, sender: &UserId) -> Result<(Vec<Row>, usize)> {
         let conn = self.conn;
+        let visible = sharing::visible_projects(self, sender)?;
         // Projects the sender may edit: from what is here, and from the batch (a project they
         // share for the first time, or a subproject of an editable one).
         let mut editable: HashSet<ProjectId> = HashSet::new();
@@ -127,16 +129,29 @@ impl SqliteLibrary<'_> {
             incoming_projects.retain(|p| {
                 let id = alias(conn, p.id).unwrap_or(p.id);
                 let local = projects::by_id(conn, id).ok().flatten();
+                let mut parent = p.parent.map(|parent| alias(conn, parent).unwrap_or(parent));
+                // A shared subproject reaches them at the top (`as_seen`): its parent here stands.
+                if let Some(local) = &local
+                    && parent.is_none()
+                    && local.parent.is_some_and(|here| !visible.contains(&here))
+                {
+                    parent = local.parent;
+                }
                 let ok = match &local {
-                    // The owner never changes; removing a project takes an owner.
+                    // The owner and the parent never change (quire never moves a project: moved
+                    // under one of the sender's, it would make them its owner); removing a project
+                    // takes an owner.
                     Some(local) => {
                         local.owner == p.owner
+                            && local.parent == parent
                             && editable.contains(&id)
                             && (p.meta.deleted_at.is_none() || owned.contains(&id))
                     }
+                    // A new project: under one the sender may edit, or at the top if theirs; owned
+                    // by nobody yet or by the sender.
                     None => {
-                        p.owner.as_ref() == Some(sender)
-                            || p.parent.is_some_and(|parent| editable.contains(&alias(conn, parent).unwrap_or(parent)))
+                        (p.owner.is_none() || p.owner.as_ref() == Some(sender))
+                            && parent.map_or(p.owner.as_ref() == Some(sender), |parent| editable.contains(&parent))
                     }
                 };
                 if ok {
@@ -171,6 +186,14 @@ impl SqliteLibrary<'_> {
         let mut kept = Vec::with_capacity(rows.len());
         let mut refused = 0;
         for row in rows {
+            let row = match row {
+                Row::Project(mut p) if accepted_projects.contains(&p.id) && p.parent.is_none() => {
+                    p.parent =
+                        projects::by_id(conn, resolve(p.id))?.and_then(|l| l.parent).filter(|h| !visible.contains(h));
+                    Row::Project(p)
+                }
+                other => other,
+            };
             let ok = match &row {
                 Row::Project(p) => accepted_projects.contains(&p.id),
                 Row::Member(m) => owned.contains(&resolve(m.project)) && &m.granted_by == sender,
@@ -208,6 +231,18 @@ impl SqliteLibrary<'_> {
             hashes.extend(attachments::of(self.conn, reference.id)?.into_iter().map(|a| a.hash));
         }
         Ok(hashes)
+    }
+}
+
+/// `row` as someone who sees only the `visible` projects has it: a project whose parent they
+/// cannot see is at the top for them (a shared subproject).
+fn as_seen(row: Row, visible: &HashSet<ProjectId>) -> Row {
+    match row {
+        Row::Project(mut p) if p.parent.is_some_and(|parent| !visible.contains(&parent)) => {
+            p.parent = None;
+            Row::Project(p)
+        }
+        other => other,
     }
 }
 
@@ -320,6 +355,73 @@ mod tests {
         let found = in_lab.iter().find(|r| r.data.title() == Some("alice's find")).unwrap();
         assert!(bob.notes_of(Some(found.id)).unwrap().is_empty(), "her note stays hers");
         assert!(bob.members_of(projects::resolve(&bob, &lab).unwrap().id).unwrap().iter().all(|m| m.user != user('c')));
+    }
+
+    /// An editor who moved the shared project under a project of their own became an owner of it
+    /// (an ancestor's owner is an owner everywhere below), and could then add members. quire never
+    /// moves a project, so a moved one is refused; so is a new project under one the sender
+    /// cannot edit.
+    #[test]
+    fn an_editor_cannot_move_a_project_or_build_under_a_private_one() {
+        let (bob_conn, alice_conn) = (crate::open_in_memory().unwrap(), crate::open_in_memory().unwrap());
+        let (mut bob, mut alice) = (library(&bob_conn), library(&alice_conn));
+        let (b, a) = (user('b'), user('a'));
+        let lab: quire_model::SlugPath = "lab".parse().unwrap();
+        projects::create(&mut bob, "Lab", None).unwrap();
+        let (_, private) = projects::create(&mut bob, "Private", None).unwrap();
+        sharing::share(&mut bob, &b, &lab, &a, "Alice", Role::Editor).unwrap();
+        send(&bob, &b, &mut alice, &a);
+
+        // Alice (crafting rows): a top-level project she owns, Lab moved under it, and a project
+        // of hers inside Bob's private one (its ID learnt somehow).
+        let mut mine = quire_model::Project::new("Mine", None, alice.device).unwrap();
+        mine.owner = Some(a.clone());
+        alice.insert_project(&mine).unwrap();
+        let mut moved = projects::resolve(&alice, &lab).unwrap();
+        moved.parent = Some(mine.id);
+        moved.meta.touch(alice.device);
+        alice.update_project(&moved).unwrap();
+        let mut planted = quire_model::Project::new("Planted", Some(private.id), alice.device).unwrap();
+        planted.owner = Some(a.clone());
+        let rows = vec![Row::Project(mine.clone()), Row::Project(moved), Row::Project(planted.clone())];
+
+        let (allowed, refused) = bob.authorize(rows, &a).unwrap();
+        assert_eq!(refused, 2, "the move and the planted project: {allowed:?}");
+        bob.merge(allowed, &alice.device.to_string()).unwrap();
+        let on_bob = projects::resolve(&bob, &lab).unwrap();
+        assert_eq!(on_bob.parent, None);
+        assert_eq!(sharing::role_of(&bob, &a, on_bob.id).unwrap(), Some(Role::Editor));
+        assert!(bob.project(planted.id).unwrap().is_none());
+    }
+
+    /// Sharing only a subproject: it reaches the member at the top of their tree (they cannot
+    /// see its parent), and their changes come back under its parent here. Before, it waited
+    /// forever for a parent that never came: the member got the papers without the project.
+    #[test]
+    fn a_shared_subproject_arrives_at_the_top_and_stays_in_place_here() {
+        let (bob_conn, alice_conn) = (crate::open_in_memory().unwrap(), crate::open_in_memory().unwrap());
+        let (mut bob, mut alice) = (library(&bob_conn), library(&alice_conn));
+        let (b, a) = (user('b'), user('a'));
+        let sub: quire_model::SlugPath = "lab/sub".parse().unwrap();
+        projects::create(&mut bob, "Lab", None).unwrap();
+        projects::create(&mut bob, "Sub", Some(&"lab".parse().unwrap())).unwrap();
+        let shared = references::add(&mut bob, paper("shared paper", "10.1/shared")).unwrap();
+        projects::link(&mut bob, &shared.reference().cite_key.to_string(), &sub).unwrap();
+        sharing::share(&mut bob, &b, &sub, &a, "Alice", Role::Editor).unwrap();
+
+        let (_, refused) = send(&bob, &b, &mut alice, &a);
+        assert_eq!(refused, 0);
+        let tree: Vec<String> = projects::tree(&alice).unwrap().iter().map(|(p, _)| p.to_string()).collect();
+        assert_eq!(tree, ["sub"]);
+        assert_eq!(projects::references(&alice, &"sub".parse().unwrap(), false).unwrap().len(), 1);
+
+        // Alice renames it and adds a subproject; Bob keeps it under Lab.
+        projects::rename(&mut alice, &"sub".parse().unwrap(), "Sub Two").unwrap();
+        projects::create(&mut alice, "Deeper", Some(&"sub-two".parse().unwrap())).unwrap();
+        let (_, refused) = send(&alice, &a, &mut bob, &b);
+        assert_eq!(refused, 0);
+        let tree: Vec<String> = projects::tree(&bob).unwrap().iter().map(|(p, _)| p.to_string()).collect();
+        assert_eq!(tree, ["lab", "lab/sub-two", "lab/sub-two/deeper"]);
     }
 
     #[test]
