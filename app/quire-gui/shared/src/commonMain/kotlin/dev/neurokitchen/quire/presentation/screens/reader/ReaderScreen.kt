@@ -16,10 +16,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
@@ -27,14 +25,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import dev.neurokitchen.quire.resources.ic_auto_fix_high
 import org.jetbrains.compose.resources.painterResource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -178,97 +174,19 @@ fun ReaderScreen(
             val screenWidth = maxWidth
             val isNarrow = screenWidth < 700.dp
             if (isNarrow) {
-                // Adaptive Mobile Reader inspired by Kindle: full-screen immersive canvas, one-touch minimization
-                Box(Modifier.fillMaxSize()) {
-                    MobileReaderView(
-                        state = state,
-                        onEvent = onEvent,
-                        loadPage = loadPage,
-                        loadFigure = loadFigure,
-                        renderedNear = renderedNear,
-                        textLayer = textLayer,
-                        selection = selection,
-                        onSelectionChange = { selection = it },
-                        readingProgressCurrent = readingProgressCurrent,
-                        onProgressCurrentChange = { readingProgressCurrent = it },
-                        readingProgressTotal = readingProgressTotal,
-                        onProgressTotalChange = { readingProgressTotal = it },
-                        onBack = onBack,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-
-                    // Overlay Drawer for Annotations
-                    if (!state.isAnnotationsCollapsed) {
-                        Box(
-                            Modifier.fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.5f))
-                                .clickable { onEvent(ReaderEvent.OnToggleAnnotations) }
-                        )
-                        AnnotationsSidebar(
-                            highlights = state.highlights,
-                            focused = state.focusedHighlight,
-                            missing = if (state.mode == ReaderMode.Pdf) state.highlights.map { it.id }.filterNot { it in located }.toSet() else emptySet(),
-                            onClick = { onEvent(ReaderEvent.OnHighlightClick(it)) },
-                            onComment = { id, text -> onEvent(ReaderEvent.OnHighlightComment(id, text)) },
-                            onRemove = { onEvent(ReaderEvent.OnHighlightRemove(it)) },
-                            onCollapse = { onEvent(ReaderEvent.OnToggleAnnotations) },
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .width((screenWidth * 0.88f).coerceAtMost(360.dp))
-                                .align(Alignment.CenterStart)
-                                .statusBarsPadding()
-                                .navigationBarsPadding()
-                                .clickable(interactionSource = null, indication = null) {},
-                        )
-                    }
-
-                    // Overlay Drawer for Notes
-                    if (!state.isNotesCollapsed) {
-                        Box(
-                            Modifier.fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.5f))
-                                .clickable { onEvent(ReaderEvent.OnToggleNotes) }
-                        )
-                        NotesPanel(
-                            notes = state.notes,
-                            draft = state.noteDraft,
-                            onDraftChange = { onEvent(ReaderEvent.OnNoteDraftChange(it)) },
-                            onAdd = { onEvent(ReaderEvent.OnNoteAdd) },
-                            onRemove = { onEvent(ReaderEvent.OnNoteRemove(it)) },
-                            onCollapse = { onEvent(ReaderEvent.OnToggleNotes) },
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .width((screenWidth * 0.90f).coerceAtMost(400.dp))
-                                .align(Alignment.CenterEnd)
-                                .clickable(interactionSource = null, indication = null) {},
-                        )
-                    }
-
-                    // Overlay Drawer for Figures
-                    if (state.isFigureDrawerOpen) {
-                        Box(
-                            Modifier.fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.5f))
-                                .clickable { onEvent(ReaderEvent.OnToggleFigureDrawer) }
-                        )
-                        FigureDrawer(
-                            isOpen = true,
-                            tabs = state.tabs,
-                            loadFigure = loadFigure,
-                            pdfFigures = if (state.pdf.path == null) emptyList() else state.pdf.figures,
-                            loadPdfFigure = loadPdfFigure,
-                            onClose = { onEvent(ReaderEvent.OnToggleFigureDrawer) },
-                            dockSide = figureDockSide,
-                            onToggleDockSide = { setLayout(layout.copy(drawerOnLeft = !layout.drawerOnLeft)) },
-                            onPin = { onEvent(ReaderEvent.OnPin(it)); onEvent(ReaderEvent.OnToggleFigureDrawer) },
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .width((screenWidth * 0.90f).coerceAtMost(400.dp))
-                                .align(Alignment.CenterEnd)
-                                .clickable(interactionSource = null, indication = null) {},
-                        )
-                    }
-                }
+                // Phones: the page full screen, frosted bars over it, panels as sheets.
+                MobileReaderView(
+                    state = state,
+                    onEvent = onEvent,
+                    loadPage = loadPage,
+                    loadFigure = loadFigure,
+                    loadPdfFigure = loadPdfFigure,
+                    renderedNear = renderedNear,
+                    textLayer = textLayer,
+                    onSelectionChange = { selection = it },
+                    onBack = onBack,
+                    modifier = Modifier.fillMaxSize(),
+                )
             } else {
                 // Desktop multi-pane layout
                 Row(Modifier.fillMaxSize()) {
