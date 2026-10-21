@@ -246,6 +246,12 @@ impl QuireLibrary {
         .await
     }
 
+    /// Converts again the stored reader texts an older converter made (after an update), in the
+    /// background; returns how many. Opening those papers then does not wait for it.
+    pub async fn rebuild_stale_texts(&self) -> Result<u32> {
+        self.with(|engine| async move { Ok(engine.rebuild_stale_texts().await? as u32) }).await
+    }
+
     /// The local file of a figure image (`BlockKind::Image`), downloaded once.
     pub async fn figure(&self, url: String) -> Result<String> {
         self.with(|engine| async move { Ok(engine.figure(&url).await?.display().to_string()) }).await

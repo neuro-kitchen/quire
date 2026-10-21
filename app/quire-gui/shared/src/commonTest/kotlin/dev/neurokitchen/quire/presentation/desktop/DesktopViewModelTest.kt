@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -67,5 +68,19 @@ class DesktopViewModelTest {
         vm.onEvent(DesktopEvent.OnToggleCitationGraph(true))
         advanceUntilIdle()
         assertEquals(2, streams, "the graph loads them again while it is open")
+    }
+
+    /** Stale paper texts are rebuilt in the background a moment after startup, once. */
+    @Test
+    fun staleTextsAreRebuiltAfterStartup() = runTest(dispatcher) {
+        var rebuilds = 0
+        val library = object : LibraryRepository by SampleLibraryRepository() {
+            override suspend fun rebuildStaleTexts(): Int = 1.also { rebuilds++ }
+        }
+        DesktopViewModel(libraryRepository = library)
+        advanceTimeBy(1_000)
+        assertEquals(0, rebuilds, "not while the first screen loads")
+        advanceUntilIdle()
+        assertEquals(1, rebuilds)
     }
 }

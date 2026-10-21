@@ -179,3 +179,33 @@ async fn scans_without_ocr_tools_say_what_to_install() {
     let error = engine.ocr(&key).await.unwrap_err().to_string();
     assert!(error.contains("OCRmyPDF") && error.contains("Tesseract"), "{error}");
 }
+
+/// A converter update made every paper's stored text stale, and each was rebuilt the first time it
+/// was opened (0.4-2.2 s, inside the reader's loading). Stale ones are now rebuilt in the
+/// background; papers never opened are left alone.
+#[tokio::test]
+async fn stale_texts_are_rebuilt_in_the_background() {
+    let dir = tempfile::tempdir().unwrap();
+    let engine = engine(dir.path(), None).await;
+    let bib = dir.path().join("refs.bib");
+    std::fs::write(&bib, "@article{one, title = {One}, year = {2020}}\n@article{two, title = {Two}, year = {2021}}")
+        .unwrap();
+    engine.import_bib(&bib, None).await.unwrap();
+    for key in ["one", "two"] {
+        let pdf = dir.path().join(format!("{key}.pdf"));
+        std::fs::write(&pdf, quire_testkit::tiny_pdf(&format!("Paper {key} about place cells and grid cells")))
+            .unwrap();
+        engine.attach_file(key, &pdf, false).await.unwrap();
+    }
+    let (_, _, cached) = engine.paper_text("one").await.unwrap();
+    assert!(!cached, "converted the first time");
+    // As after an update: the stored text names another converter.
+    let (_, pdfs) = engine.pdfs_of("one").await.unwrap();
+    let md = pdfs[0].1.with_extension("md");
+    let text = std::fs::read_to_string(&md).unwrap();
+    std::fs::write(&md, text.replacen("<!-- quire reader text: ", "<!-- quire reader text: older ", 1)).unwrap();
+
+    assert_eq!(engine.rebuild_stale_texts().await.unwrap(), 1, "only the stale one; `two` was never opened");
+    assert!(engine.paper_text("one").await.unwrap().2, "from the store again");
+    assert_eq!(engine.rebuild_stale_texts().await.unwrap(), 0);
+}
