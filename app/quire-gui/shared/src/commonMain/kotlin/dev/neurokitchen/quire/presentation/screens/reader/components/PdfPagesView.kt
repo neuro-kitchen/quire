@@ -1,5 +1,15 @@
 package dev.neurokitchen.quire.presentation.screens.reader.components
 
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.ui.unit.max
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -110,6 +120,13 @@ fun PdfPagesView(
     contentPadding: PaddingValues = PaddingValues(),
     /** A page to bring to the top (the phone's page slider); `null`: none. */
     jumpToPage: Int? = null,
+    /** A pinch ended at this zoom; `null`: pinching does nothing (the desktop zooms with keys). */
+    onPinchZoom: ((Float) -> Unit)? = null,
+    /**
+     * Touch screens: text is selected after a long-press, so a plain drag scrolls (up, down and
+     * sideways when zoomed). With a mouse a drag selects.
+     */
+    selectAfterLongPress: Boolean = false,
 ) {
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -128,8 +145,28 @@ fun PdfPagesView(
         onProgressChange(firstVisiblePage, pages.size)
     }
 
-    BoxWithConstraints(modifier.fillMaxSize().background(themeColors.background)) {
+    // A pinch scales the pages as they are while the fingers move (no render on every frame);
+    // the zoom is set when they lift, and the pages render once at the new width.
+    var pinch by remember { mutableFloatStateOf(1f) }
+    val horizontal = rememberScrollState()
+
+    BoxWithConstraints(
+        modifier
+            .fillMaxSize()
+            .background(themeColors.background)
+            .then(
+                if (onPinchZoom == null) Modifier else Modifier.pinchToZoom(
+                    onPinch = { pinch = (pinch * it).coerceIn(0.5f / zoom, 4f / zoom) },
+                    onEnd = {
+                        if (pinch != 1f) onPinchZoom(zoom * pinch)
+                        pinch = 1f
+                    },
+                ),
+            ),
+    ) {
         val pageWidth = min(maxWidth - Dimens.SpaceLg * 2, MaxPageWidth) * zoom
+        // Zoomed in, pages are wider than the view: it scrolls sideways too.
+        val contentWidth = max(maxWidth, pageWidth + Dimens.SpaceMd * 2)
 
         LazyColumn(
             state = list,
@@ -141,7 +178,14 @@ fun PdfPagesView(
                 top = Dimens.SpaceLg + contentPadding.calculateTopPadding(),
                 bottom = Dimens.SpaceLg + contentPadding.calculateBottomPadding(),
             ),
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxHeight()
+                .horizontalScroll(horizontal)
+                .width(contentWidth)
+                .graphicsLayer {
+                    scaleX = pinch
+                    scaleY = pinch
+                },
         ) {
             itemsIndexed(pages) { index, size ->
                 PageItem(
@@ -155,6 +199,7 @@ fun PdfPagesView(
                     activeSelection = selection?.takeIf { it.page == index },
                     textLayer = textLayer,
                     isSnapshotMode = isSnapshotMode,
+                    selectAfterLongPress = selectAfterLongPress,
                     onSelect = { selection = it },
                     onAddSnapshot = { rect -> onAddSnapshot(rect, index) },
                     loadPage = loadPage,
@@ -212,6 +257,7 @@ private fun PageItem(
     activeSelection: ActivePdfSelection?,
     textLayer: PdfTextLayer,
     isSnapshotMode: Boolean = false,
+    selectAfterLongPress: Boolean = false,
     onSelect: (ActivePdfSelection?) -> Unit,
     onAddSnapshot: (PageRect) -> Unit = {},
     loadPage: suspend (Int, Int) -> ImageBitmap?,
@@ -291,27 +337,31 @@ private fun PageItem(
             }
             .then(
                 if (isSnapshotMode) Modifier
-                else Modifier.pointerInput(index, textLayer) {
+                else Modifier.pointerInput(index, textLayer, selectAfterLongPress) {
                     fun points(offset: Offset): Offset = offset / (this.size.width.toFloat() / size.width)
                     var anchor: Int? = null
                     var pending: Job? = null
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            val at = points(offset)
-                            anchor = null
-                            scope.launch { anchor = textLayer.glyphAt(index, at.x, at.y) }
-                        },
-                        onDrag = { change, _ ->
-                            change.consume()
-                            val at = points(change.position)
-                            pending?.cancel()
-                            pending = scope.launch {
-                                val from = anchor ?: return@launch
-                                val to = textLayer.glyphAt(index, at.x, at.y) ?: return@launch
-                                select(textLayer, index, from, to)?.let(onSelect)
-                            }
-                        },
-                    )
+                    val start = { offset: Offset ->
+                        val at = points(offset)
+                        anchor = null
+                        scope.launch { anchor = textLayer.glyphAt(index, at.x, at.y) }
+                        Unit
+                    }
+                    val drag = { change: PointerInputChange ->
+                        change.consume()
+                        val at = points(change.position)
+                        pending?.cancel()
+                        pending = scope.launch {
+                            val from = anchor ?: return@launch
+                            val to = textLayer.glyphAt(index, at.x, at.y) ?: return@launch
+                            select(textLayer, index, from, to)?.let(onSelect)
+                        }
+                    }
+                    if (selectAfterLongPress) {
+                        detectDragGesturesAfterLongPress(onDragStart = start, onDrag = { change, _ -> drag(change) })
+                    } else {
+                        detectDragGestures(onDragStart = start, onDrag = { change, _ -> drag(change) })
+                    }
                 }
             ),
     ) {
@@ -364,3 +414,26 @@ private fun DrawScope.box(r: PageRect, scale: Float, fill: Color, stroke: Color?
 
 private val SelectionFill = Color(0x553B82F6)
 private val SelectionStroke = Color(0xFF2563EB)
+
+/**
+ * Two fingers pinching: [onPinch] with each step's zoom factor, [onEnd] when they lift. One finger
+ * is left alone (the list scrolls, taps and selections work as before).
+ */
+private fun Modifier.pinchToZoom(onPinch: (Float) -> Unit, onEnd: () -> Unit) = pointerInput(Unit) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false)
+        var pinched = false
+        do {
+            val event = awaitPointerEvent()
+            if (event.changes.count { it.pressed } >= 2) {
+                val factor = event.calculateZoom()
+                if (factor != 1f) {
+                    pinched = true
+                    onPinch(factor)
+                    event.changes.forEach { it.consume() }
+                }
+            }
+        } while (event.changes.any { it.pressed })
+        if (pinched) onEnd()
+    }
+}
