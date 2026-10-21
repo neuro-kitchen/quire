@@ -104,7 +104,11 @@ fun HomeTab(
             verticalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
         ) {
             item { LargeTitle("Quire", stringResource(Res.string.library_my_library) + " · " + pluralStringResource(Res.plurals.mobile_items, references.size, references.size)) }
-            if (!state.isLoading && references.isEmpty()) {
+            val error = state.error
+            if (error != null) {
+                // The engine could not read the library: say so (it is not an empty library).
+                item { EmptyNote(error) }
+            } else if (!state.isLoading && references.isEmpty()) {
                 item { EmptyNote(stringResource(Res.string.home_empty)) }
             }
             section(Res.string.home_continue, reading, onOpenDetails, onOpenReader, onSeeAll = null)

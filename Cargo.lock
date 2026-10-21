@@ -5079,10 +5079,12 @@ dependencies = [
 name = "quire-ffi"
 version = "0.1.0"
 dependencies = [
+ "jni 0.22.4",
  "quire-document",
  "quire-engine",
  "quire-model",
  "quire-testkit",
+ "rustls-platform-verifier",
  "tempfile",
  "thiserror 2.0.21",
  "tokio",
