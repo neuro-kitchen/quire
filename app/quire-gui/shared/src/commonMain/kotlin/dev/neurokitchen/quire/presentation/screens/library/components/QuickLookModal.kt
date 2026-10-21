@@ -1,5 +1,13 @@
 package dev.neurokitchen.quire.presentation.screens.library.components
 
+import dev.neurokitchen.quire.resources.reader_open
+import dev.neurokitchen.quire.resources.reader_close_pane
+import dev.neurokitchen.quire.resources.quicklook_press_space_or_esc
+import dev.neurokitchen.quire.resources.quicklook_pdf_available
+import dev.neurokitchen.quire.resources.quicklook_close_preview
+import dev.neurokitchen.quire.resources.quicklook_abstract
+import dev.neurokitchen.quire.resources.common_copy_citekey
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -70,13 +78,13 @@ fun QuickLookModal(
 
     Dialog(onDismissRequest = onDismissRequest) {
         Surface(
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(Dimens.RadiusLarge),
             color = colors.sidepane,
             shadowElevation = 16.dp,
             modifier = Modifier
                 .width(680.dp)
                 .heightIn(max = 640.dp)
-                .border(1.dp, colors.border.copy(alpha = 0.8f), RoundedCornerShape(16.dp))
+                .border(1.dp, colors.border.copy(alpha = 0.8f), RoundedCornerShape(Dimens.RadiusLarge))
                 .onKeyEvent { event ->
                     if (event.type == KeyEventType.KeyDown) {
                         when (event.key) {
@@ -107,7 +115,7 @@ fun QuickLookModal(
                         modifier = Modifier
                             .clip(RoundedCornerShape(Dimens.RadiusSmall))
                             .background(colors.accent.copy(alpha = 0.15f))
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            .padding(horizontal = Dimens.SpaceXs, vertical = Dimens.SpaceMin),
                     ) {
                         Icon(
                             painter = painterResource(kindIcon(reference.kind)),
@@ -124,12 +132,12 @@ fun QuickLookModal(
                     }
 
                     if (reference.year.isNotBlank()) {
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(Dimens.SpaceXs))
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(Dimens.RadiusSmall))
                                 .background(colors.fillQuarternary)
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                                .padding(horizontal = Dimens.SpaceXs, vertical = Dimens.SpaceMin),
                         ) {
                             Text(
                                 reference.year,
@@ -140,7 +148,7 @@ fun QuickLookModal(
                     }
 
                     // Reading Status Dot & Label
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(Dimens.SpaceXs))
                     val statusColor = when (reference.reading) {
                         ReadingStatus.Read -> colors.statusRead
                         ReadingStatus.Reading -> colors.statusReading
@@ -156,7 +164,7 @@ fun QuickLookModal(
                         modifier = Modifier
                             .clip(RoundedCornerShape(Dimens.RadiusSmall))
                             .background(statusColor.copy(alpha = 0.15f))
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            .padding(horizontal = Dimens.SpaceXs, vertical = Dimens.SpaceMin),
                     ) {
                         Box(
                             modifier = Modifier
@@ -173,13 +181,13 @@ fun QuickLookModal(
                     }
 
                     if (reference.hasPdf) {
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(Dimens.SpaceXs))
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(Dimens.RadiusSmall))
                                 .background(colors.accentRed.copy(alpha = 0.15f))
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                                .padding(horizontal = Dimens.SpaceXs, vertical = Dimens.SpaceMin),
                         ) {
                             Icon(
                                 painterResource(Res.drawable.ic_picture_as_pdf),
@@ -187,9 +195,9 @@ fun QuickLookModal(
                                 tint = colors.accentRed,
                                 modifier = Modifier.size(13.dp),
                             )
-                            Spacer(Modifier.width(4.dp))
+                            Spacer(Modifier.width(Dimens.SpaceMin))
                             Text(
-                                "PDF Available",
+                                stringResource(Res.string.quicklook_pdf_available),
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 10.sp),
                                 color = colors.accentRed,
                             )
@@ -209,7 +217,7 @@ fun QuickLookModal(
                     ) {
                         Icon(
                             painterResource(Res.drawable.ic_close),
-                            contentDescription = "Close Preview",
+                            contentDescription = stringResource(Res.string.quicklook_close_preview),
                             tint = colors.fillSecondary,
                             modifier = Modifier.size(16.dp),
                         )
@@ -224,7 +232,7 @@ fun QuickLookModal(
                         .fillMaxWidth()
                         .weight(1f, fill = false)
                         .verticalScroll(scrollState)
-                        .padding(horizontal = 24.dp, vertical = 16.dp),
+                        .padding(horizontal = Dimens.SpaceLg, vertical = Dimens.SpaceMd),
                 ) {
                     // Paper Title
                     Text(
@@ -247,7 +255,7 @@ fun QuickLookModal(
                                 .clip(RoundedCornerShape(Dimens.RadiusSmall))
                                 .background(colors.fillQuarternary.copy(alpha = 0.6f))
                                 .clickable { clipboard.setText(AnnotatedString("@${reference.citeKey}")) }
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                                .padding(horizontal = Dimens.SpaceXs, vertical = Dimens.SpaceMin),
                         ) {
                             Text(
                                 "@${reference.citeKey}",
@@ -260,7 +268,7 @@ fun QuickLookModal(
                             Spacer(Modifier.width(6.dp))
                             Icon(
                                 painterResource(Res.drawable.ic_content_copy),
-                                contentDescription = "Copy CiteKey",
+                                contentDescription = stringResource(Res.string.common_copy_citekey),
                                 tint = colors.fillSecondary,
                                 modifier = Modifier.size(12.dp),
                             )
@@ -287,9 +295,9 @@ fun QuickLookModal(
 
                     // Abstract Section
                     if (reference.abstract.isNotBlank()) {
-                        Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(Dimens.SpaceMd))
                         Text(
-                            "ABSTRACT",
+                            stringResource(Res.string.quicklook_abstract),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 10.sp,
@@ -319,7 +327,7 @@ fun QuickLookModal(
 
                     // Tags & Collections
                     if (reference.tags.isNotEmpty() || reference.projects.isNotEmpty()) {
-                        Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(Dimens.SpaceMd))
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -330,7 +338,7 @@ fun QuickLookModal(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(Dimens.RadiusSmall))
                                         .background(colors.fillQuarternary.copy(alpha = 0.8f))
-                                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                                        .padding(horizontal = Dimens.SpaceXs, vertical = 3.dp),
                                 ) {
                                     Icon(
                                         painterResource(Res.drawable.ic_folder),
@@ -338,7 +346,7 @@ fun QuickLookModal(
                                         tint = colors.fillSecondary,
                                         modifier = Modifier.size(12.dp),
                                     )
-                                    Spacer(Modifier.width(4.dp))
+                                    Spacer(Modifier.width(Dimens.SpaceMin))
                                     Text(
                                         project,
                                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
@@ -376,14 +384,14 @@ fun QuickLookModal(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(colors.tabbar.copy(alpha = 0.5f))
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                        .padding(horizontal = 20.dp, vertical = Dimens.SpaceSm),
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
                     ) {
                         Text(
-                            "Press Space or Esc to dismiss",
+                            stringResource(Res.string.quicklook_press_space_or_esc),
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                             color = colors.fillTertiary,
                         )
@@ -397,7 +405,7 @@ fun QuickLookModal(
                             onClick = onDismissRequest,
                             shape = RoundedCornerShape(Dimens.RadiusSmall),
                         ) {
-                            Text("Close", style = MaterialTheme.typography.labelMedium)
+                            Text(stringResource(Res.string.reader_close_pane), style = MaterialTheme.typography.labelMedium)
                         }
 
                         Button(
@@ -408,7 +416,7 @@ fun QuickLookModal(
                                 contentColor = colors.onAccent,
                             ),
                         ) {
-                            Text("Open in Reader", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
+                            Text(stringResource(Res.string.reader_open), style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
                         }
                     }
                 }

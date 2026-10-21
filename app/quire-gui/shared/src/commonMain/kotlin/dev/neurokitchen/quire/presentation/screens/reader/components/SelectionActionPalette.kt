@@ -1,5 +1,9 @@
 package dev.neurokitchen.quire.presentation.screens.reader.components
 
+import dev.neurokitchen.quire.resources.selection_copy_with_citation
+import dev.neurokitchen.quire.resources.selection_copy_text
+import dev.neurokitchen.quire.resources.selection_add_note
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -66,8 +70,8 @@ fun SelectionActionPalette(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceMin),
+                modifier = Modifier.padding(horizontal = Dimens.SpaceXs, vertical = Dimens.SpaceMin),
             ) {
                 // One colour: the engine keeps no colour per highlight yet, so others would not stay.
                 val paletteColors = listOf("yellow" to colors.highlightYellow)
@@ -83,9 +87,9 @@ fun SelectionActionPalette(
                     )
                 }
 
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(Dimens.SpaceMin))
                 VerticalDivider(color = colors.fillQuarternary, modifier = Modifier.height(20.dp))
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(Dimens.SpaceMin))
 
                 // Add note to selection
                 IconButton(
@@ -94,7 +98,7 @@ fun SelectionActionPalette(
                 ) {
                     Icon(
                         painterResource(Res.drawable.ic_sticky_note_2),
-                        contentDescription = "Add Note",
+                        contentDescription = stringResource(Res.string.selection_add_note),
                         tint = colors.sectionNotes,
                         modifier = Modifier.size(16.dp),
                     )
@@ -107,7 +111,7 @@ fun SelectionActionPalette(
                 ) {
                     Icon(
                         painterResource(Res.drawable.ic_content_copy),
-                        contentDescription = "Copy Text",
+                        contentDescription = stringResource(Res.string.selection_copy_text),
                         tint = colors.fillPrimary,
                         modifier = Modifier.size(16.dp),
                     )
@@ -120,7 +124,7 @@ fun SelectionActionPalette(
                 ) {
                     Icon(
                         painterResource(Res.drawable.ic_subject),
-                        contentDescription = "Copy with Citation",
+                        contentDescription = stringResource(Res.string.selection_copy_with_citation),
                         tint = colors.accent,
                         modifier = Modifier.size(16.dp),
                     )

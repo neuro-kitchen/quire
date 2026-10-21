@@ -1,5 +1,16 @@
 package dev.neurokitchen.quire.presentation.screens.reader.components
 
+import dev.neurokitchen.quire.resources.figures_this_document_does_not
+import dev.neurokitchen.quire.resources.figures_no_structured_tables_were
+import dev.neurokitchen.quire.resources.figures_no_extracted_tables
+import dev.neurokitchen.quire.resources.figures_no_extracted_figures
+import dev.neurokitchen.quire.resources.figures_loading_figure
+import dev.neurokitchen.quire.resources.figures_figures_tables
+import dev.neurokitchen.quire.resources.figures_figure_preview
+import dev.neurokitchen.quire.resources.figures_figure
+import dev.neurokitchen.quire.resources.figures_enlarged_figure
+import dev.neurokitchen.quire.resources.figures_close_lightbox
+import dev.neurokitchen.quire.resources.figures_close_drawer
 import dev.neurokitchen.quire.resources.reader_rows
 import dev.neurokitchen.quire.resources.reader_open_beside
 import androidx.compose.material3.TextButton
@@ -108,7 +119,8 @@ fun FigureDrawer(
     val loadImage: suspend (ExtractedFigure) -> ImageBitmap? = { figure -> figureImage(figure, loadFigure, loadPdfFigure) }
 
     // Extract figures and tables from paper tabs
-    val textFigures = remember(tabs) {
+    val figureWord = stringResource(Res.string.figures_figure)
+    val textFigures = remember(tabs, figureWord) {
         val list = mutableListOf<ExtractedFigure>()
         var figIndex = 1
         tabs.forEach { tab ->
@@ -118,7 +130,7 @@ fun FigureDrawer(
                     list.add(
                         ExtractedFigure(
                             id = "fig-$figIndex",
-                            title = "Figure $figIndex",
+                            title = "$figureWord $figIndex",
                             caption = caption,
                             imageUrl = block.kind.url,
                         )
@@ -222,7 +234,7 @@ fun FigureDrawer(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "FIGURES & TABLES",
+                    text = stringResource(Res.string.figures_figures_tables),
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp,
@@ -260,7 +272,7 @@ fun FigureDrawer(
                 ) {
                     Icon(
                         painterResource(Res.drawable.ic_close),
-                        contentDescription = "Close Drawer",
+                        contentDescription = stringResource(Res.string.figures_close_drawer),
                         tint = colors.fillSecondary,
                         modifier = Modifier.size(14.dp),
                     )
@@ -272,14 +284,14 @@ fun FigureDrawer(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(horizontal = 14.dp, vertical = Dimens.SpaceMin),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
         ) {
             DrawerTabChip("Figures (${shownFigures.size})", selected = selectedTab == 0) { selectedTab = 0 }
             DrawerTabChip("Tables (${tables.size})", selected = selectedTab == 1) { selectedTab = 1 }
         }
 
-        HorizontalDivider(color = colors.border.copy(alpha = 0.4f), modifier = Modifier.padding(top = 8.dp))
+        HorizontalDivider(color = colors.border.copy(alpha = 0.4f), modifier = Modifier.padding(top = Dimens.SpaceXs))
 
         // Content List
         if (selectedTab == 0) {
@@ -287,8 +299,8 @@ fun FigureDrawer(
                 DrawerEmptyState(title = "", message = stringResource(Res.string.figures_finding))
             } else if (shownFigures.isEmpty()) {
                 DrawerEmptyState(
-                    title = "No Extracted Figures",
-                    message = "This document does not contain standalone raster figures in its text layer.\n\nTip: Use the Snapshot tool in the toolbar to capture figures directly from the PDF into notes.",
+                    title = stringResource(Res.string.figures_no_extracted_figures),
+                    message = stringResource(Res.string.figures_this_document_does_not),
                 )
             } else {
                 LazyColumn(
@@ -309,8 +321,8 @@ fun FigureDrawer(
         } else {
             if (tables.isEmpty()) {
                 DrawerEmptyState(
-                    title = "No Extracted Tables",
-                    message = "No structured tables were extracted from this document's text layer.",
+                    title = stringResource(Res.string.figures_no_extracted_tables),
+                    message = stringResource(Res.string.figures_no_structured_tables_were),
                 )
             } else {
                 LazyColumn(
@@ -330,14 +342,14 @@ fun FigureDrawer(
     enlarged?.let { figure ->
         Dialog(onDismissRequest = { enlarged = null }) {
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(Dimens.RadiusBase),
                 color = colors.background,
                 shadowElevation = 24.dp,
                 modifier = Modifier
-                    .padding(16.dp)
-                    .clip(RoundedCornerShape(12.dp)),
+                    .padding(Dimens.SpaceMd)
+                    .clip(RoundedCornerShape(Dimens.RadiusBase)),
             ) {
-                Column(Modifier.padding(16.dp)) {
+                Column(Modifier.padding(Dimens.SpaceMd)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End,
@@ -352,7 +364,7 @@ fun FigureDrawer(
                         ) {
                             Icon(
                                 painterResource(Res.drawable.ic_close),
-                                contentDescription = "Close Lightbox",
+                                contentDescription = stringResource(Res.string.figures_close_lightbox),
                                 tint = colors.fillPrimary,
                                 modifier = Modifier.size(16.dp),
                             )
@@ -362,7 +374,7 @@ fun FigureDrawer(
                     if (img != null) {
                         Image(
                             bitmap = img!!,
-                            contentDescription = "Enlarged Figure",
+                            contentDescription = stringResource(Res.string.figures_enlarged_figure),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(max = 600.dp),
@@ -374,7 +386,7 @@ fun FigureDrawer(
                                 .fillMaxWidth()
                                 .height(200.dp),
                         ) {
-                            Text("Loading figure...", color = colors.fillTertiary)
+                            Text(stringResource(Res.string.figures_loading_figure), color = colors.fillTertiary)
                         }
                     }
                 }
@@ -435,7 +447,7 @@ private fun FigureCard(
                     .background(colors.fillQuarternary.copy(alpha = 0.4f)),
             ) {
                 Text(
-                    "Figure Preview",
+                    stringResource(Res.string.figures_figure_preview),
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.fillTertiary,
                 )
@@ -479,7 +491,7 @@ private fun TableCard(table: ExtractedTable, onPin: () -> Unit) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Dimens.SpaceXs))
             Text(
                 text = stringResource(Res.string.reader_rows, table.rows.size),
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
@@ -488,7 +500,7 @@ private fun TableCard(table: ExtractedTable, onPin: () -> Unit) {
             Spacer(Modifier.weight(1f))
             OpenBeside(onPin)
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(Dimens.SpaceXs))
         PaperTable(
             rows = table.rows,
             textStyle = MaterialTheme.typography.bodySmall,
@@ -532,11 +544,11 @@ private fun DrawerEmptyState(title: String, message: String) {
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(Dimens.SpaceLg),
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
         ) {
             Icon(
                 painterResource(Res.drawable.ic_inventory_2),

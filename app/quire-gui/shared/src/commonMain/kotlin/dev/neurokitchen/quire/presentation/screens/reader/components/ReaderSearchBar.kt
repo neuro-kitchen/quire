@@ -1,5 +1,8 @@
 package dev.neurokitchen.quire.presentation.screens.reader.components
 
+import dev.neurokitchen.quire.resources.find_find_in_document
+import dev.neurokitchen.quire.resources.find_close_search_esc
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -59,7 +62,7 @@ fun ReaderSearchBar(
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
         modifier = modifier
             .fillMaxWidth()
             .height(38.dp)
@@ -77,7 +80,7 @@ fun ReaderSearchBar(
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
             if (query.isEmpty()) {
                 Text(
-                    "Find in document...",
+                    stringResource(Res.string.find_find_in_document),
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.fillTertiary,
                 )
@@ -126,7 +129,7 @@ fun ReaderSearchBar(
             }
         }
 
-        Spacer(Modifier.width(4.dp))
+        Spacer(Modifier.width(Dimens.SpaceMin))
 
         // Close button
         Box(
@@ -138,7 +141,7 @@ fun ReaderSearchBar(
         ) {
             Icon(
                 painterResource(Res.drawable.ic_close),
-                contentDescription = "Close Search (Esc)",
+                contentDescription = stringResource(Res.string.find_close_search_esc),
                 tint = colors.fillSecondary,
                 modifier = Modifier.size(14.dp),
             )

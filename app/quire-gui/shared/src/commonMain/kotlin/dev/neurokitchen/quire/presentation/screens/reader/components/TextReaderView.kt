@@ -135,7 +135,7 @@ fun TextReaderView(
                 .horizontalScroll(rememberScrollState())
                 .background(themeColors.surface)
                 .padding(Dimens.SpaceXs),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceMin),
         ) {
             tabs.forEachIndexed { index, t ->
                 val label = stringResource(t.kind.label) + (t.count?.let { " ($it)" } ?: "")
@@ -359,7 +359,7 @@ private fun TabChip(text: String, selected: Boolean, onClick: () -> Unit) {
             .clip(RoundedCornerShape(Dimens.RadiusLarge))
             .background(if (selected) colors.accent else colors.fillQuinary)
             .clickable(onClick = onClick)
-            .padding(horizontal = Dimens.SpaceXs, vertical = 4.dp),
+            .padding(horizontal = Dimens.SpaceXs, vertical = Dimens.SpaceMin),
     )
 }
 

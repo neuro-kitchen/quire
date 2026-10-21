@@ -1,5 +1,17 @@
 package dev.neurokitchen.quire.presentation.screens.library.components
 
+import dev.neurokitchen.quire.resources.reader_open
+import dev.neurokitchen.quire.resources.items_selected
+import dev.neurokitchen.quire.resources.items_select_all
+import dev.neurokitchen.quire.resources.items_quick_look_space
+import dev.neurokitchen.quire.resources.items_quick_look_preview
+import dev.neurokitchen.quire.resources.items_new_collection
+import dev.neurokitchen.quire.resources.items_delete_paper
+import dev.neurokitchen.quire.resources.items_delete
+import dev.neurokitchen.quire.resources.items_create_collection
+import dev.neurokitchen.quire.resources.items_copy_title
+import dev.neurokitchen.quire.resources.items_copy_citation
+import dev.neurokitchen.quire.resources.items_clear_selection
 import dev.neurokitchen.quire.resources.export_menu
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.runtime.rememberUpdatedState
@@ -133,7 +145,7 @@ fun ItemsTable(
         if (selectedIds.size > 1) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(colors.accent.copy(alpha = 0.12f))
@@ -143,21 +155,21 @@ fun ItemsTable(
                     modifier = Modifier
                         .clip(RoundedCornerShape(Dimens.RadiusFull))
                         .background(colors.accent)
-                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                        .padding(horizontal = Dimens.SpaceXs, vertical = 2.dp),
                 ) {
                     Text(
-                        "${selectedIds.size} selected",
+                        stringResource(Res.string.items_selected, selectedIds.size),
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                         color = colors.onAccent,
                     )
                 }
 
                 TextButton(onClick = onSelectAll) {
-                    Text("Select All", style = MaterialTheme.typography.labelSmall, color = colors.accent)
+                    Text(stringResource(Res.string.items_select_all), style = MaterialTheme.typography.labelSmall, color = colors.accent)
                 }
 
                 TextButton(onClick = onClearSelection) {
-                    Text("Clear Selection", style = MaterialTheme.typography.labelSmall, color = colors.fillSecondary)
+                    Text(stringResource(Res.string.items_clear_selection), style = MaterialTheme.typography.labelSmall, color = colors.fillSecondary)
                 }
 
                 Spacer(Modifier.weight(1f))
@@ -173,11 +185,11 @@ fun ItemsTable(
                         .clip(RoundedCornerShape(Dimens.RadiusSmall))
                         .background(colors.fillQuarternary)
                         .clickable(onClick = onCreateCollectionFromSelected)
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .padding(horizontal = Dimens.SpaceXs, vertical = Dimens.SpaceMin),
                 ) {
                     Icon(painterResource(Res.drawable.ic_create_new_folder), contentDescription = null, tint = colors.fillPrimary, modifier = Modifier.size(14.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("New Collection...", style = MaterialTheme.typography.labelSmall, color = colors.fillPrimary)
+                    Spacer(Modifier.width(Dimens.SpaceMin))
+                    Text(stringResource(Res.string.items_new_collection), style = MaterialTheme.typography.labelSmall, color = colors.fillPrimary)
                 }
 
                 // Delete Selected button
@@ -187,11 +199,11 @@ fun ItemsTable(
                         .clip(RoundedCornerShape(Dimens.RadiusSmall))
                         .background(colors.accentRed.copy(alpha = 0.15f))
                         .clickable(onClick = onDeleteSelected)
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .padding(horizontal = Dimens.SpaceXs, vertical = Dimens.SpaceMin),
                 ) {
                     Icon(painterResource(Res.drawable.ic_delete), contentDescription = null, tint = colors.accentRed, modifier = Modifier.size(14.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Delete (${selectedIds.size})", style = MaterialTheme.typography.labelSmall, color = colors.accentRed)
+                    Spacer(Modifier.width(Dimens.SpaceMin))
+                    Text(stringResource(Res.string.items_delete, selectedIds.size), style = MaterialTheme.typography.labelSmall, color = colors.accentRed)
                 }
             }
             HorizontalDivider(color = colors.accent.copy(alpha = 0.3f))
@@ -392,7 +404,7 @@ private fun ItemRow(
                 ) {
                     Icon(
                         painterResource(Res.drawable.ic_description),
-                        contentDescription = "Quick Look (Space)",
+                        contentDescription = stringResource(Res.string.items_quick_look_space),
                         tint = if (isSelected) colors.onAccent else colors.fillTertiary,
                         modifier = Modifier.size(14.dp),
                     )
@@ -413,8 +425,8 @@ private fun ItemRow(
                 text = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(painterResource(Res.drawable.ic_description), contentDescription = null, tint = colors.fillSecondary, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Open in Reader", style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
+                        Spacer(Modifier.width(Dimens.SpaceXs))
+                        Text(stringResource(Res.string.reader_open), style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
                     }
                 },
                 onClick = {
@@ -427,8 +439,8 @@ private fun ItemRow(
                 text = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(painterResource(Res.drawable.ic_description), contentDescription = null, tint = colors.accent, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Quick Look Preview", style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
+                        Spacer(Modifier.width(Dimens.SpaceXs))
+                        Text(stringResource(Res.string.items_quick_look_preview), style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
                         Spacer(Modifier.weight(1f))
                         Text("Space", style = MaterialTheme.typography.labelSmall, color = colors.fillTertiary)
                     }
@@ -443,8 +455,8 @@ private fun ItemRow(
                 text = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(painterResource(Res.drawable.ic_create_new_folder), contentDescription = null, tint = colors.fillSecondary, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Create Collection...", style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
+                        Spacer(Modifier.width(Dimens.SpaceXs))
+                        Text(stringResource(Res.string.items_create_collection), style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
                     }
                 },
                 onClick = {
@@ -453,14 +465,14 @@ private fun ItemRow(
                 },
             )
 
-            HorizontalDivider(color = colors.fillQuarternary, modifier = Modifier.padding(vertical = 4.dp))
+            HorizontalDivider(color = colors.fillQuarternary, modifier = Modifier.padding(vertical = Dimens.SpaceMin))
 
             DropdownMenuItem(
                 text = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(painterResource(Res.drawable.ic_content_copy), contentDescription = null, tint = colors.fillSecondary, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Copy Citation", style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
+                        Spacer(Modifier.width(Dimens.SpaceXs))
+                        Text(stringResource(Res.string.items_copy_citation), style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
                     }
                 },
                 onClick = {
@@ -473,8 +485,8 @@ private fun ItemRow(
                 text = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(painterResource(Res.drawable.ic_content_copy), contentDescription = null, tint = colors.fillSecondary, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Copy Title", style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
+                        Spacer(Modifier.width(Dimens.SpaceXs))
+                        Text(stringResource(Res.string.items_copy_title), style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
                     }
                 },
                 onClick = {
@@ -483,14 +495,14 @@ private fun ItemRow(
                 },
             )
 
-            HorizontalDivider(color = colors.fillQuarternary, modifier = Modifier.padding(vertical = 4.dp))
+            HorizontalDivider(color = colors.fillQuarternary, modifier = Modifier.padding(vertical = Dimens.SpaceMin))
 
             DropdownMenuItem(
                 text = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(painterResource(Res.drawable.ic_delete), contentDescription = null, tint = colors.accentRed, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Delete Paper", style = MaterialTheme.typography.bodyMedium, color = colors.accentRed)
+                        Spacer(Modifier.width(Dimens.SpaceXs))
+                        Text(stringResource(Res.string.items_delete_paper), style = MaterialTheme.typography.bodyMedium, color = colors.accentRed)
                         Spacer(Modifier.weight(1f))
                         Text("Del", style = MaterialTheme.typography.labelSmall, color = colors.fillTertiary)
                     }
