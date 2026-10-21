@@ -7,14 +7,19 @@ import dev.neurokitchen.quire.data.repository.SamplePreferencesRepository
 import dev.neurokitchen.quire.domain.model.LibraryQuery
 import dev.neurokitchen.quire.domain.repository.LibraryRepository
 import dev.neurokitchen.quire.domain.repository.PreferencesRepository
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class DesktopViewModel(
     private val preferencesRepository: PreferencesRepository = SamplePreferencesRepository(),
     private val libraryRepository: LibraryRepository = SampleLibraryRepository(),
@@ -28,12 +33,13 @@ class DesktopViewModel(
                 _state.update { it.copy(appTheme = prefs.appTheme) }
             }
         }
-        viewModelScope.launch(Dispatchers.IO) {
-            libraryRepository.references(LibraryQuery())
-                .catch { /* sample or empty fallback */ }
-                .collect { refs ->
-                    _state.update { it.copy(allReferences = refs) }
-                }
+        // Every reference, for the command palette and the citation graph: followed only while one
+        // of them is open (the library screen keeps its own list).
+        viewModelScope.launch {
+            _state.map { it.isCommandPaletteOpen || it.isCitationGraphOpen }
+                .distinctUntilChanged()
+                .flatMapLatest { open -> if (open) libraryRepository.references(LibraryQuery()).catch { } else emptyFlow() }
+                .collect { refs -> _state.update { it.copy(allReferences = refs) } }
         }
     }
 

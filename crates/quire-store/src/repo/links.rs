@@ -18,6 +18,18 @@ pub(super) fn unlink(conn: &Connection, reference: ReferenceId, project: Project
     MEMBERS.clear(conn, [id_blob(project), id_blob(reference)], device)
 }
 
+impl super::SqliteLibrary<'_> {
+    /// Every live reference in a live project, as (reference, project): one query for what each
+    /// reference is in and how many each project holds.
+    pub fn memberships(&self) -> Result<Vec<(ReferenceId, ProjectId)>> {
+        let sql = "SELECT pr.reference_id, pr.project_id FROM project_reference pr
+                   JOIN reference r ON r.id = pr.reference_id
+                   JOIN project p ON p.id = pr.project_id
+                   WHERE pr.deleted_at IS NULL AND r.deleted_at IS NULL AND p.deleted_at IS NULL";
+        all(self.conn, sql, [], |row| Ok((id_at(row, "reference_id")?, id_at(row, "project_id")?)))
+    }
+}
+
 pub(super) fn projects_of(conn: &Connection, reference: ReferenceId) -> Result<Vec<ProjectId>> {
     let sql = "SELECT project_id FROM project_reference
                WHERE reference_id = ?1 AND deleted_at IS NULL

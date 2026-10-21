@@ -54,7 +54,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
-import dev.neurokitchen.quire.domain.model.PageImage
 import dev.neurokitchen.quire.domain.model.PageRect
 import dev.neurokitchen.quire.domain.model.PageSize
 import dev.neurokitchen.quire.domain.model.PdfMatch
@@ -63,7 +62,6 @@ import dev.neurokitchen.quire.presentation.designsystem.Dimens
 import dev.neurokitchen.quire.presentation.designsystem.QuireTheme
 import dev.neurokitchen.quire.presentation.designsystem.ReaderTheme
 import dev.neurokitchen.quire.presentation.designsystem.readerColors
-import dev.neurokitchen.quire.presentation.mapping.toImageBitmap
 import dev.neurokitchen.quire.presentation.screens.reader.PdfTextLayer
 import dev.neurokitchen.quire.resources.Res
 import dev.neurokitchen.quire.resources.reader_page_of
@@ -93,8 +91,10 @@ fun PdfPagesView(
     zoom: Float,
     locations: List<QuoteLocation>,
     focused: String?,
-    loadPage: suspend (index: Int, widthPx: Int) -> PageImage?,
+    loadPage: suspend (index: Int, widthPx: Int) -> ImageBitmap?,
     modifier: Modifier = Modifier,
+    /** A page already rendered at another width: shown at once, until the sharp one is ready. */
+    renderedNear: (index: Int, widthPx: Int) -> ImageBitmap? = { _, _ -> null },
     readerTheme: ReaderTheme = ReaderTheme.Dark,
     textLayer: PdfTextLayer = PdfTextLayer.None,
     matches: List<PdfMatch> = emptyList(),
@@ -147,6 +147,7 @@ fun PdfPagesView(
                     onSelect = { selection = it },
                     onAddSnapshot = { rect -> onAddSnapshot(rect, index) },
                     loadPage = loadPage,
+                    renderedNear = renderedNear,
                 )
             }
         }
@@ -201,11 +202,14 @@ private fun PageItem(
     isSnapshotMode: Boolean = false,
     onSelect: (ActivePdfSelection?) -> Unit,
     onAddSnapshot: (PageRect) -> Unit = {},
-    loadPage: suspend (Int, Int) -> PageImage?,
+    loadPage: suspend (Int, Int) -> ImageBitmap?,
+    renderedNear: (Int, Int) -> ImageBitmap?,
 ) {
     val widthPx = with(LocalDensity.current) { width.toPx() }.roundToInt()
-    val image: ImageBitmap? by produceState<ImageBitmap?>(null, index, widthPx) {
-        value = loadPage(index, widthPx)?.toImageBitmap()
+    // A page rendered at another width (before a zoom or resize) stands in until the sharp one is
+    // ready, instead of a blank page.
+    val image: ImageBitmap? by produceState(renderedNear(index, widthPx), index, widthPx) {
+        loadPage(index, widthPx)?.let { value = it }
     }
     val colors = QuireTheme.colors
     val scope = rememberCoroutineScope()
