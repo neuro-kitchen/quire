@@ -1,5 +1,6 @@
 package dev.neurokitchen.quire.presentation.screens.reader.components
 
+import androidx.compose.foundation.layout.IntrinsicSize
 import dev.neurokitchen.quire.resources.annotations_collapse_annotations
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.neurokitchen.quire.domain.model.Highlight
 import dev.neurokitchen.quire.presentation.designsystem.Dimens
@@ -59,10 +59,12 @@ fun AnnotationsSidebar(
     onRemove: (String) -> Unit,
     modifier: Modifier = Modifier,
     onCollapse: (() -> Unit)? = null,
+    /** The "Annotations" heading (not under the phone's Notes tabs, which name it). */
+    showTitle: Boolean = true,
 ) {
     val colors = QuireTheme.colors
     Column(modifier.fillMaxHeight().background(colors.sidepane)) {
-        Row(
+        if (showTitle) Row(
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.SpaceSm, vertical = 6.dp),
         ) {
@@ -137,14 +139,14 @@ private fun Annotation(
             .clickable(onClick = onClick)
             .padding(Dimens.SpaceXs),
     ) {
-        Row {
-            Box(Modifier.width(4.dp).height(36.dp).background(barColor, RoundedCornerShape(2.dp)))
+        // The colour bar runs the passage's height.
+        Row(Modifier.height(IntrinsicSize.Min)) {
+            Box(Modifier.width(4.dp).fillMaxHeight().background(barColor, RoundedCornerShape(2.dp)))
             Text(
                 highlight.quote,
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.fillPrimary,
-                maxLines = 4,
-                overflow = TextOverflow.Ellipsis,
+                // The whole highlighted passage (it was cut after four lines).
                 modifier = Modifier.padding(start = Dimens.SpaceXs),
             )
         }

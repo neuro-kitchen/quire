@@ -519,4 +519,8 @@
     <string name="add_subtitle_phone">By identifier, from PDF files or a .bib file, pasted BibTeX, or typed in</string>
     <string name="reader_to_text">Read mode</string>
     <string name="reader_to_pdf">PDF</string>
+    <string name="reader_figures_tables">Figures and tables</string>
+    <string name="reader_page_n">Page %1$s</string>
+    <string name="reader_notebook_highlights">Highlights (%1$s)</string>
+    <string name="reader_notebook_notes">Notes (%1$s)</string>
 </resources>
