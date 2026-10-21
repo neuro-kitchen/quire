@@ -1,5 +1,10 @@
 package dev.neurokitchen.quire.presentation.screens.reader.components
 
+import androidx.compose.ui.draw.shadow
+import dev.neurokitchen.quire.resources.reader_notebook_notes
+import dev.neurokitchen.quire.resources.reader_notebook_highlights
+import dev.neurokitchen.quire.resources.reader_page_n
+import dev.neurokitchen.quire.resources.reader_figures_tables
 import dev.neurokitchen.quire.resources.reader_to_pdf
 import dev.neurokitchen.quire.resources.reader_to_text
 import dev.neurokitchen.quire.resources.ic_picture_as_pdf
@@ -98,7 +103,6 @@ import dev.neurokitchen.quire.resources.find_find_in_document
 import dev.neurokitchen.quire.resources.ic_arrow_back
 import dev.neurokitchen.quire.resources.ic_chevron_right
 import dev.neurokitchen.quire.resources.ic_close
-import dev.neurokitchen.quire.resources.ic_description
 import dev.neurokitchen.quire.resources.ic_inventory_2
 import dev.neurokitchen.quire.resources.ic_search
 import dev.neurokitchen.quire.resources.ic_sticky_note_2
@@ -110,7 +114,6 @@ import dev.neurokitchen.quire.resources.reader_figures
 import dev.neurokitchen.quire.resources.reader_find_count
 import dev.neurokitchen.quire.resources.reader_find_next
 import dev.neurokitchen.quire.resources.reader_find_previous
-import dev.neurokitchen.quire.resources.reader_highlights
 import dev.neurokitchen.quire.resources.reader_loading
 import dev.neurokitchen.quire.resources.reader_notes
 import dev.neurokitchen.quire.resources.reader_page_n_of
@@ -223,7 +226,14 @@ fun MobileReaderView(
             if (state.find.isOpen) {
                 FindBar(state, onEvent, haze)
             } else {
-                TopBar(state.title, onBack, onFind = { onEvent(ReaderEvent.OnFindToggle) }, haze)
+                TopBar(
+                    state.title,
+                    onBack,
+                    onFind = { onEvent(ReaderEvent.OnFindToggle) },
+                    haze = haze,
+                    // Aa up top, as on Kindle; only for the text (a PDF's pages cannot be restyled).
+                    onDisplay = if (isPdf) null else ({ isDisplayOpen = true }),
+                )
             }
         }
 
@@ -237,14 +247,15 @@ fun MobileReaderView(
                 isPdf = isPdf,
                 position = position,
                 total = if (isPdf) state.pdf.pages.size else total,
-                highlights = state.highlights.size,
-                notes = state.notes.size,
+                annotations = state.highlights.size + state.notes.size,
                 haze = haze,
                 onJump = { jump = it },
-                onHighlights = { onEvent(ReaderEvent.OnToggleAnnotations) },
                 onFigures = { onEvent(ReaderEvent.OnToggleFigureDrawer) },
                 onNotes = { onEvent(ReaderEvent.OnToggleNotes) },
-                onDisplay = { isDisplayOpen = true },
+                // While dragging the slider: the page you would land on (PDF), as on Kindle.
+                preview = if (isPdf) {
+                    { page -> PagePreview(page, state.pdf.pages.getOrNull(page), loadPage, renderedNear) }
+                } else null,
                 // With a PDF: one tap between the page as printed and the reflowed text.
                 onToggleMode = if (state.pdf.path != null) {
                     { onEvent(ReaderEvent.OnModeChange(if (isPdf) ReaderMode.Text else ReaderMode.Pdf)) }
@@ -253,35 +264,10 @@ fun MobileReaderView(
         }
 
         if (isDisplayOpen && !isPdf) DisplaySheet(state, onEvent, onDismiss = { isDisplayOpen = false })
-        if (!state.isAnnotationsCollapsed) {
-            PanelSheet(onDismiss = { onEvent(ReaderEvent.OnToggleAnnotations) }) {
-                val located = state.pdf.locations.map { it.highlightId }.toSet()
-                AnnotationsSidebar(
-                    highlights = state.highlights,
-                    focused = state.focusedHighlight,
-                    missing = if (isPdf) state.highlights.map { it.id }.filterNot { it in located }.toSet() else emptySet(),
-                    onClick = {
-                        onEvent(ReaderEvent.OnHighlightClick(it))
-                        onEvent(ReaderEvent.OnToggleAnnotations)
-                    },
-                    onComment = { id, text -> onEvent(ReaderEvent.OnHighlightComment(id, text)) },
-                    onRemove = { onEvent(ReaderEvent.OnHighlightRemove(it)) },
-                    onCollapse = { onEvent(ReaderEvent.OnToggleAnnotations) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
+        // Notes: the paper's highlights and notes, in one sheet (Kindle's notebook).
         if (!state.isNotesCollapsed) {
             PanelSheet(onDismiss = { onEvent(ReaderEvent.OnToggleNotes) }) {
-                NotesPanel(
-                    notes = state.notes,
-                    draft = state.noteDraft,
-                    onDraftChange = { onEvent(ReaderEvent.OnNoteDraftChange(it)) },
-                    onAdd = { onEvent(ReaderEvent.OnNoteAdd) },
-                    onRemove = { onEvent(ReaderEvent.OnNoteRemove(it)) },
-                    onCollapse = { onEvent(ReaderEvent.OnToggleNotes) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                Notebook(state, isPdf, onEvent)
             }
         }
         if (state.isFigureDrawerOpen) {
@@ -333,7 +319,7 @@ private fun Frosted(haze: HazeState, modifier: Modifier = Modifier, content: @Co
 }
 
 @Composable
-private fun TopBar(title: String, onBack: (() -> Unit)?, onFind: () -> Unit, haze: HazeState) {
+private fun TopBar(title: String, onBack: (() -> Unit)?, onFind: () -> Unit, haze: HazeState, onDisplay: (() -> Unit)?) {
     val colors = QuireTheme.colors
     Frosted(haze, Modifier.fillMaxWidth()) {
         Row(
@@ -354,6 +340,15 @@ private fun TopBar(title: String, onBack: (() -> Unit)?, onFind: () -> Unit, haz
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).padding(horizontal = Dimens.SpaceXs),
             )
+            if (onDisplay != null) {
+                val displayLabel = stringResource(Res.string.reader_display)
+                Box(
+                    Modifier.size(48.dp).clip(CircleShape).clickable(onClickLabel = displayLabel, onClick = onDisplay),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("Aa", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = colors.accent)
+                }
+            }
             IconButton(onClick = onFind) {
                 Icon(painterResource(Res.drawable.ic_search), contentDescription = stringResource(Res.string.find_find_in_document), tint = colors.fillPrimary)
             }
@@ -409,23 +404,22 @@ private fun FindBar(state: ReaderState, onEvent: (ReaderEvent) -> Unit, haze: Ha
 }
 
 /**
- * Bottom controls: where you are (page n of N, or % for text) with a slider to move there, and a
- * floating toolbar (Highlights, Figures, Notes, Aa), frosted.
+ * Bottom controls: where you are (page n of N, or % for text) with a slider to move there (and,
+ * while dragging, a preview of that page), and a frosted toolbar: the PDF / Read mode toggle at the
+ * start, Figures & tables in the middle, Notes (highlights and notes) at the end.
  */
 @Composable
 private fun BottomControls(
     isPdf: Boolean,
     position: Int,
     total: Int,
-    highlights: Int,
-    notes: Int,
+    annotations: Int,
     haze: HazeState,
     onJump: (Int) -> Unit,
-    onHighlights: () -> Unit,
     onFigures: () -> Unit,
     onNotes: () -> Unit,
-    onDisplay: () -> Unit,
     onToggleMode: (() -> Unit)?,
+    preview: (@Composable (page: Int) -> Unit)?,
 ) {
     val colors = QuireTheme.colors
     val last = total.coerceAtLeast(1)
@@ -439,6 +433,7 @@ private fun BottomControls(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
     ) {
+        if (dragging && preview != null) preview(value.roundToInt() - 1)
         Frosted(haze, Modifier.fillMaxWidth().clip(RoundedCornerShape(Dimens.RadiusLarge))) {
             Row(Modifier.fillMaxWidth().padding(horizontal = Dimens.SpaceMd), verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -468,25 +463,97 @@ private fun BottomControls(
         Frosted(
             haze,
             Modifier
+                .fillMaxWidth()
                 .clip(CircleShape)
                 .border(1.dp, colors.paneDivider.copy(alpha = 0.4f), CircleShape),
         ) {
-            Row(Modifier.padding(horizontal = Dimens.SpaceXs, vertical = Dimens.SpaceMin), horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceMin)) {
-                ToolbarAction(Res.drawable.ic_sticky_note_2, stringResource(Res.string.reader_highlights), highlights, onHighlights)
-                ToolbarAction(Res.drawable.ic_inventory_2, stringResource(Res.string.reader_figures), null, onFigures)
-                ToolbarAction(Res.drawable.ic_description, stringResource(Res.string.reader_notes), notes, onNotes)
-                // Aa: how the text shows (a PDF's pages cannot be restyled, so not in PDF mode).
-                if (!isPdf) {
-                    val displayLabel = stringResource(Res.string.reader_display)
-                    Box(
-                        Modifier.size(48.dp).clip(CircleShape).clickable(onClickLabel = displayLabel, onClick = onDisplay),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text("Aa", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = colors.accent)
-                    }
+            // Three fixed places, so Figures stays centred however wide the toggle is.
+            Box(Modifier.fillMaxWidth().padding(horizontal = Dimens.SpaceXs, vertical = Dimens.SpaceMin)) {
+                if (onToggleMode != null) {
+                    Box(Modifier.align(Alignment.CenterStart)) { ModeToggle(isPdf, onToggleMode) }
                 }
-                if (onToggleMode != null) ModeToggle(isPdf, onToggleMode)
+                Box(Modifier.align(Alignment.Center)) {
+                    ToolbarAction(Res.drawable.ic_inventory_2, stringResource(Res.string.reader_figures_tables), null, onFigures)
+                }
+                Box(Modifier.align(Alignment.CenterEnd)) {
+                    ToolbarAction(Res.drawable.ic_sticky_note_2, stringResource(Res.string.reader_notes), annotations, onNotes)
+                }
             }
+        }
+    }
+}
+
+/** The page the slider is on, as a small card (Kindle's page preview while scrubbing). */
+@Composable
+private fun PagePreview(
+    page: Int,
+    size: dev.neurokitchen.quire.domain.model.PageSize?,
+    loadPage: suspend (Int, Int) -> ImageBitmap?,
+    renderedNear: (Int, Int) -> ImageBitmap?,
+) {
+    val colors = QuireTheme.colors
+    val widthDp = 140.dp
+    val widthPx = with(androidx.compose.ui.platform.LocalDensity.current) { widthDp.roundToPx() }
+    // A small render (cached by the reader); a sharper one already made stands in at once.
+    val image by androidx.compose.runtime.produceState(renderedNear(page, widthPx), page) {
+        loadPage(page, widthPx)?.let { value = it }
+    }
+    val ratio = size?.let { it.height / it.width } ?: 1.414f
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Dimens.SpaceMin)) {
+        Box(
+            Modifier
+                .width(widthDp)
+                .height(widthDp * ratio)
+                // Lifted off the page behind it (a white page on a white page otherwise).
+                .shadow(Dimens.ElevationHigh * 2, RoundedCornerShape(Dimens.RadiusSmall))
+                .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                .background(Color.White)
+                .border(1.dp, colors.paneDivider, RoundedCornerShape(Dimens.RadiusSmall)),
+        ) {
+            image?.let { androidx.compose.foundation.Image(it, contentDescription = null, modifier = Modifier.fillMaxSize()) }
+        }
+        Text(
+            stringResource(Res.string.reader_page_n, page + 1),
+            style = MaterialTheme.typography.labelLarge,
+            color = colors.onAccent,
+            modifier = Modifier.clip(CircleShape).background(colors.accent).padding(horizontal = Dimens.SpaceSm, vertical = Dimens.SpaceMin),
+        )
+    }
+}
+
+/** Notes: tabs for the paper's highlights and its notes. */
+@Composable
+private fun Notebook(state: ReaderState, isPdf: Boolean, onEvent: (ReaderEvent) -> Unit) {
+    var tab by remember { mutableIntStateOf(if (state.highlights.isEmpty() && state.notes.isNotEmpty()) 1 else 0) }
+    Column(Modifier.fillMaxSize()) {
+        androidx.compose.material3.PrimaryTabRow(selectedTabIndex = tab, containerColor = Color.Transparent) {
+            androidx.compose.material3.Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(stringResource(Res.string.reader_notebook_highlights, state.highlights.size)) })
+            androidx.compose.material3.Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(stringResource(Res.string.reader_notebook_notes, state.notes.size)) })
+        }
+        if (tab == 0) {
+            val located = state.pdf.locations.map { it.highlightId }.toSet()
+            AnnotationsSidebar(
+                highlights = state.highlights,
+                focused = state.focusedHighlight,
+                missing = if (isPdf) state.highlights.map { it.id }.filterNot { it in located }.toSet() else emptySet(),
+                onClick = {
+                    onEvent(ReaderEvent.OnHighlightClick(it))
+                    onEvent(ReaderEvent.OnToggleNotes)
+                },
+                onComment = { id, text -> onEvent(ReaderEvent.OnHighlightComment(id, text)) },
+                onRemove = { onEvent(ReaderEvent.OnHighlightRemove(it)) },
+                modifier = Modifier.fillMaxWidth(),
+                showTitle = false,
+            )
+        } else {
+            NotesPanel(
+                notes = state.notes,
+                draft = state.noteDraft,
+                onDraftChange = { onEvent(ReaderEvent.OnNoteDraftChange(it)) },
+                onAdd = { onEvent(ReaderEvent.OnNoteAdd) },
+                onRemove = { onEvent(ReaderEvent.OnNoteRemove(it)) },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
