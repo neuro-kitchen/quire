@@ -133,7 +133,7 @@ fn peer(context: &Context, action: &PeerAction) -> anyhow::Result<()> {
                 output::hint("No peers yet: `quire sync peer add <name> <device-id>`.");
             }
             for (name, peer) in peers {
-                anstream::println!("{}  {}", style::paint(style::KEY, name), style::paint(style::DIM, peer.id));
+                crate::out!("{}  {}", style::paint(style::KEY, name), style::paint(style::DIM, peer.id));
             }
         }
         PeerAction::Rm { name } => {
@@ -175,7 +175,7 @@ async fn hub(context: &Context, action: &HubAction) -> anyhow::Result<()> {
             for device in engine.hub_devices().await? {
                 let mark = if device.device == me { "  (this one)" } else { "" };
                 let state = if device.revoked { style::paint(style::DIM, "revoked") } else { "".into() };
-                anstream::println!("{}{mark}  {state}", style::paint(style::KEY, &device.device));
+                crate::out!("{}{mark}  {state}", style::paint(style::KEY, &device.device));
             }
         }
         HubAction::Revoke { device } => {

@@ -156,6 +156,49 @@ mod tests {
         total
     }
 
+    /// A reference from another device naming one identifier twice (no quire writes that, but a
+    /// row can be crafted) failed the whole batch with a UNIQUE error, and every later sync with it.
+    #[test]
+    fn a_repeated_identifier_from_another_device_is_kept_once() {
+        let conn = crate::open_in_memory().unwrap();
+        let mut here = device(&conn);
+        let mut data = paper("Attention", Some("10.1/a")).data;
+        data.identifiers.push(Identifier::parse("doi:10.1/A").unwrap());
+        let device = quire_model::DeviceId::new();
+        let key = quire_model::CiteKey::parse("vaswani2017").unwrap();
+        let row = Row::Reference(quire_model::Reference::new(key, data, Origin::User, device));
+        let merged = here.merge(vec![row], &device.to_string()).unwrap();
+        assert_eq!(merged.applied, 1);
+        let stored = here.references(&quire_core::ReferenceFilter::default()).unwrap();
+        assert_eq!(stored[0].data.identifiers.len(), 1);
+    }
+
+    /// An attachment row whose hash is not a content hash (crafted: `../../x`) is refused: the
+    /// hash names the file in the store, and is used to build its path.
+    #[test]
+    fn an_attachment_with_a_bad_hash_is_refused() {
+        let conn = crate::open_in_memory().unwrap();
+        let mut here = device(&conn);
+        let added = references::add(&mut here, paper("Attention", Some("10.1/a"))).unwrap();
+        let device = quire_model::DeviceId::new();
+        let row = |hash: &str| {
+            Row::Attachment(quire_model::Attachment::new(
+                added.reference().id,
+                hash.into(),
+                "x.pdf".into(),
+                "application/pdf".into(),
+                1,
+                "file:x".into(),
+                device,
+            ))
+        };
+        let good = "a".repeat(64);
+        let merged =
+            here.merge(vec![row("../../../../home/x/thesis"), row("a"), row(&good)], &device.to_string()).unwrap();
+        assert_eq!((merged.refused, merged.applied), (2, 1));
+        assert_eq!(here.attachment_hashes().unwrap(), [good]);
+    }
+
     #[test]
     fn two_devices_converge() {
         let (a_conn, b_conn) = (crate::open_in_memory().unwrap(), crate::open_in_memory().unwrap());

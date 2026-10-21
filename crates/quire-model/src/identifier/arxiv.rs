@@ -15,8 +15,14 @@ const PREFIXES: &[&str] = &[
     "http://arxiv.org/abs/",
     "https://arxiv.org/pdf/",
     "http://arxiv.org/pdf/",
+    "https://www.arxiv.org/abs/",
+    "https://www.arxiv.org/pdf/",
+    "https://export.arxiv.org/abs/",
+    "https://export.arxiv.org/pdf/",
     "arxiv.org/abs/",
     "arxiv.org/pdf/",
+    "www.arxiv.org/abs/",
+    "export.arxiv.org/abs/",
     "arxiv:",
 ];
 
@@ -32,7 +38,7 @@ impl ArxivId {
     /// Parses a bare ID, `arXiv:<id>`, or an arxiv.org `abs`/`pdf` URL.
     pub fn parse(input: &str) -> Result<Self> {
         let text = input.trim();
-        let text = strip_any_prefix(text, PREFIXES).unwrap_or(text).trim();
+        let text = strip_any_prefix(text, PREFIXES).map_or(text, super::before_query).trim();
         let text = text.strip_suffix(".pdf").unwrap_or(text).trim_end_matches('/');
         let (id, version) = split_version(text);
         let id = if is_new_style(id) { Some(id.to_string()) } else { canonical_old_style(id) };

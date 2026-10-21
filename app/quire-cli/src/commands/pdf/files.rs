@@ -40,8 +40,8 @@ pub async fn list(context: &Context, args: &ListArgs) -> anyhow::Result<()> {
                     Some(PdfKind::Mixed) => ", partly scanned",
                     _ => "",
                 };
-                let facts = format!("{} pages{kind}", attachment.pages.unwrap_or(0));
-                anstream::println!(
+                let facts = format!("{}{kind}", output::count(attachment.pages.unwrap_or(0), "page", "pages"));
+                crate::out!(
                     "{}  {}  {}",
                     style::paint(style::KEY, &reference.cite_key),
                     style::paint(style::DIM, facts),
@@ -51,11 +51,7 @@ pub async fn list(context: &Context, args: &ListArgs) -> anyhow::Result<()> {
         }
     }
     for reference in &missing {
-        anstream::println!(
-            "{}  {}",
-            style::paint(style::KEY, &reference.cite_key),
-            style::paint(style::WARN, "no PDF")
-        );
+        crate::out!("{}  {}", style::paint(style::KEY, &reference.cite_key), style::paint(style::WARN, "no PDF"));
     }
     output::hint(format!("{} with a PDF, {} without (`quire pdf get` finds them)", have.len(), missing.len()));
     Ok(())
@@ -151,7 +147,7 @@ pub async fn path(engine: &Engine, args: &QueryArgs) -> anyhow::Result<()> {
     let (reference, pdfs) = engine.pdfs_of(&args.query).await?;
     anyhow::ensure!(!pdfs.is_empty(), "`{}` has no PDF", reference.cite_key);
     for (_, path) in pdfs {
-        println!("{}", path.display());
+        crate::out!("{}", path.display());
     }
     Ok(())
 }
@@ -172,7 +168,7 @@ pub async fn text(engine: &Engine, args: &TextArgs) -> anyhow::Result<()> {
         engine.forget_text(&args.query).await?;
     }
     let (reference, text) = engine.reader_text(&args.query).await?;
-    print!("{}", text.markdown);
+    crate::data!("{}", text.markdown);
     output::hint(format!("{}: {} text in {} ms", reference.cite_key, text.source.label(), start.elapsed().as_millis()));
     Ok(())
 }
@@ -215,7 +211,7 @@ pub async fn extract(context: &Context, args: &ExtractArgs) -> anyhow::Result<()
             Ok((reference, text)) => {
                 done += 1;
                 let stats = TextStats::of(&text.markdown);
-                anstream::println!(
+                crate::out!(
                     "{}  {}",
                     style::paint(style::KEY, &reference.cite_key),
                     style::paint(style::DIM, format!("{}  {stats}", text.source.label()))
@@ -227,7 +223,7 @@ pub async fn extract(context: &Context, args: &ExtractArgs) -> anyhow::Result<()
             }
         }
     }
-    output::hint(format!("{done} texts extracted, {failed} failed"));
+    output::hint(format!("{} extracted, {failed} failed", output::count(done, "text", "texts")));
     Ok(())
 }
 

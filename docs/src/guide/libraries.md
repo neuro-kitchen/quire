@@ -29,7 +29,8 @@ quire ref unlink smith2020 -p thesis/chapter-2  # stays in the library
 quire list -p thesis -r                          # -r: with subprojects
 ```
 
-Removing a project moves it to the trash; its references stay in the library.
+Removing a project moves it to the trash; its references stay in the library. A project with
+subprojects is removed only with `-r` (`quire project rm thesis -r`), which removes them too.
 
 ## Trash
 
@@ -47,4 +48,5 @@ quire library restore ~/backups/thesis.tar.gz thesis-copy
 A backup is one `.tar.gz` with a consistent copy of the database (taken while quire may be in
 use), the PDFs and the papers' texts. It is not encrypted: keep it somewhere private. A restored
 library is a new library (registered under the name you give) with a new device ID, so it can
-sync with the library it came from without being mistaken for it.
+sync with the library it came from without being mistaken for it. Files the backed-up library kept
+updated (`--keep-updated`) are not kept updated by the restored one: set them again where needed.

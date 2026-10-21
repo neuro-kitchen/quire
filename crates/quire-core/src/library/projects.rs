@@ -1,6 +1,8 @@
 //! Projects: created by name under an optional parent, found by slug path (`thesis/chapter-2`),
 //! listed as a tree, and used to collect references for export.
 
+use std::collections::HashSet;
+
 use quire_model::{Project, ProjectId, Reference, Slug, SlugPath};
 
 use crate::error::{CoreError, Result};
@@ -79,11 +81,13 @@ pub fn resolve(library: &impl Library, path: &SlugPath) -> Result<Project> {
     parent.ok_or_else(|| CoreError::ProjectNotFound(path.to_string()))
 }
 
-/// The path of the project `id` (walking up its parents).
+/// The path of the project `id` (walking up its parents; a parent seen before ends the walk,
+/// see [`ancestors`]).
 pub fn path_of(library: &impl Library, id: ProjectId) -> Result<SlugPath> {
     let mut slugs = Vec::new();
     let mut next = Some(id);
-    while let Some(id) = next {
+    let mut seen = HashSet::new();
+    while let Some(id) = next.filter(|id| seen.insert(*id)) {
         let project = library.project(id)?.ok_or_else(|| CoreError::ProjectNotFound(id.to_string()))?;
         slugs.push(project.slug.to_string());
         next = project.parent;
@@ -114,15 +118,32 @@ fn collect(
     Ok(())
 }
 
-/// `project` and, if `recursive`, all projects below it.
+/// `project` and, if `recursive`, all projects below it (each once, see [`ancestors`]).
 pub fn with_descendants(library: &impl Library, project: ProjectId, recursive: bool) -> Result<Vec<ProjectId>> {
     let mut ids = vec![project];
+    let mut seen = HashSet::from([project]);
     let mut next = 0;
     while recursive && next < ids.len() {
-        ids.extend(library.child_projects(Some(ids[next]))?.into_iter().map(|p| p.id));
+        let children = library.child_projects(Some(ids[next]))?.into_iter().map(|p| p.id);
+        ids.extend(children.filter(|id| seen.insert(*id)).collect::<Vec<_>>());
         next += 1;
     }
     Ok(ids)
+}
+
+/// `project` and its parents, nearest first. quire never moves a project, so parents cannot form a
+/// cycle here; a synced row could still name one (crafted or corrupted), and every walk stops at a
+/// project it has seen instead of looping forever.
+pub fn ancestors(library: &impl Library, project: ProjectId) -> Result<Vec<Project>> {
+    let mut found = Vec::new();
+    let mut seen = HashSet::new();
+    let mut next = Some(project);
+    while let Some(id) = next.filter(|id| seen.insert(*id)) {
+        let Some(project) = library.project(id)? else { break };
+        next = project.parent;
+        found.push(project);
+    }
+    Ok(found)
 }
 
 /// The references in the project at `path` (and below it if `recursive`), ordered by cite key.
@@ -157,10 +178,28 @@ mod tests {
     use super::*;
     use crate::library::references::{AddRequest, add};
     use crate::memory::MemoryLibrary;
+    use crate::ports::prelude::*;
     use quire_model::{EntryKind, Identifier, Origin, ReferenceData};
 
     fn path(text: &str) -> SlugPath {
         text.parse().unwrap()
+    }
+
+    /// Two projects naming each other as parent can only come from a crafted or corrupted sync
+    /// row, but walking them once looped forever on the database thread.
+    #[test]
+    fn a_parent_cycle_ends_the_walk() {
+        let mut lib = MemoryLibrary::default();
+        let device = lib.device();
+        let mut a = Project::new("A", None, device).unwrap();
+        let b = Project::new("B", Some(a.id), device).unwrap();
+        a.parent = Some(b.id);
+        lib.insert_project(&a).unwrap();
+        lib.insert_project(&b).unwrap();
+        assert_eq!(path_of(&lib, b.id).unwrap().to_string(), "a/b");
+        assert_eq!(with_descendants(&lib, a.id, true).unwrap(), [a.id, b.id]);
+        let me = quire_model::UserId::parse(&"a".repeat(64)).unwrap();
+        assert_eq!(crate::library::sharing::role_of(&lib, &me, a.id).unwrap(), None);
     }
 
     fn add_doi(lib: &mut MemoryLibrary, doi: &str, project: Option<ProjectId>) -> Reference {

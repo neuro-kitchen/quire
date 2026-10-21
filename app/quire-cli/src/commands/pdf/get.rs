@@ -196,7 +196,7 @@ pub fn report_attached(attached: &Attached, from: &str) {
         Some(PdfKind::Mixed) => "partly scanned",
         None => "",
     };
-    let facts = format!("{} pages, {kind}  {from}", a.pages.unwrap_or(0));
+    let facts = format!("{}, {kind}  {from}", output::count(a.pages.unwrap_or(0), "page", "pages"));
     let label = if attached.new { "attached" } else { "unchanged" };
     output::report(
         Tone::Ok,

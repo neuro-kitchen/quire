@@ -35,7 +35,7 @@ pub mod reference;
 pub mod saved_search;
 pub mod tag;
 
-pub use attachment::{Attachment, PdfAttempt, PdfKind};
+pub use attachment::{Attachment, PdfAttempt, PdfKind, is_content_hash};
 pub use creator::{Creator, CreatorRole, Name, PersonName};
 pub use date::Date;
 pub use error::{ModelError, Result};

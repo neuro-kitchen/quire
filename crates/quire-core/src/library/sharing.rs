@@ -15,18 +15,15 @@ use crate::ports::Library;
 /// recorded on any of them is an owner).
 pub fn role_of(library: &impl Library, user: &UserId, project: ProjectId) -> Result<Option<Role>> {
     let mut best: Option<Role> = None;
-    let mut next = Some(project);
-    while let Some(id) = next {
-        let Some(found) = library.project(id)? else { break };
+    for found in projects::ancestors(library, project)? {
         if found.owner.as_ref() == Some(user) {
             return Ok(Some(Role::Owner));
         }
-        for member in library.members_of(id)? {
+        for member in library.members_of(found.id)? {
             if &member.user == user && !member.meta.is_deleted() {
                 best = best.max(Some(member.role));
             }
         }
-        next = found.parent;
     }
     Ok(best)
 }

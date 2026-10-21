@@ -35,9 +35,9 @@ fn line(reference: &Reference) -> String {
 pub async fn list(engine: &Engine, _args: &DuplicatesArgs) -> anyhow::Result<()> {
     let groups = engine.duplicates().await?;
     for group in &groups {
-        anstream::println!("{}", line(&group.reference));
+        crate::out!("{}", line(&group.reference));
         for (other, reason) in &group.duplicates {
-            anstream::println!("  ≈ {}  {}", line(other), style::paint(style::DIM, reason.describe()));
+            crate::out!("  ≈ {}  {}", line(other), style::paint(style::DIM, reason.describe()));
         }
     }
     match groups.len() {

@@ -60,8 +60,12 @@ pub(crate) async fn receive_bytes<R: AsyncRead + Unpin>(reader: &mut R, size: u6
     if size > MAX_FILE {
         return Err(SyncError::TooLarge);
     }
-    let mut bytes = vec![0; size as usize];
-    reader.read_exact(&mut bytes).await?;
+    // Read as the bytes come, not allocated up front from what the header claims.
+    let mut bytes = Vec::new();
+    reader.take(size).read_to_end(&mut bytes).await?;
+    if bytes.len() as u64 != size {
+        return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof).into());
+    }
     Ok(bytes)
 }
 

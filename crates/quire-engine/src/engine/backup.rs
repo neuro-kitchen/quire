@@ -116,7 +116,7 @@ fn walk(dir: &Path) -> Result<Vec<PathBuf>> {
 }
 
 /// Restores the backup `archive` into the folder `target` (which must not exist or be empty);
-/// the restored library gets a new device ID. Returns its manifest.
+/// the restored library gets a new device ID and no files kept updated. Returns its manifest.
 pub fn restore(archive: &Path, target: &Path) -> Result<Manifest> {
     if target.exists() && std::fs::read_dir(target).map_err(EngineError::file(target))?.next().is_some() {
         return Err(EngineError::Library(format!("{} is not empty; restore into a new folder", target.display())));
@@ -142,5 +142,8 @@ pub fn restore(archive: &Path, target: &Path) -> Result<Manifest> {
     let conn = rusqlite::Connection::open(&database)?;
     // A new device: this copy and the one backed up may both sync.
     conn.execute("DELETE FROM library_meta WHERE key = 'device_id'", [])?;
+    // Files kept updated are paths on the machine the backup came from: rewriting them from here
+    // would overwrite whatever is there (and two libraries would write one file).
+    conn.execute("DELETE FROM auto_export", [])?;
     Ok(manifest)
 }

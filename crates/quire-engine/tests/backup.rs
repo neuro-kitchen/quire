@@ -40,3 +40,27 @@ async fn backup_and_restore() {
 
     assert!(quire_engine::engine::backup::restore(&archive, &target).is_err(), "not into a folder in use");
 }
+
+/// A restored library once kept the backed-up one's automatic exports: paths on the machine it
+/// came from, rewritten after every change here (restoring someone else's backup overwrote the
+/// files it named; restoring your own into a second folder made two libraries write one file).
+#[tokio::test]
+async fn a_restored_library_has_no_automatic_exports() {
+    let dir = tempfile::tempdir().unwrap();
+    let original = engine(dir.path(), None).await;
+    let request = quire_engine::ExportRequest { project: None, recursive: false, profile: None, format: None };
+    original.keep_updated(&request, &dir.path().join("kept.bib")).await.unwrap();
+    assert_eq!(original.auto_exports().await.unwrap().len(), 1);
+    let archive = dir.path().join("library.tar.gz");
+    original.backup(&archive).await.unwrap();
+
+    let target = dir.path().join("restored");
+    quire_engine::engine::backup::restore(&archive, &target).unwrap();
+    let options = OpenOptions {
+        library: LibraryChoice::Path(target),
+        config_file: Some(dir.path().join("config.toml")),
+        endpoints: None,
+    };
+    let restored = Engine::open(options).await.unwrap();
+    assert!(restored.auto_exports().await.unwrap().is_empty());
+}

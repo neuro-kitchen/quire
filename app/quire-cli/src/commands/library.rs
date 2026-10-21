@@ -93,7 +93,7 @@ pub async fn run(context: &Context, args: &LibraryArgs) -> anyhow::Result<()> {
                         (false, true) => "  (built-in default)",
                         (true, true) => "",
                     };
-                    anstream::println!(
+                    crate::out!(
                         "{mark} {name}  {}{}",
                         style::paint(style::DIM, library.path.display()),
                         style::paint(style::DIM, state)
@@ -118,7 +118,12 @@ pub async fn run(context: &Context, args: &LibraryArgs) -> anyhow::Result<()> {
             output::report(
                 Tone::Ok,
                 "backed up",
-                format!("{} ({} files, {:.1} MB)", report.path.display(), report.files, report.bytes as f64 / 1e6),
+                format!(
+                    "{} ({}, {:.1} MB)",
+                    report.path.display(),
+                    output::count(report.files, "file", "files"),
+                    report.bytes as f64 / 1e6
+                ),
             );
             output::hint("It holds your library unencrypted (notes, PDFs): keep it somewhere private.");
         }

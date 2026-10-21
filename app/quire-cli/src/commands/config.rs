@@ -32,7 +32,7 @@ pub async fn run(context: &Context, args: &ConfigArgs) -> anyhow::Result<()> {
     match &args.action {
         Action::Get { key } => {
             if let Some(value) = Config::load(&file)?.get(key)? {
-                println!("{value}");
+                crate::out!("{value}");
             }
         }
         Action::Set { key, value } => {
@@ -48,14 +48,14 @@ pub async fn run(context: &Context, args: &ConfigArgs) -> anyhow::Result<()> {
         }
         Action::List => {
             for (key, value) in Config::load(&file)?.entries() {
-                anstream::println!("{}={value}", style::paint(style::KEY, key));
+                crate::out!("{}={value}", style::paint(style::KEY, key));
             }
             output::hint(format!("from {}", file.display()));
         }
         Action::Keys => {
             let width = KEYS.iter().map(|k| k.pattern.len()).max().unwrap_or(0);
             for spec in KEYS {
-                anstream::println!("{}  {}", style::paint(style::KEY, format!("{:<width$}", spec.pattern)), spec.help);
+                crate::out!("{}  {}", style::paint(style::KEY, format!("{:<width$}", spec.pattern)), spec.help);
             }
         }
     }

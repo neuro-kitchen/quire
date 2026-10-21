@@ -73,7 +73,7 @@ pub async fn run(context: &Context, args: &AddArgs) -> anyhow::Result<ExitCode> 
             Ok(Added::New(reference)) => {
                 output::report(Tone::Ok, "added", output::summary(&reference));
                 for issue in &issues {
-                    anstream::println!("{:>12}{}", "", check::issue_line(issue));
+                    crate::out!("{:>12}{}", "", check::issue_line(issue));
                 }
             }
             Ok(Added::Existing(reference)) => output::report(Tone::Warn, "existing", output::summary(&reference)),

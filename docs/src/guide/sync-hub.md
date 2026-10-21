@@ -83,6 +83,8 @@ Opening a paper (`quire pdf open`, or the app) looks for its PDF here, then on t
 other devices, then at the source (open access, the publisher) as when it was first added. Past the
 cache limit, the least recently opened PDFs are removed from the device, but **only those the hub
 holds**: a device never removes what may be the last copy, and without a hub nothing is removed.
+"Holds" is what the last sync found: a PDF the hub has lost and has no room to take again (over
+quota) stays on the device.
 
 ## Devices
 

@@ -85,8 +85,13 @@ What a collaborator sees is the shared project only. Your tags, notes, highlight
 status, saved searches and your other projects stay yours, and theirs stay theirs. Each side
 checks what the other sends against the sender's role: a reader's edits are refused, an editor
 cannot add members, and nobody but you can put one of your references in the trash (an editor
-removes a paper by unlinking it from the shared project). `quire sync with` reports refused
-changes.
+removes a paper by unlinking it from the shared project). Projects are never moved: a change
+that puts a shared project under another one, or a new project under one the sender cannot edit,
+is refused. `quire sync with` reports refused changes.
+
+A shared subproject (`quire project share thesis/chapter-2 …`) appears at the top of the other
+person's tree, since they cannot see its parent; what they change in it comes back in place,
+under its parent, on your side.
 
 The first time a shared project arrives, its owner is recorded and never changes (trust on first
 use, as with SSH keys).
