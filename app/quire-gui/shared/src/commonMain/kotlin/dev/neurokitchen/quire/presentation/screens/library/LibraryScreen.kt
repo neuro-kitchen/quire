@@ -182,7 +182,7 @@ fun LibraryScreen(
         }
     }
 
-    state.addDialog?.let { dialog -> AddReferenceDialog(dialog, onEvent) }
+    state.addDialog?.let { dialog -> AddReferenceDialog(dialog, onEvent, projects = state.projectChoices) }
 
     val uriHandler = LocalUriHandler.current
     LaunchedEffect(state.pageToOpen) {
@@ -276,7 +276,6 @@ private fun ThreePanes(
                 onToggleInspector = { onEvent(LibraryEvent.OnToggleInspector) },
                 isInspectorCollapsed = state.isInspectorCollapsed,
                 onSaveSearch = { onEvent(LibraryEvent.OnNameDialog(NameDialog.SaveSearch(state.query))) },
-                onImportPdf = { onEvent(LibraryEvent.OnImportPdf(it)) },
             )
             HorizontalDivider(color = QuireTheme.colors.paneDivider)
             state.searchError?.let { SearchError(it) }
