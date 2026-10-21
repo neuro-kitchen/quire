@@ -515,4 +515,6 @@
     <string name="details_publisher_page">Open publisher's page</string>
     <string name="details_show_more">Show more</string>
     <string name="details_show_less">Show less</string>
+    <string name="add_confirm_short">Add</string>
+    <string name="add_subtitle_phone">By identifier, from PDF files or a .bib file, pasted BibTeX, or typed in</string>
 </resources>

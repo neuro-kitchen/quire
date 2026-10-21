@@ -11,13 +11,13 @@ import dev.neurokitchen.quire.resources.add_project
 import dev.neurokitchen.quire.resources.add_file_pick_zotero
 import dev.neurokitchen.quire.resources.add_file_pick_bib
 import dev.neurokitchen.quire.resources.add_file_hint
-import dev.neurokitchen.quire.resources.add_pdf_pick_title
 import dev.neurokitchen.quire.resources.add_pdf_pick
 import dev.neurokitchen.quire.resources.add_pdf_hint
 import dev.neurokitchen.quire.resources.add_tab_file
 import dev.neurokitchen.quire.resources.add_tab_pdf
-import dev.neurokitchen.quire.presentation.platform.pickFolder
-import dev.neurokitchen.quire.presentation.platform.pickFile
+import dev.neurokitchen.quire.presentation.platform.FilePicker
+import dev.neurokitchen.quire.presentation.platform.PickKind
+import dev.neurokitchen.quire.presentation.platform.rememberFilePicker
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -35,6 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -98,46 +99,77 @@ fun AddReferenceDialog(
             DialogConfirm(stringResource(Res.string.add_confirm), { onEvent(LibraryEvent.OnAddConfirm) }, enabled = state.canAdd, working = state.isWorking)
         },
     ) {
-        Column {
-            ChoiceMenu(
-                label = stringResource(Res.string.add_project),
-                selected = state.project,
-                choices = projectChoices(stringResource(Res.string.add_project_none), projects),
-                onSelect = { onEvent(LibraryEvent.OnAddProjectSelect(it)) },
-            )
-            Spacer(Modifier.height(Dimens.SpaceSm))
+        AddReferenceContent(state, onEvent, projects)
+    }
+}
+
+/**
+ * What the add dialog holds, for the phone's full-screen Add too: the project, the ways in as
+ * tabs ([scrollableTabs] on narrow screens, so their names do not wrap), the chosen tab, errors.
+ */
+@Composable
+fun AddReferenceContent(
+    state: AddDialogState,
+    onEvent: (LibraryEvent) -> Unit,
+    projects: List<Pair<String, String>>,
+    modifier: Modifier = Modifier,
+    scrollableTabs: Boolean = false,
+) {
+    val picker = rememberFilePicker { kind, paths ->
+        when (kind) {
+            PickKind.Pdfs -> onEvent(LibraryEvent.OnAddPdfsPicked(paths))
+            PickKind.Bib, PickKind.Folder -> paths.firstOrNull()?.let { onEvent(LibraryEvent.OnAddFilePicked(it)) }
+        }
+    }
+    Column(modifier) {
+        ChoiceMenu(
+            label = stringResource(Res.string.add_project),
+            selected = state.project,
+            choices = projectChoices(stringResource(Res.string.add_project_none), projects),
+            onSelect = { onEvent(LibraryEvent.OnAddProjectSelect(it)) },
+        )
+        Spacer(Modifier.height(Dimens.SpaceSm))
+        val tabs: @Composable () -> Unit = {
+            AddTab.entries.forEach { tab ->
+                Tab(
+                    selected = state.tab == tab,
+                    onClick = { onEvent(LibraryEvent.OnAddTabSelect(tab)) },
+                    text = { Text(stringResource(tab.label()), maxLines = 1) },
+                )
+            }
+        }
+        if (scrollableTabs) {
+            PrimaryScrollableTabRow(
+                selectedTabIndex = state.tab.ordinal,
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                edgePadding = Dimens.SpaceXs,
+                modifier = Modifier.clip(RoundedCornerShape(Dimens.RadiusSmall)),
+            ) { tabs() }
+        } else {
             PrimaryTabRow(
                 selectedTabIndex = state.tab.ordinal,
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                 modifier = Modifier.clip(RoundedCornerShape(Dimens.RadiusSmall)),
-            ) {
-                AddTab.entries.forEach { tab ->
-                    Tab(
-                        selected = state.tab == tab,
-                        onClick = { onEvent(LibraryEvent.OnAddTabSelect(tab)) },
-                        text = { Text(stringResource(tab.label())) },
-                    )
-                }
-            }
-            Spacer(Modifier.height(Dimens.SpaceMd))
-            when (state.tab) {
-                AddTab.Identifier -> IdentifierTab(state, onEvent)
-                AddTab.Pdf -> PdfTab(state, onEvent)
-                AddTab.File -> FileTab(state, onEvent)
-                AddTab.Manual -> ManualTab(state.manual) { onEvent(LibraryEvent.OnManualChange(it)) }
-                AddTab.Bibtex -> OutlinedTextField(
-                    value = state.bibtex,
-                    onValueChange = { onEvent(LibraryEvent.OnBibtexChange(it)) },
-                    label = { Text(stringResource(Res.string.add_bibtex_label)) },
-                    placeholder = { Text("@article{key,\n  title = {…},\n  author = {…},\n}") },
-                    modifier = Modifier.fillMaxWidth().height(160.dp),
-                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                )
-            }
-            state.error?.let { error ->
-                Spacer(Modifier.height(Dimens.SpaceXs))
-                Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-            }
+            ) { tabs() }
+        }
+        Spacer(Modifier.height(Dimens.SpaceMd))
+        when (state.tab) {
+            AddTab.Identifier -> IdentifierTab(state, onEvent)
+            AddTab.Pdf -> PdfTab(state, onEvent, picker)
+            AddTab.File -> FileTab(state, onEvent, picker)
+            AddTab.Manual -> ManualTab(state.manual) { onEvent(LibraryEvent.OnManualChange(it)) }
+            AddTab.Bibtex -> OutlinedTextField(
+                value = state.bibtex,
+                onValueChange = { onEvent(LibraryEvent.OnBibtexChange(it)) },
+                label = { Text(stringResource(Res.string.add_bibtex_label)) },
+                placeholder = { Text("@article{key,\n  title = {…},\n  author = {…},\n}") },
+                modifier = Modifier.fillMaxWidth().height(160.dp),
+                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            )
+        }
+        state.error?.let { error ->
+            Spacer(Modifier.height(Dimens.SpaceXs))
+            Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
     }
 }
@@ -245,8 +277,7 @@ private fun AddTab.label() = when (this) {
 
 /** PDF files: each becomes the paper it is. Chosen one at a time; each can be taken off again. */
 @Composable
-private fun PdfTab(state: AddDialogState, onEvent: (LibraryEvent) -> Unit) {
-    val title = stringResource(Res.string.add_pdf_pick_title)
+private fun PdfTab(state: AddDialogState, onEvent: (LibraryEvent) -> Unit, picker: FilePicker) {
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.SpaceXs)) {
         Text(stringResource(Res.string.add_pdf_hint), style = MaterialTheme.typography.bodySmall, color = QuireTheme.colors.fillSecondary)
         state.pdfs.forEach { path ->
@@ -255,7 +286,7 @@ private fun PdfTab(state: AddDialogState, onEvent: (LibraryEvent) -> Unit) {
                 TextButton(onClick = { onEvent(LibraryEvent.OnAddPdfRemove(path)) }) { Text(stringResource(Res.string.add_remove)) }
             }
         }
-        OutlinedButton(onClick = { pickFile(title, listOf("pdf"))?.let { onEvent(LibraryEvent.OnAddPdfsPicked(listOf(it))) } }) {
+        OutlinedButton(onClick = { picker.pick(PickKind.Pdfs) }) {
             Text(stringResource(Res.string.add_pdf_pick))
         }
     }
@@ -263,18 +294,21 @@ private fun PdfTab(state: AddDialogState, onEvent: (LibraryEvent) -> Unit) {
 
 /** A `.bib` file, or Zotero's data folder. */
 @Composable
-private fun FileTab(state: AddDialogState, onEvent: (LibraryEvent) -> Unit) {
+private fun FileTab(state: AddDialogState, onEvent: (LibraryEvent) -> Unit, picker: FilePicker) {
     val bibTitle = stringResource(Res.string.add_file_pick_bib)
     val zoteroTitle = stringResource(Res.string.add_file_pick_zotero)
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.SpaceXs)) {
         Text(stringResource(Res.string.add_file_hint), style = MaterialTheme.typography.bodySmall, color = QuireTheme.colors.fillSecondary)
         state.file?.let { Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 2) }
         Row(horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceXs)) {
-            OutlinedButton(onClick = { pickFile(bibTitle, listOf("bib"))?.let { onEvent(LibraryEvent.OnAddFilePicked(it)) } }) {
+            OutlinedButton(onClick = { picker.pick(PickKind.Bib) }) {
                 Text(bibTitle)
             }
-            OutlinedButton(onClick = { pickFolder(zoteroTitle)?.let { onEvent(LibraryEvent.OnAddFilePicked(it)) } }) {
-                Text(zoteroTitle)
+            // Zotero's data folder: a desktop's folder (phones pick documents, not folders).
+            if (picker.canPickFolders) {
+                OutlinedButton(onClick = { picker.pick(PickKind.Folder) }) {
+                    Text(zoteroTitle)
+                }
             }
         }
     }
