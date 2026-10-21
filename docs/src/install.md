@@ -14,7 +14,11 @@ SQLite is built in; there are no system libraries to install. Optional programs:
 | Program | Used for |
 |---|---|
 | `pdftotext` (poppler) | a second try at the text of PDFs the built-in extractor reads badly |
+| `ocrmypdf` | OCR of scanned PDFs: a text layer added to the PDF (`quire pdf ocr`) |
+| `tesseract` and `pdftoppm` (poppler) | OCR without OCRmyPDF: the scan's text for the reader and search |
 | a web browser | PDFs behind a login or a bot check (`quire pdf get --browser`) |
+
+The sync hub (`quire-hub`) runs as a container; see [Sync hub](guide/sync-hub.md).
 
 ## The desktop app
 
@@ -38,6 +42,7 @@ quire completions zsh  > ~/.zfunc/_quire       # with `fpath+=~/.zfunc` in .zshr
 
 ## Secrets
 
-The browser-extension token and the sync device key are kept in the system keyring (Secret
-Service, Keychain, Credential Manager). Where there is none, set `QUIRE_NO_KEYRING=1` and they are
-stored in files next to the config, readable only by you.
+The browser-extension token, the device's sync key and your user key (the same on all your
+devices; `quire user recovery-kit` prints it to keep offline) are kept in the system keyring
+(Secret Service, Keychain, Credential Manager). Where there is none (or with `QUIRE_NO_KEYRING=1`)
+they are stored in files next to the config, readable only by you.
