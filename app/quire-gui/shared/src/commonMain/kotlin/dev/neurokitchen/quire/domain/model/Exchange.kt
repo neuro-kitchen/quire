@@ -12,15 +12,35 @@ data class ZoteroImport(
 )
 
 /**
- * What to export: the project at [projectPath] (with subprojects if [recursive]) or the library,
- * with a config [profile] and/or a [format] (`biblatex`, `bibtex`, `csl-json`, `hayagriva`).
+ * What to export: the [references] (IDs) if any, else the project at [projectPath] (with
+ * subprojects if [recursive]) or the library; with a config [profile] or [options] given
+ * directly, and/or a [format] (`biblatex`, `bibtex`, `csl-json`, `hayagriva`).
  */
 data class ExportSelection(
     val projectPath: String? = null,
     val recursive: Boolean = true,
+    val references: List<String> = emptyList(),
     val profile: String? = null,
+    val options: ExportOptions? = null,
     val format: String? = null,
 )
+
+/**
+ * How to write an export: an export profile's settings. [omit]: fields left out (BibLaTeX names
+ * for .bib and Hayagriva, CSL names for CSL-JSON); [ascii]: .bib non-ASCII as LaTeX commands;
+ * [encoding] `utf-8`, `utf-8-bom` or `windows-1252` (.bib).
+ */
+data class ExportOptions(
+    val format: String = "biblatex",
+    val omit: List<String> = emptyList(),
+    val ascii: Boolean = false,
+    val monthMacros: Boolean = false,
+    val preprintsAsArticles: Boolean = false,
+    val encoding: String = "utf-8",
+)
+
+/** An export profile from the config. */
+data class ExportProfile(val name: String, val options: ExportOptions)
 
 /** A file rewritten after every change to the library; [written] `YYYY-MM-DD`. */
 data class AutoExport(

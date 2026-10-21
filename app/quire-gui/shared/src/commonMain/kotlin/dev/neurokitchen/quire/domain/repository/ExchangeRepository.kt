@@ -2,6 +2,7 @@ package dev.neurokitchen.quire.domain.repository
 
 import dev.neurokitchen.quire.domain.model.AutoExport
 import dev.neurokitchen.quire.domain.model.AutoExportRun
+import dev.neurokitchen.quire.domain.model.ExportProfile
 import dev.neurokitchen.quire.domain.model.ExportSelection
 import dev.neurokitchen.quire.domain.model.ManuscriptCheck
 import dev.neurokitchen.quire.domain.model.PaperAnnotations
@@ -17,9 +18,13 @@ interface ExchangeRepository {
     suspend fun importZotero(dir: String, projectPath: String? = null): ZoteroImport = unsupported()
     /** The export format names. */
     fun exportFormats(): List<String> = unsupported()
+    /** The encodings an export file can be written in. */
+    fun exportEncodings(): List<String> = listOf("utf-8")
+    /** The export profiles in the config. */
+    suspend fun exportProfiles(): List<ExportProfile> = emptyList()
     /** The selected references as text, and how many. */
     suspend fun export(selection: ExportSelection): Pair<String, Int> = unsupported()
-    /** Writes the selection to [path] once; returns how many references. */
+    /** Writes the selection to [path] once, in its encoding; returns how many references. */
     suspend fun exportTo(selection: ExportSelection, path: String): Int = unsupported()
     /** Writes the selection to [path] now and after every change; returns how many references. */
     suspend fun keepUpdated(selection: ExportSelection, path: String): Int = unsupported()

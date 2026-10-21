@@ -1,5 +1,14 @@
 package dev.neurokitchen.quire
 
+import dev.neurokitchen.quire.presentation.components.export_dialog.ENCODING_ASCII
+import dev.neurokitchen.quire.presentation.components.export_dialog.ENCODING_WINDOWS_1252
+import dev.neurokitchen.quire.presentation.components.export_dialog.ENCODING_UTF8_BOM
+import dev.neurokitchen.quire.presentation.components.export_dialog.ENCODING_UTF8
+import dev.neurokitchen.quire.presentation.components.export_dialog.OmitField
+import dev.neurokitchen.quire.presentation.components.export_dialog.ExportTarget
+import dev.neurokitchen.quire.presentation.components.export_dialog.ExportDialogContent
+import dev.neurokitchen.quire.presentation.components.export_dialog.ExportDialogState
+import dev.neurokitchen.quire.domain.model.ExportOptions
 import dev.neurokitchen.quire.domain.model.PaperTabKind
 import dev.neurokitchen.quire.domain.model.PaperTab
 import dev.neurokitchen.quire.domain.model.BlockKind
@@ -612,6 +621,45 @@ class DesktopScreenshots {
     @Composable
     private fun Library(state: LibraryState, dark: Boolean) {
         QuireTheme(appTheme = if (dark) AppTheme.Obsidian else AppTheme.PaperLight, desktop = true) { Surface { LibraryScreen(state, onEvent = {}) } }
+    }
+
+    @Test
+    fun exportDialog() {
+        val state = ExportDialogState(
+            target = ExportTarget(projectPath = "thesis"),
+            formats = listOf("biblatex", "bibtex", "csl-json", "hayagriva"),
+            encodings = listOf(ENCODING_UTF8, ENCODING_UTF8_BOM, ENCODING_WINDOWS_1252, ENCODING_ASCII),
+            options = ExportOptions(format = "bibtex", monthMacros = true),
+            encoding = ENCODING_WINDOWS_1252,
+            omitted = setOf(OmitField.Abstract, OmitField.File),
+            preview = """
+                @article{hafting2005,
+                  author = {Hafting, Torkel and Fyhn, Marianne and Molden, Sturla and Moser, May-Britt and Moser, Edvard I.},
+                  title = {Microstructure of a spatial map in the entorhinal cortex},
+                  journal = {Nature},
+                  year = {2005},
+                  month = aug,
+                  volume = {436},
+                  pages = {801--806},
+                  doi = {10.1038/nature03721},
+                }
+
+                @article{okeefe1971,
+                  author = {O'Keefe, J. and Dostrovsky, J.},
+                  title = {The hippocampus as a spatial map},
+                  journal = {Brain Research},
+                  year = {1971},
+                }
+            """.trimIndent(),
+            count = 2,
+        )
+        render("desktop-export.png", width = 1000, height = 700) {
+            QuireTheme(darkTheme = false, desktop = true) {
+                Surface {
+                    ExportDialogContent(state, projects = listOf("thesis" to "Thesis", "thesis/chapter-2" to "Chapter 2"), onEvent = {}, onDismiss = {})
+                }
+            }
+        }
     }
 
     private fun render(name: String, width: Int = 1400, height: Int = 860, content: @Composable () -> Unit) {

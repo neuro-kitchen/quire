@@ -1,5 +1,6 @@
 package dev.neurokitchen.quire.presentation.screens.library.components
 
+import dev.neurokitchen.quire.resources.export_menu
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.geometry.Offset
@@ -100,6 +101,7 @@ fun ItemsTable(
     onSelectAll: () -> Unit = {},
     onClearSelection: () -> Unit = {},
     onCreateCollectionFromSelected: () -> Unit = {},
+    onExportSelected: () -> Unit = {},
     onQuickLook: () -> Unit = {},
     modifier: Modifier = Modifier,
     /** Dragging rows onto a project: the shared drag, and what to do on a drop. */
@@ -159,6 +161,10 @@ fun ItemsTable(
                 }
 
                 Spacer(Modifier.weight(1f))
+
+                TextButton(onClick = onExportSelected) {
+                    Text(stringResource(Res.string.export_menu), style = MaterialTheme.typography.labelSmall, color = colors.fillPrimary)
+                }
 
                 // Create Collection from Selection button
                 Row(

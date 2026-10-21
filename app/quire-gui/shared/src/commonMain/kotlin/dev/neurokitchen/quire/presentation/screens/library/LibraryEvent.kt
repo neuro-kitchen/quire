@@ -1,5 +1,7 @@
 package dev.neurokitchen.quire.presentation.screens.library
 
+import dev.neurokitchen.quire.presentation.components.notice.Notice
+import dev.neurokitchen.quire.presentation.components.export_dialog.ExportTarget
 import dev.neurokitchen.quire.domain.model.LibrarySource
 import dev.neurokitchen.quire.domain.model.SortColumn
 
@@ -77,5 +79,8 @@ sealed interface LibraryEvent {
     data object OnToggleSidebar : LibraryEvent
     data object OnToggleInspector : LibraryEvent
     data class OnToggleQuickLook(val open: Boolean? = null) : LibraryEvent
-    data class OnExportProject(val projectId: String, val path: String) : LibraryEvent
+    /** Opens the export dialog for [target]; `null` closes it. */
+    data class OnShowExport(val target: ExportTarget?) : LibraryEvent
+    /** The export dialog saved: closes it and reports what it did. */
+    data class OnExportDone(val notice: Notice) : LibraryEvent
 }
