@@ -171,6 +171,8 @@ fun TabBar(
                             Icon(painterResource(Res.drawable.ic_link), contentDescription = null, tint = colors.fillSecondary, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(8.dp))
                             Text("Citation Network Graph...", style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
+                            Spacer(Modifier.weight(1f))
+                            Text("Ctrl+G", style = MaterialTheme.typography.labelSmall, color = colors.fillTertiary)
                         }
                     },
                     onClick = {
@@ -330,6 +332,29 @@ fun TabBar(
                     color = colors.fillSecondary,
                 )
             }
+        }
+
+        // Citation Network Graph Explorer Button
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                .background(colors.fillQuarternary.copy(alpha = 0.5f))
+                .clickable(onClick = onCitationGraphClick)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+        ) {
+            Icon(
+                painterResource(Res.drawable.ic_link),
+                contentDescription = "Citation Graph",
+                tint = colors.accent,
+                modifier = Modifier.size(13.dp),
+            )
+            Spacer(Modifier.width(5.dp))
+            Text(
+                "Graph",
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
+                color = colors.accent,
+            )
         }
 
         ToolbarIconButton(Res.drawable.ic_sync, stringResource(Res.string.library_sync) + " (Ctrl+R)", onClick = onSyncClick)

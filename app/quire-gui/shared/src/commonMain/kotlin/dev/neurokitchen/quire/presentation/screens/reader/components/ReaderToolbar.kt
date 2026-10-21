@@ -147,37 +147,53 @@ fun ReaderToolbar(
         }
 
         // Toggle Figures & Tables Drawer
-        Box(
-            contentAlignment = Alignment.Center,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .size(Dimens.ToolbarButton)
+                .height(28.dp)
                 .clip(RoundedCornerShape(Dimens.RadiusSmall))
                 .background(if (isFigureDrawerOpen) colors.accent.copy(alpha = 0.15f) else Color.Transparent)
-                .clickable(onClick = onToggleFigureDrawer),
+                .border(1.dp, if (isFigureDrawerOpen) colors.accent else colors.border.copy(alpha = 0.5f), RoundedCornerShape(Dimens.RadiusSmall))
+                .clickable(onClick = onToggleFigureDrawer)
+                .padding(horizontal = 6.dp),
         ) {
             Icon(
                 painterResource(Res.drawable.ic_inventory_2),
                 contentDescription = "Toggle Figures & Tables Drawer",
                 tint = if (isFigureDrawerOpen) colors.accent else colors.fillSecondary,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(14.dp),
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                "Figures",
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium),
+                color = if (isFigureDrawerOpen) colors.accent else colors.fillSecondary,
             )
         }
 
         // Toggle Area Snapshot Mode
         if (hasPdf) {
-            Box(
-                contentAlignment = Alignment.Center,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .size(Dimens.ToolbarButton)
+                    .height(28.dp)
                     .clip(RoundedCornerShape(Dimens.RadiusSmall))
-                    .background(if (isSnapshotMode) colors.accent.copy(alpha = 0.2f) else Color.Transparent)
-                    .clickable(onClick = onToggleSnapshotMode),
+                    .background(if (isSnapshotMode) colors.accent else Color.Transparent)
+                    .border(1.dp, if (isSnapshotMode) colors.accent else colors.border.copy(alpha = 0.5f), RoundedCornerShape(Dimens.RadiusSmall))
+                .clickable(onClick = onToggleSnapshotMode)
+                .padding(horizontal = 6.dp),
             ) {
                 Icon(
                     painterResource(Res.drawable.ic_auto_fix_high),
                     contentDescription = "Area Snapshot Tool",
-                    tint = if (isSnapshotMode) colors.accent else colors.fillSecondary,
-                    modifier = Modifier.size(16.dp),
+                    tint = if (isSnapshotMode) colors.onAccent else colors.fillSecondary,
+                    modifier = Modifier.size(14.dp),
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    "Snapshot",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium),
+                    color = if (isSnapshotMode) colors.onAccent else colors.fillSecondary,
                 )
             }
         }

@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -52,6 +53,7 @@ import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 import dev.neurokitchen.quire.resources.ic_close
+import dev.neurokitchen.quire.resources.ic_link
 
 /** The paper's notes beside the reader, and a field to write a new one. */
 @Composable
@@ -106,14 +108,35 @@ fun NotesPanel(
             },
         )
 
-        Button(
-            onClick = onAdd,
-            enabled = draft.isNotBlank(),
-            shape = RoundedCornerShape(Dimens.RadiusSmall),
-            colors = ButtonDefaults.buttonColors(containerColor = colors.accent),
-            modifier = Modifier.padding(vertical = Dimens.SpaceXs).align(Alignment.End),
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(top = Dimens.SpaceXs),
         ) {
-            Text(stringResource(Res.string.reader_add_note), style = MaterialTheme.typography.labelMedium)
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                    .background(colors.accent.copy(alpha = 0.12f))
+                    .clickable {
+                        val next = if (draft.isEmpty() || draft.endsWith(" ")) draft + "[[citeKey]]" else "$draft [[citeKey]]"
+                        onDraftChange(next)
+                    }
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(painterResource(Res.drawable.ic_link), null, tint = colors.accent, modifier = Modifier.size(12.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("+ Link [[Paper]]", style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold), color = colors.accent)
+                }
+            }
+            Spacer(Modifier.weight(1f))
+            Button(
+                onClick = onAdd,
+                enabled = draft.isNotBlank(),
+                shape = RoundedCornerShape(Dimens.RadiusSmall),
+                colors = ButtonDefaults.buttonColors(containerColor = colors.accent),
+            ) {
+                Text(stringResource(Res.string.reader_add_note), style = MaterialTheme.typography.labelMedium)
+            }
         }
 
         if (notes.isEmpty()) {

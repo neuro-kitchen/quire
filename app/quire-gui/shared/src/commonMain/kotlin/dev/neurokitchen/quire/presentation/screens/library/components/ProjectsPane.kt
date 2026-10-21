@@ -91,7 +91,10 @@ fun ProjectsPane(
             ToolbarIconButton(
                 Res.drawable.ic_auto_fix_high,
                 "New Smart Collection...",
-                onClick = { onEvent(LibraryEvent.OnNameDialog(NameDialog.SaveSearch(""))) },
+                onClick = {
+                    val q = if (state.query.isNotBlank()) state.query else "status:unread"
+                    onEvent(LibraryEvent.OnNameDialog(NameDialog.SaveSearch(q)))
+                },
             )
             Spacer(Modifier.weight(1f))
             Box(

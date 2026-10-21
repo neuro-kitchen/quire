@@ -93,6 +93,7 @@ import dev.neurokitchen.quire.resources.ic_close
 import dev.neurokitchen.quire.resources.ic_attach_file
 import dev.neurokitchen.quire.resources.ic_create_new_folder
 import dev.neurokitchen.quire.resources.ic_delete
+import dev.neurokitchen.quire.resources.ic_description
 import dev.neurokitchen.quire.resources.ic_expand_more
 import dev.neurokitchen.quire.resources.ic_folder
 import dev.neurokitchen.quire.resources.ic_info
@@ -191,6 +192,21 @@ fun ItemPane(
                         Icon(painterResource(Res.drawable.ic_picture_as_pdf), null, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(Dimens.SpaceMin))
                         Text(stringResource(Res.string.reader_open), style = MaterialTheme.typography.labelSmall)
+                    }
+
+                    // Quick Look preview button
+                    Button(
+                        onClick = { onEvent(LibraryEvent.OnToggleQuickLook(true)) },
+                        shape = RoundedCornerShape(Dimens.RadiusBase),
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.sidepane),
+                        contentPadding = PaddingValues(horizontal = Dimens.SpaceSm, vertical = 4.dp),
+                        modifier = Modifier
+                            .height(30.dp)
+                            .border(1.dp, colors.border, RoundedCornerShape(Dimens.RadiusBase)),
+                    ) {
+                        Icon(painterResource(Res.drawable.ic_description), null, tint = colors.fillPrimary, modifier = Modifier.size(13.dp))
+                        Spacer(Modifier.width(Dimens.SpaceMin))
+                        Text("Quick Look", style = MaterialTheme.typography.labelSmall, color = colors.fillPrimary)
                     }
 
                     // Reading status badge
@@ -576,6 +592,28 @@ private fun SectionBody(
                         Text(note.updated, style = MaterialTheme.typography.labelSmall, color = colors.fillSecondary)
                     }
                     RemoveButton { onEvent(LibraryEvent.OnNoteDelete(note.id)) }
+                }
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                        .background(colors.accent.copy(alpha = 0.12f))
+                        .clickable {
+                            val cur = noteDraft
+                            val next = if (cur.isEmpty() || cur.endsWith(" ")) cur + "[[key]]" else "$cur [[key]]"
+                            onEvent(LibraryEvent.OnNoteDraftChange(next))
+                        }
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(painterResource(Res.drawable.ic_link), null, tint = colors.accent, modifier = Modifier.size(11.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("+ Link [[Paper]]", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.SemiBold), color = colors.accent)
+                    }
                 }
             }
             InputRow(noteDraft, stringResource(Res.string.item_add_note) + " ([[key]] to link)", { onEvent(LibraryEvent.OnNoteDraftChange(it)) }) {

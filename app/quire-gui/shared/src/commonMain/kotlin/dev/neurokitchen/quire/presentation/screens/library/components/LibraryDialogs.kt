@@ -47,6 +47,7 @@ import dev.neurokitchen.quire.resources.confirm_delete_project
 import dev.neurokitchen.quire.resources.confirm_delete_project_body
 import dev.neurokitchen.quire.resources.confirm_delete_tag
 import dev.neurokitchen.quire.resources.confirm_delete_tag_body
+import dev.neurokitchen.quire.resources.ic_auto_fix_high
 import dev.neurokitchen.quire.resources.ic_create_new_folder
 import dev.neurokitchen.quire.resources.ic_delete
 import dev.neurokitchen.quire.resources.ic_sell
@@ -83,14 +84,14 @@ fun NameDialogView(
         Header(
             icon = when (dialog) {
                 is NameDialog.RenameTag -> Res.drawable.ic_sell
-                is NameDialog.SaveSearch, is NameDialog.RenameSavedSearch -> Res.drawable.ic_search
+                is NameDialog.SaveSearch, is NameDialog.RenameSavedSearch -> Res.drawable.ic_auto_fix_high
                 else -> Res.drawable.ic_create_new_folder
             },
             tint = QuireTheme.colors.accent,
-            title = title,
+            title = if (dialog is NameDialog.SaveSearch) "New Smart Collection" else title,
             subtitle = when (dialog) {
                 is NameDialog.NewProject -> stringResource(Res.string.name_new_project_hint)
-                is NameDialog.SaveSearch -> dialog.query
+                is NameDialog.SaveSearch -> "Filter Query: \"${dialog.query}\""
                 else -> null
             },
         )

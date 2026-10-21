@@ -44,10 +44,17 @@ fun DesktopApp(
                 .fillMaxSize()
                 .onPreviewKeyEvent { event ->
                     if (event.type == KeyEventType.KeyDown && (event.isCtrlPressed || event.isMetaPressed)) {
-                        if (event.key == Key.K) {
-                            viewModel.onEvent(DesktopEvent.OnToggleCommandPalette(!state.isCommandPaletteOpen))
-                            true
-                        } else false
+                        when (event.key) {
+                            Key.K -> {
+                                viewModel.onEvent(DesktopEvent.OnToggleCommandPalette(!state.isCommandPaletteOpen))
+                                true
+                            }
+                            Key.G -> {
+                                viewModel.onEvent(DesktopEvent.OnToggleCitationGraph(!state.isCitationGraphOpen))
+                                true
+                            }
+                            else -> false
+                        }
                     } else false
                 },
         ) {
