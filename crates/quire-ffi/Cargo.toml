@@ -21,6 +21,11 @@ thiserror.workspace = true
 tokio.workspace = true
 uniffi.workspace = true
 
+[target.'cfg(target_os = "android")'.dependencies]
+# Initialising reqwest's certificate verifier from the app (Android's trust store, through the JVM).
+jni.workspace = true
+rustls-platform-verifier.workspace = true
+
 
 [dev-dependencies]
 quire-testkit.workspace = true
