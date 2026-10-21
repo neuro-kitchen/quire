@@ -1,5 +1,11 @@
 package dev.neurokitchen.quire.presentation.screens.reader.components
 
+import dev.neurokitchen.quire.resources.reader_open
+import dev.neurokitchen.quire.resources.reader_close_pane
+import dev.neurokitchen.quire.resources.common_copy_citekey
+import dev.neurokitchen.quire.resources.citation_in_library
+import dev.neurokitchen.quire.resources.citation_copy_key
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -64,17 +70,17 @@ fun CitationHoverCard(
 
     Dialog(onDismissRequest = onDismissRequest) {
         Surface(
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(Dimens.RadiusBase),
             color = colors.sidepane,
             shadowElevation = 16.dp,
             modifier = Modifier
                 .width(420.dp)
-                .border(1.dp, colors.border.copy(alpha = 0.8f), RoundedCornerShape(12.dp)),
+                .border(1.dp, colors.border.copy(alpha = 0.8f), RoundedCornerShape(Dimens.RadiusBase)),
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(Dimens.SpaceMd),
             ) {
                 // Header Bar
                 Row(
@@ -87,7 +93,7 @@ fun CitationHoverCard(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(Dimens.RadiusSmall))
                                 .background(colors.accent.copy(alpha = 0.15f))
-                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                                .padding(horizontal = Dimens.SpaceXs, vertical = 3.dp),
                         ) {
                             Text(
                                 "@${citation.key}",
@@ -104,7 +110,7 @@ fun CitationHoverCard(
                                     .padding(horizontal = 6.dp, vertical = 3.dp),
                             ) {
                                 Text(
-                                    "IN LIBRARY",
+                                    stringResource(Res.string.citation_in_library),
                                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.sp),
                                     color = colors.statusRead,
                                 )
@@ -122,7 +128,7 @@ fun CitationHoverCard(
                     ) {
                         Icon(
                             painterResource(Res.drawable.ic_close),
-                            contentDescription = "Close",
+                            contentDescription = stringResource(Res.string.reader_close_pane),
                             tint = colors.fillSecondary,
                             modifier = Modifier.size(14.dp),
                         )
@@ -160,7 +166,7 @@ fun CitationHoverCard(
                             .clip(RoundedCornerShape(Dimens.RadiusSmall))
                             .background(colors.background.copy(alpha = 0.6f))
                             .border(1.dp, colors.border.copy(alpha = 0.3f), RoundedCornerShape(Dimens.RadiusSmall))
-                            .padding(8.dp),
+                            .padding(Dimens.SpaceXs),
                     ) {
                         Text(
                             text = citation.abstract,
@@ -188,17 +194,17 @@ fun CitationHoverCard(
                             .clip(RoundedCornerShape(Dimens.RadiusSmall))
                             .background(colors.fillQuarternary.copy(alpha = 0.6f))
                             .clickable { clipboard.setText(AnnotatedString("@${citation.key}")) }
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            .padding(horizontal = Dimens.SpaceXs, vertical = Dimens.SpaceMin),
                     ) {
                         Icon(
                             painterResource(Res.drawable.ic_content_copy),
-                            contentDescription = "Copy CiteKey",
+                            contentDescription = stringResource(Res.string.common_copy_citekey),
                             tint = colors.fillSecondary,
                             modifier = Modifier.size(12.dp),
                         )
-                        Spacer(Modifier.width(4.dp))
+                        Spacer(Modifier.width(Dimens.SpaceMin))
                         Text(
-                            "Copy Key",
+                            stringResource(Res.string.citation_copy_key),
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                             color = colors.fillSecondary,
                         )
@@ -217,7 +223,7 @@ fun CitationHoverCard(
                                 .padding(horizontal = 10.dp, vertical = 5.dp),
                         ) {
                             Text(
-                                "Open in Reader",
+                                stringResource(Res.string.reader_open),
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 11.sp,

@@ -1,5 +1,7 @@
 package dev.neurokitchen.quire.presentation.components.export_dialog
 
+import dev.neurokitchen.quire.presentation.designsystem.components.DialogConfirm
+import dev.neurokitchen.quire.presentation.designsystem.components.DialogCancel
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.clickable
@@ -19,15 +21,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -133,19 +132,19 @@ fun ExportDialogContent(
         onDismiss = onDismiss,
         actions = {
             if (state.isWorking) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.add_cancel)) }
+            DialogCancel(onDismiss, stringResource(Res.string.add_cancel))
             OutlinedButton(onClick = { state.preview?.let { clipboard.setText(AnnotatedString(it)) } }, enabled = state.preview != null) {
                 Text(stringResource(Res.string.export_copy))
             }
-            Button(
+            DialogConfirm(
+                label = stringResource(Res.string.export_save),
                 onClick = {
                     pickSaveFile(saveTitle, "references." + extension(state.options.format))?.let {
                         onEvent(ExportDialogEvent.OnSave(it, keepUpdated && state.canKeepUpdated))
                     }
                 },
                 enabled = state.preview != null && !state.isWorking,
-                colors = ButtonDefaults.buttonColors(containerColor = QuireTheme.colors.accent),
-            ) { Text(stringResource(Res.string.export_save)) }
+            )
         },
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceMd)) {

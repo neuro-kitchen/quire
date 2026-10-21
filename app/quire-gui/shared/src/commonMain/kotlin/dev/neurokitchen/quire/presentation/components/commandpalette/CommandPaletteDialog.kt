@@ -1,5 +1,21 @@
 package dev.neurokitchen.quire.presentation.components.commandpalette
 
+import dev.neurokitchen.quire.resources.palette_view_citation_network_graph
+import dev.neurokitchen.quire.resources.palette_type_a_command_paper
+import dev.neurokitchen.quire.resources.palette_search
+import dev.neurokitchen.quire.resources.palette_reopen_library_files_and
+import dev.neurokitchen.quire.resources.palette_reload_sync_library
+import dev.neurokitchen.quire.resources.palette_open_tools_maintenance
+import dev.neurokitchen.quire.resources.palette_open_preferences_settings
+import dev.neurokitchen.quire.resources.palette_no_matching_commands_or
+import dev.neurokitchen.quire.resources.palette_main_library_collection_view
+import dev.neurokitchen.quire.resources.palette_items
+import dev.neurokitchen.quire.resources.palette_interactive_d_graph_of
+import dev.neurokitchen.quire.resources.palette_go_to_my_library
+import dev.neurokitchen.quire.resources.palette_duplicate_detection_sync_checks
+import dev.neurokitchen.quire.resources.palette_application_and_reader_configurations
+import dev.neurokitchen.quire.resources.common_clear
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -156,14 +172,26 @@ fun CommandPaletteDialog(
     val listState = rememberLazyListState()
 
     // Build the items registry
+    // Composable lookups, before the list is built.
+    val paletteGoToMyLibrary = stringResource(Res.string.palette_go_to_my_library)
+    val paletteMainLibraryCollectionView = stringResource(Res.string.palette_main_library_collection_view)
+    val paletteOpenPreferencesSettings = stringResource(Res.string.palette_open_preferences_settings)
+    val paletteApplicationAndReaderConfigurations = stringResource(Res.string.palette_application_and_reader_configurations)
+    val paletteReloadSyncLibrary = stringResource(Res.string.palette_reload_sync_library)
+    val paletteReopenLibraryFilesAnd = stringResource(Res.string.palette_reopen_library_files_and)
+    val paletteOpenToolsMaintenance = stringResource(Res.string.palette_open_tools_maintenance)
+    val paletteDuplicateDetectionSyncChecks = stringResource(Res.string.palette_duplicate_detection_sync_checks)
+    val paletteViewCitationNetworkGraph = stringResource(Res.string.palette_view_citation_network_graph)
+    val paletteInteractiveDGraphOf = stringResource(Res.string.palette_interactive_d_graph_of)
+
     val allItems = remember(query, selectedCategory, papers, allReferences, currentTheme) {
         val items = mutableListOf<PaletteItem>()
 
         // 1. Navigation / Global Actions
         items.add(
             PaletteItem.Action(
-                title = "Go to My Library",
-                subtitle = "Main library collection view",
+                title = paletteGoToMyLibrary,
+                subtitle = paletteMainLibraryCollectionView,
                 shortcut = "Esc",
                 iconType = ActionIcon.Library,
                 onExecute = { onSelectTab(null); onDismissRequest() },
@@ -171,8 +199,8 @@ fun CommandPaletteDialog(
         )
         items.add(
             PaletteItem.Action(
-                title = "Open Preferences & Settings",
-                subtitle = "Application and reader configurations",
+                title = paletteOpenPreferencesSettings,
+                subtitle = paletteApplicationAndReaderConfigurations,
                 shortcut = "Ctrl+,",
                 iconType = ActionIcon.Settings,
                 onExecute = { onOpenSettings(); onDismissRequest() },
@@ -180,8 +208,8 @@ fun CommandPaletteDialog(
         )
         items.add(
             PaletteItem.Action(
-                title = "Reload & Sync Library",
-                subtitle = "Reopen library files and refresh engine state",
+                title = paletteReloadSyncLibrary,
+                subtitle = paletteReopenLibraryFilesAnd,
                 shortcut = "Ctrl+R",
                 iconType = ActionIcon.Sync,
                 onExecute = { onReload(); onDismissRequest() },
@@ -189,8 +217,8 @@ fun CommandPaletteDialog(
         )
         items.add(
             PaletteItem.Action(
-                title = "Open Tools & Maintenance",
-                subtitle = "Duplicate detection, sync checks, import/export",
+                title = paletteOpenToolsMaintenance,
+                subtitle = paletteDuplicateDetectionSyncChecks,
                 shortcut = null,
                 iconType = ActionIcon.Tools,
                 onExecute = { onOpenTools(); onDismissRequest() },
@@ -198,8 +226,8 @@ fun CommandPaletteDialog(
         )
         items.add(
             PaletteItem.Action(
-                title = "View Citation Network Graph",
-                subtitle = "Interactive 2D graph of connections between library papers",
+                title = paletteViewCitationNetworkGraph,
+                subtitle = paletteInteractiveDGraphOf,
                 shortcut = null,
                 iconType = ActionIcon.Default,
                 onExecute = { onOpenCitationGraph(); onDismissRequest() },
@@ -315,11 +343,11 @@ fun CommandPaletteDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                        .padding(horizontal = 14.dp, vertical = Dimens.SpaceSm),
                 ) {
                     Icon(
                         painter = painterResource(Res.drawable.ic_search),
-                        contentDescription = "Search",
+                        contentDescription = stringResource(Res.string.palette_search),
                         tint = colors.accent,
                         modifier = Modifier.size(20.dp),
                     )
@@ -342,7 +370,7 @@ fun CommandPaletteDialog(
                         decorationBox = { innerTextField ->
                             if (query.isEmpty()) {
                                 Text(
-                                    "Type a command, paper title, or action...",
+                                    stringResource(Res.string.palette_type_a_command_paper),
                                     style = MaterialTheme.typography.bodyLarge.copy(
                                         color = colors.fillTertiary,
                                         fontSize = 15.sp,
@@ -363,12 +391,12 @@ fun CommandPaletteDialog(
                         ) {
                             Icon(
                                 painterResource(Res.drawable.ic_close),
-                                contentDescription = "Clear",
+                                contentDescription = stringResource(Res.string.common_clear),
                                 tint = colors.fillSecondary,
                                 modifier = Modifier.size(14.dp),
                             )
                         }
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(Dimens.SpaceXs))
                     }
                     // Esc Badge
                     Box(
@@ -389,7 +417,7 @@ fun CommandPaletteDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 4.dp),
+                        .padding(horizontal = 14.dp, vertical = Dimens.SpaceMin),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     PaletteCategory.entries.forEach { cat ->
@@ -416,7 +444,7 @@ fun CommandPaletteDialog(
                     }
                 }
 
-                HorizontalDivider(color = colors.border.copy(alpha = 0.4f), modifier = Modifier.padding(top = 8.dp))
+                HorizontalDivider(color = colors.border.copy(alpha = 0.4f), modifier = Modifier.padding(top = Dimens.SpaceXs))
 
                 // Results List
                 LazyColumn(
@@ -435,7 +463,7 @@ fun CommandPaletteDialog(
                                     .padding(vertical = 36.dp),
                             ) {
                                 Text(
-                                    "No matching commands or papers found",
+                                    stringResource(Res.string.palette_no_matching_commands_or),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = colors.fillTertiary,
                                 )
@@ -469,18 +497,18 @@ fun CommandPaletteDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(colors.tabbar.copy(alpha = 0.5f))
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                        .padding(horizontal = 14.dp, vertical = Dimens.SpaceXs),
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceSm),
                     ) {
                         FooterShortcutHint("↑↓", "Navigate")
                         FooterShortcutHint("↵", "Open / Select")
                         FooterShortcutHint("esc", "Dismiss")
                     }
                     Text(
-                        "${allItems.size} items",
+                        stringResource(Res.string.palette_items, allItems.size),
                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                         color = colors.fillTertiary,
                     )
@@ -508,7 +536,7 @@ private fun PaletteItemRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 2.dp)
+            .padding(horizontal = Dimens.SpaceXs, vertical = 2.dp)
             .clip(RoundedCornerShape(Dimens.RadiusSmall))
             .background(bg)
             .then(borderModifier)
@@ -583,7 +611,7 @@ private fun PaletteItemRow(
             }
         }
 
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(Dimens.SpaceXs))
 
         // Category Tag or Shortcut Pill
         if (item is PaletteItem.Action && item.shortcut != null) {
@@ -624,7 +652,7 @@ private fun FooterShortcutHint(badge: String, label: String) {
             modifier = Modifier
                 .clip(RoundedCornerShape(3.dp))
                 .background(colors.fillQuarternary)
-                .padding(horizontal = 4.dp, vertical = 1.dp),
+                .padding(horizontal = Dimens.SpaceMin, vertical = 1.dp),
         ) {
             Text(
                 badge,
@@ -632,7 +660,7 @@ private fun FooterShortcutHint(badge: String, label: String) {
                 color = colors.fillSecondary,
             )
         }
-        Spacer(Modifier.width(4.dp))
+        Spacer(Modifier.width(Dimens.SpaceMin))
         Text(
             label,
             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),

@@ -1,5 +1,8 @@
 package dev.neurokitchen.quire.presentation.screens.library.components
 
+import dev.neurokitchen.quire.presentation.designsystem.components.DialogConfirm
+import dev.neurokitchen.quire.presentation.designsystem.components.DialogCancel
+import dev.neurokitchen.quire.presentation.designsystem.components.DialogShell
 import dev.neurokitchen.quire.presentation.designsystem.components.projectChoices
 import dev.neurokitchen.quire.presentation.designsystem.components.ChoiceMenu
 import dev.neurokitchen.quire.resources.add_remove
@@ -16,9 +19,7 @@ import dev.neurokitchen.quire.resources.add_tab_pdf
 import dev.neurokitchen.quire.presentation.platform.pickFolder
 import dev.neurokitchen.quire.presentation.platform.pickFile
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -28,11 +29,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -48,7 +46,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import dev.neurokitchen.quire.presentation.designsystem.Dimens
 import dev.neurokitchen.quire.presentation.designsystem.QuireTheme
 import dev.neurokitchen.quire.presentation.screens.library.AddDialogState
@@ -90,106 +87,57 @@ fun AddReferenceDialog(
     /** Every project as (path, name), for "Add to". */
     projects: List<Pair<String, String>> = emptyList(),
 ) {
-    Dialog(onDismissRequest = { onEvent(LibraryEvent.OnShowAddDialog(false)) }) {
-        Card(
-            shape = RoundedCornerShape(Dimens.RadiusLarge),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-            elevation = CardDefaults.cardElevation(defaultElevation = Dimens.ElevationMedium),
-            modifier = Modifier.width(600.dp),
-        ) {
-            Column(Modifier.padding(Dimens.SpaceMd)) {
-                Header()
-                Spacer(Modifier.height(Dimens.SpaceSm))
-                ChoiceMenu(
-                    label = stringResource(Res.string.add_project),
-                    selected = state.project,
-                    choices = projectChoices(stringResource(Res.string.add_project_none), projects),
-                    onSelect = { onEvent(LibraryEvent.OnAddProjectSelect(it)) },
-                )
-                Spacer(Modifier.height(Dimens.SpaceSm))
-                PrimaryTabRow(
-                    selectedTabIndex = state.tab.ordinal,
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    modifier = Modifier.clip(RoundedCornerShape(Dimens.RadiusSmall)),
-                ) {
-                    AddTab.entries.forEach { tab ->
-                        Tab(
-                            selected = state.tab == tab,
-                            onClick = { onEvent(LibraryEvent.OnAddTabSelect(tab)) },
-                            text = { Text(stringResource(tab.label())) },
-                        )
-                    }
-                }
-                Spacer(Modifier.height(Dimens.SpaceMd))
-                when (state.tab) {
-                    AddTab.Identifier -> IdentifierTab(state, onEvent)
-                    AddTab.Pdf -> PdfTab(state, onEvent)
-                    AddTab.File -> FileTab(state, onEvent)
-                    AddTab.Manual -> ManualTab(state.manual) { onEvent(LibraryEvent.OnManualChange(it)) }
-                    AddTab.Bibtex -> OutlinedTextField(
-                        value = state.bibtex,
-                        onValueChange = { onEvent(LibraryEvent.OnBibtexChange(it)) },
-                        label = { Text(stringResource(Res.string.add_bibtex_label)) },
-                        placeholder = { Text("@article{key,\n  title = {…},\n  author = {…},\n}") },
-                        modifier = Modifier.fillMaxWidth().height(160.dp),
-                        textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+    DialogShell(
+        title = stringResource(Res.string.add_title),
+        subtitle = stringResource(Res.string.add_subtitle),
+        icon = Res.drawable.ic_add,
+        width = 600.dp,
+        onDismiss = { onEvent(LibraryEvent.OnShowAddDialog(false)) },
+        actions = {
+            DialogCancel({ onEvent(LibraryEvent.OnShowAddDialog(false)) }, stringResource(Res.string.add_cancel))
+            DialogConfirm(stringResource(Res.string.add_confirm), { onEvent(LibraryEvent.OnAddConfirm) }, enabled = state.canAdd, working = state.isWorking)
+        },
+    ) {
+        Column {
+            ChoiceMenu(
+                label = stringResource(Res.string.add_project),
+                selected = state.project,
+                choices = projectChoices(stringResource(Res.string.add_project_none), projects),
+                onSelect = { onEvent(LibraryEvent.OnAddProjectSelect(it)) },
+            )
+            Spacer(Modifier.height(Dimens.SpaceSm))
+            PrimaryTabRow(
+                selectedTabIndex = state.tab.ordinal,
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.clip(RoundedCornerShape(Dimens.RadiusSmall)),
+            ) {
+                AddTab.entries.forEach { tab ->
+                    Tab(
+                        selected = state.tab == tab,
+                        onClick = { onEvent(LibraryEvent.OnAddTabSelect(tab)) },
+                        text = { Text(stringResource(tab.label())) },
                     )
                 }
-                state.error?.let { error ->
-                    Spacer(Modifier.height(Dimens.SpaceXs))
-                    Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                }
-                Spacer(Modifier.height(Dimens.SpaceMd))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    TextButton(onClick = { onEvent(LibraryEvent.OnShowAddDialog(false)) }) {
-                        Text(stringResource(Res.string.add_cancel))
-                    }
-                    Spacer(Modifier.width(Dimens.SpaceXs))
-                    Button(
-                        onClick = { onEvent(LibraryEvent.OnAddConfirm) },
-                        colors = ButtonDefaults.buttonColors(containerColor = QuireTheme.colors.accent),
-                        enabled = state.canAdd,
-                    ) {
-                        if (state.isWorking) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary,
-                            )
-                            Spacer(Modifier.width(Dimens.SpaceXs))
-                        }
-                        Text(stringResource(Res.string.add_confirm))
-                    }
-                }
             }
-        }
-    }
-}
-
-@Composable
-private fun Header() {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceXs)) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(RoundedCornerShape(Dimens.RadiusBase))
-                .background(QuireTheme.colors.accent.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(painterResource(Res.drawable.ic_add), contentDescription = null, tint = QuireTheme.colors.accent, modifier = Modifier.size(20.dp))
-        }
-        Column {
-            Text(
-                stringResource(Res.string.add_title),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = QuireTheme.colors.fillPrimary,
-            )
-            Text(stringResource(Res.string.add_subtitle), style = MaterialTheme.typography.bodySmall, color = QuireTheme.colors.fillSecondary)
+            Spacer(Modifier.height(Dimens.SpaceMd))
+            when (state.tab) {
+                AddTab.Identifier -> IdentifierTab(state, onEvent)
+                AddTab.Pdf -> PdfTab(state, onEvent)
+                AddTab.File -> FileTab(state, onEvent)
+                AddTab.Manual -> ManualTab(state.manual) { onEvent(LibraryEvent.OnManualChange(it)) }
+                AddTab.Bibtex -> OutlinedTextField(
+                    value = state.bibtex,
+                    onValueChange = { onEvent(LibraryEvent.OnBibtexChange(it)) },
+                    label = { Text(stringResource(Res.string.add_bibtex_label)) },
+                    placeholder = { Text("@article{key,\n  title = {…},\n  author = {…},\n}") },
+                    modifier = Modifier.fillMaxWidth().height(160.dp),
+                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                )
+            }
+            state.error?.let { error ->
+                Spacer(Modifier.height(Dimens.SpaceXs))
+                Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
         }
     }
 }

@@ -1,5 +1,6 @@
 package dev.neurokitchen.quire.presentation.screens.library.components
 
+import dev.neurokitchen.quire.resources.toolbar_toggle_inspector_ctrl_i
 import dev.neurokitchen.quire.resources.add_title
 import dev.neurokitchen.quire.resources.search_save
 import androidx.compose.material3.TextButton
@@ -64,7 +65,7 @@ fun ItemsToolbar(
     val colors = QuireTheme.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
         modifier = modifier
             .fillMaxWidth()
             .height(Dimens.ToolbarHeight)
@@ -84,7 +85,7 @@ fun ItemsToolbar(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .clickable(onClick = onAddReference)
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                    .padding(horizontal = 10.dp, vertical = Dimens.SpaceMin),
             ) {
                 Icon(
                     painterResource(Res.drawable.ic_add),
@@ -103,7 +104,7 @@ fun ItemsToolbar(
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
                         .background(colors.onAccent.copy(alpha = 0.2f))
-                        .padding(horizontal = 4.dp, vertical = 1.dp),
+                        .padding(horizontal = Dimens.SpaceMin, vertical = 1.dp),
                 ) {
                     Text(
                         text = "Ctrl+N",
@@ -134,7 +135,7 @@ fun ItemsToolbar(
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
                         .background(colors.fillQuarternary)
-                        .padding(horizontal = 4.dp, vertical = 1.dp),
+                        .padding(horizontal = Dimens.SpaceMin, vertical = 1.dp),
                 ) {
                     Text(
                         text = "Ctrl+F",
@@ -157,7 +158,7 @@ fun ItemsToolbar(
             ) {
                 Icon(
                     painterResource(Res.drawable.ic_info),
-                    contentDescription = "Toggle Inspector (Ctrl+I)",
+                    contentDescription = stringResource(Res.string.toolbar_toggle_inspector_ctrl_i),
                     tint = if (!isInspectorCollapsed) colors.accent else colors.fillSecondary,
                     modifier = Modifier.size(16.dp),
                 )

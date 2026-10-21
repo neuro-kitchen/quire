@@ -49,7 +49,7 @@ fun SettingsSidebar(
             .fillMaxHeight()
             .background(colors.sidepane)
             .padding(Dimens.SpaceSm),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(Dimens.SpaceMin),
     ) {
         SettingsSection.entries.forEach { section ->
             val isSelected = section == selected

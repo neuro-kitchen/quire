@@ -115,10 +115,10 @@ private fun Tag(tag: TagState, onClick: () -> Unit, onRename: () -> Unit, onColo
                 .background(if (tag.isSelected) colors.accent else Color.Transparent)
                 .onSecondaryClick { menuOpen = true }
                 .clickable(onClick = onClick)
-                .padding(horizontal = 4.dp, vertical = 1.dp),
+                .padding(horizontal = Dimens.SpaceMin, vertical = 1.dp),
         ) {
             if (tagColor != null) {
-                Box(Modifier.padding(end = 4.dp).size(8.dp).clip(CircleShape).background(tagColor))
+                Box(Modifier.padding(end = Dimens.SpaceMin).size(8.dp).clip(CircleShape).background(tagColor))
             }
             Text(
                 text = tag.name,
