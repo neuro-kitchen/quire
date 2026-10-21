@@ -11,6 +11,7 @@
 //!   ([`cache`]).
 
 pub mod cache;
+pub mod figures;
 pub mod find;
 pub mod layer;
 pub mod layout;
@@ -24,6 +25,7 @@ pub mod tidy;
 pub mod types;
 
 pub use cache::{DocumentCache, global_cache};
+pub use figures::{FigureRegion, figures};
 pub use ocr_layer::is_sparse;
 pub use pages::{locate, nearest_glyph, page_sizes, page_text, render_page_at, search, text_range, word_at};
 pub use types::{Glyph, GlyphBox, Line, PageRect, PageSize, PageText, QuoteMatch, RenderedPage, TextMatch, WordBox};
