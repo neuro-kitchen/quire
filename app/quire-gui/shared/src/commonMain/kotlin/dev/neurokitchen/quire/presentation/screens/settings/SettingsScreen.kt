@@ -112,7 +112,6 @@ fun SettingsScreen(
                 state.section == SettingsSection.Appearance -> AppearanceSectionView(state.appTheme, onEvent)
                 state.section == SettingsSection.Shortcuts -> ShortcutsSectionView()
                 state.section == SettingsSection.Reader -> ReaderDefaultsSectionView(state.readerFont, state.readerTheme, state.readerFontSize, onEvent)
-                state.section == SettingsSection.Export -> ExportSectionView()
                 state.section == SettingsSection.ConfigFile -> RawConfigEditor(
                     state.raw,
                     onChange = { onEvent(SettingsEvent.OnRawChange(it)) },
@@ -219,28 +218,6 @@ private fun AppearanceSectionView(
                 }
             }
         }
-
-        HorizontalDivider(color = colors.fillQuarternary, modifier = Modifier.padding(vertical = Dimens.SpaceXs))
-
-        Text("Display Density & Metrics", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = colors.fillPrimary)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(Dimens.RadiusBase))
-                    .background(colors.accent)
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-            ) {
-                Text("Comfortable (Default)", style = MaterialTheme.typography.labelSmall, color = colors.onAccent, fontWeight = FontWeight.SemiBold)
-            }
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(Dimens.RadiusBase))
-                    .background(colors.fillQuarternary)
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-            ) {
-                Text("Compact Desktop", style = MaterialTheme.typography.labelSmall, color = colors.fillPrimary)
-            }
-        }
     }
 }
 
@@ -344,68 +321,36 @@ private fun ReaderDefaultsSectionView(
                 }
             }
         }
-    }
-}
-
-/** CiteKey & BibTeX Export Settings */
-@Composable
-private fun ExportSectionView() {
-    val colors = QuireTheme.colors
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(Dimens.SpaceMd),
-    ) {
-        Text("CiteKey Generation Pattern", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = colors.fillPrimary)
-        Text("Template used when generating citation keys from author and publication metadata.", style = MaterialTheme.typography.bodySmall, color = colors.fillSecondary)
-
-        Card(
-            shape = RoundedCornerShape(Dimens.RadiusBase),
-            colors = CardDefaults.cardColors(containerColor = colors.sidepane),
-            modifier = Modifier.fillMaxWidth().border(1.dp, colors.border, RoundedCornerShape(Dimens.RadiusBase)).padding(Dimens.SpaceMd),
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Pattern Template:", style = MaterialTheme.typography.labelMedium, color = colors.fillSecondary)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(Dimens.RadiusSmall))
-                        .background(colors.background)
-                        .border(1.dp, colors.border, RoundedCornerShape(Dimens.RadiusSmall))
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                ) {
-                    Text("[auth][year]", style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace), color = colors.accent)
-                }
-                Text("Example output: hodgkin1952, vaswani2017", style = MaterialTheme.typography.bodySmall, color = colors.fillTertiary)
-            }
-        }
 
         HorizontalDivider(color = colors.fillQuarternary)
 
-        Text("BibTeX / BibLaTeX Export", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = colors.fillPrimary)
+        Text("Default Reading Font Size", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = colors.fillPrimary)
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Dimens.RadiusBase))
-                .background(colors.sidepane)
-                .padding(Dimens.SpaceMd),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Icon(painterResource(Res.drawable.ic_link), null, tint = colors.accent, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text("Auto-export .bib on library changes", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = colors.fillPrimary)
-                Text("Automatically writes references.bib in the project root", style = MaterialTheme.typography.bodySmall, color = colors.fillSecondary)
-            }
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(Dimens.RadiusFull))
-                    .background(colors.accent)
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                    .background(colors.sidepane)
+                    .border(1.dp, colors.border, RoundedCornerShape(Dimens.RadiusSmall))
+                    .clickable { onEvent(SettingsEvent.OnSetReaderFontSize(maxOf(12, defaultFontSize - 1))) },
+                contentAlignment = Alignment.Center,
             ) {
-                Text("Enabled", style = MaterialTheme.typography.labelSmall, color = colors.onAccent)
+                Text("−", style = MaterialTheme.typography.titleMedium, color = colors.fillPrimary)
+            }
+            Text("${defaultFontSize}sp", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = colors.fillPrimary)
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                    .background(colors.sidepane)
+                    .border(1.dp, colors.border, RoundedCornerShape(Dimens.RadiusSmall))
+                    .clickable { onEvent(SettingsEvent.OnSetReaderFontSize(minOf(28, defaultFontSize + 1))) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("+", style = MaterialTheme.typography.titleMedium, color = colors.fillPrimary)
             }
         }
     }
@@ -427,6 +372,7 @@ private fun ShortcutsSectionView() {
         ShortcutCategoryCard(
             title = "Navigation & Windows",
             shortcuts = listOf(
+                "Ctrl + K" to "Universal Command Palette & Quick Switcher",
                 "Ctrl + B" to "Toggle Left Navigation Sidebar",
                 "Ctrl + I" to "Toggle Right Inspector Panel",
                 "Ctrl + R" to "Sync / Reload Library",
@@ -438,6 +384,7 @@ private fun ShortcutsSectionView() {
         ShortcutCategoryCard(
             title = "Library & References",
             shortcuts = listOf(
+                "Space" to "Quick Look Peek Modal on Selected Paper",
                 "Ctrl + N" to "Add Reference (DOI, arXiv, BibTeX)",
                 "Ctrl + A" to "Select All Items",
                 "Ctrl + F / Ctrl + S" to "Search Library Items",
@@ -451,12 +398,14 @@ private fun ShortcutsSectionView() {
         )
 
         ShortcutCategoryCard(
-            title = "Reader & Document View",
+            title = "Reader & Knowledge Tools",
             shortcuts = listOf(
                 "Ctrl + + / Ctrl + =" to "Zoom In (PDF) / Increase Font Size (Text)",
                 "Ctrl + -" to "Zoom Out (PDF) / Decrease Font Size (Text)",
                 "Ctrl + 0" to "Reset Zoom (100%) / Reset Font Size (16px)",
                 "Ctrl + F" to "Toggle In-Document Search Bar",
+                "Drag on PDF" to "Area Snapshot tool to extract visual quote into notes",
+                "[[citeKey]]" to "Bidirectional Wikilink in notes (auto-tracks backlinks)",
                 "Aa Button" to "Select Typography & Reader Palette",
                 "Bottom Action Palette" to "Annotate Highlight (Yellow, Green, Blue, Purple, Red)",
             ),
