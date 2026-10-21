@@ -5,6 +5,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.use
+import androidx.compose.foundation.layout.Box
+import dev.neurokitchen.quire.domain.model.LibraryQuery
+import dev.neurokitchen.quire.domain.model.Note
+import dev.neurokitchen.quire.presentation.components.commandpalette.CommandPaletteDialog
+import dev.neurokitchen.quire.presentation.components.graph.CitationGraphDialog
+import dev.neurokitchen.quire.presentation.desktop.OpenPaper
+import dev.neurokitchen.quire.presentation.screens.library.components.QuickLookModal
+import dev.neurokitchen.quire.presentation.screens.reader.components.CitationDetail
+import dev.neurokitchen.quire.presentation.screens.reader.components.NotesPanel
 import dev.neurokitchen.quire.data.repository.SampleLibraryRepository
 import dev.neurokitchen.quire.presentation.screens.library.components.ItemPane
 import dev.neurokitchen.quire.presentation.screens.library.components.NameDialogView
@@ -365,6 +374,207 @@ class DesktopScreenshots {
         }
     }
 
+    @Test
+    fun oledThemeWindow() {
+        startKoin { modules(appModules(sampleDataModule)) }
+        render("desktop-oled.png") {
+            QuireTheme(appTheme = AppTheme.Oled, desktop = true) {
+                DesktopApp()
+            }
+        }
+    }
+
+    @Test
+    fun commandPaletteOverlay() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        val vm = LibraryViewModel(SampleLibraryRepository(), SampleReaderRepository(), object : ExchangeRepository {}, object : AttachmentRepository {}, object : SearchRepository {})
+        val state = runBlocking { vm.state.first { !it.isLoading } }
+        val refs = runBlocking { SampleLibraryRepository().references(LibraryQuery()).first() }
+        render("desktop-command-palette.png") {
+            QuireTheme(appTheme = AppTheme.Obsidian, desktop = true) {
+                Surface {
+                    Box(Modifier.fillMaxSize()) {
+                        LibraryScreen(state, onEvent = {})
+                        CommandPaletteDialog(
+                            isOpen = true,
+                            onDismissRequest = {},
+                            papers = listOf(OpenPaper("1", "Microstructure of a spatial map in the entorhinal cortex")),
+                            allReferences = refs,
+                            currentTheme = AppTheme.Obsidian,
+                            onOpenPaper = { _, _ -> },
+                            onSelectTab = {},
+                            onSetTheme = {},
+                            onOpenSettings = {},
+                            onReload = {},
+                            onOpenTools = {},
+                            onOpenCitationGraph = {},
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun quickLookModal() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        val vm = LibraryViewModel(SampleLibraryRepository(), SampleReaderRepository(), object : ExchangeRepository {}, object : AttachmentRepository {}, object : SearchRepository {})
+        vm.onEvent(LibraryEvent.OnReferenceClick("1"))
+        val state = runBlocking { vm.state.first { it.selected != null } }
+        render("desktop-quick-look.png") {
+            QuireTheme(appTheme = AppTheme.Obsidian, desktop = true) {
+                Surface {
+                    Box(Modifier.fillMaxSize()) {
+                        LibraryScreen(state, onEvent = {})
+                        QuickLookModal(
+                            reference = state.selected!!,
+                            onDismissRequest = {},
+                            onOpenReader = {},
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun splitReaderMode() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        val reader = SampleReaderRepository()
+        runBlocking { reader.addHighlight("3", "form a map of space", "Together they ", "the key claim") }
+        val pdf = SamplePdfRepository()
+        val path = "mock://papers/place-cells.pdf"
+        val vm = ReaderViewModel("3", "The hippocampus as a spatial map", reader, pdf)
+        vm.onEvent(ReaderEvent.OnModeChange(ReaderMode.Split))
+        val state = runBlocking { vm.state.first { !it.isLoading && it.mode == ReaderMode.Split } }
+        render("desktop-reader-split.png") {
+            QuireTheme(darkTheme = false, desktop = true) {
+                Surface {
+                    ReaderScreen(state, {}, { index, width -> pdf.render(path, index, width) }, { null })
+                }
+            }
+        }
+    }
+
+    @Test
+    fun readerWithFigureDrawer() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        val pdf = SamplePdfRepository()
+        val path = "mock://papers/place-cells.pdf"
+        val state = ReaderState(
+            referenceId = "3",
+            title = "The hippocampus as a spatial map",
+            isLoading = false,
+            mode = ReaderMode.Split,
+            isFigureDrawerOpen = true,
+            pdf = runBlocking { PdfViewState(path = path, pages = pdf.pageSizes(path)) },
+        )
+        render("desktop-reader-figures.png") {
+            QuireTheme(darkTheme = true, desktop = true) {
+                Surface {
+                    ReaderScreen(state, {}, { index, width -> pdf.render(path, index, width) }, { null })
+                }
+            }
+        }
+    }
+
+    @Test
+    fun readerWithCitationHoverCard() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        val citation = CitationDetail(
+            key = "hafting2005",
+            title = "Microstructure of a spatial map in the entorhinal cortex",
+            authors = "Hafting, T., Fyhn, M., Molden, S., Moser, M. B., & Moser, E. I.",
+            year = "2005",
+            venue = "Nature, 436(7052), 801-806",
+            abstract = "Topographical maps of the external world are found throughout the primary sensory and motor areas of the cortex. Grid cells in the medial entorhinal cortex are part of a universal spatial metric system.",
+        )
+        val state = ReaderState(
+            referenceId = "3",
+            title = "The hippocampus as a spatial map",
+            isLoading = false,
+            mode = ReaderMode.Text,
+            activeCitation = citation,
+        )
+        render("desktop-reader-citation-card.png") {
+            QuireTheme(darkTheme = true, desktop = true) {
+                Surface {
+                    ReaderScreen(state, {}, { _, _ -> null }, { null })
+                }
+            }
+        }
+    }
+
+    @Test
+    fun citationNetworkGraphDialog() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        val vm = LibraryViewModel(SampleLibraryRepository(), SampleReaderRepository(), object : ExchangeRepository {}, object : AttachmentRepository {}, object : SearchRepository {})
+        val state = runBlocking { vm.state.first { !it.isLoading } }
+        val refs = runBlocking { SampleLibraryRepository().references(LibraryQuery()).first() }
+        render("desktop-citation-graph.png") {
+            QuireTheme(appTheme = AppTheme.Obsidian, desktop = true) {
+                Surface {
+                    Box(Modifier.fillMaxSize()) {
+                        LibraryScreen(state, onEvent = {})
+                        CitationGraphDialog(
+                            isOpen = true,
+                            onDismissRequest = {},
+                            references = refs,
+                            onOpenPaper = { _, _ -> },
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun notesWithWikilinks() {
+        val notes = listOf(
+            Note("n1", "Key finding: grid cells directly connect to [[hafting2005]] and support spatial orientation according to [[moser2008]].", "Today"),
+            Note("n2", "Compare with hippocampal place fields described in [[okeefe1971]].", "Yesterday"),
+        )
+        render("desktop-notes-wikilinks.png", width = 360, height = 600) {
+            QuireTheme(appTheme = AppTheme.Obsidian, desktop = true) {
+                Surface {
+                    NotesPanel(
+                        notes = notes,
+                        draft = "Follow up on [[hafting2005]] methodology",
+                        onDraftChange = {},
+                        onAdd = {},
+                        onRemove = {},
+                        onCollapse = {},
+                        onWikilinkClick = {},
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun itemPaneWithBacklinks() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        val vm = LibraryViewModel(SampleLibraryRepository(), SampleReaderRepository(), object : ExchangeRepository {}, object : AttachmentRepository {}, object : SearchRepository {})
+        vm.onEvent(LibraryEvent.OnReferenceClick("1"))
+        val state = runBlocking { vm.state.first { it.selected != null } }
+        render("desktop-item-backlinks.png", width = 380, height = 900) {
+            QuireTheme(appTheme = AppTheme.Obsidian, desktop = true) {
+                Surface {
+                    ItemPane(
+                        reference = state.selected,
+                        itemCount = state.references.size,
+                        collapsed = emptySet(),
+                        onSectionToggle = {},
+                        editing = null,
+                        tagDraft = "",
+                        noteDraft = "",
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+        }
+    }
+
     @Composable
     private fun Library(state: LibraryState, dark: Boolean) {
         QuireTheme(appTheme = if (dark) AppTheme.Obsidian else AppTheme.PaperLight, desktop = true) { Surface { LibraryScreen(state, onEvent = {}) } }
@@ -381,5 +591,22 @@ class DesktopScreenshots {
         }
         val file = File("build/screenshots/$name").apply { parentFile.mkdirs(); writeBytes(png) }
         assertTrue(file.length() > 0)
+
+        findRepoAssetsGui()?.let { dir ->
+            val assetFile = File(dir, name).apply { parentFile.mkdirs(); writeBytes(png) }
+            assertTrue(assetFile.length() > 0)
+        }
+    }
+
+    private fun findRepoAssetsGui(): File? {
+        var cur: File? = File(".").canonicalFile
+        while (cur != null) {
+            val candidate = File(cur, "assets")
+            if (candidate.exists() && candidate.isDirectory) {
+                return File(candidate, "gui").apply { mkdirs() }
+            }
+            cur = cur.parentFile
+        }
+        return null
     }
 }
