@@ -1,7 +1,7 @@
 package dev.neurokitchen.quire.presentation.screens.reader.components
 
+import dev.neurokitchen.quire.resources.reader_note
 import androidx.compose.ui.draw.shadow
-import dev.neurokitchen.quire.resources.reader_notebook_notes
 import dev.neurokitchen.quire.resources.reader_notebook_highlights
 import dev.neurokitchen.quire.resources.reader_page_n
 import dev.neurokitchen.quire.resources.reader_figures_tables
@@ -247,7 +247,8 @@ fun MobileReaderView(
                 isPdf = isPdf,
                 position = position,
                 total = if (isPdf) state.pdf.pages.size else total,
-                annotations = state.highlights.size + state.notes.size,
+                highlights = state.highlights.size,
+                notes = state.notes.size,
                 haze = haze,
                 onJump = { jump = it },
                 onFigures = { onEvent(ReaderEvent.OnToggleFigureDrawer) },
@@ -264,10 +265,17 @@ fun MobileReaderView(
         }
 
         if (isDisplayOpen && !isPdf) DisplaySheet(state, onEvent, onDismiss = { isDisplayOpen = false })
-        // Notes: the paper's highlights and notes, in one sheet (Kindle's notebook).
         if (!state.isNotesCollapsed) {
             PanelSheet(onDismiss = { onEvent(ReaderEvent.OnToggleNotes) }) {
-                Notebook(state, isPdf, onEvent)
+                NotesPanel(
+                    notes = state.notes,
+                    draft = state.noteDraft,
+                    onDraftChange = { onEvent(ReaderEvent.OnNoteDraftChange(it)) },
+                    onAdd = { onEvent(ReaderEvent.OnNoteAdd) },
+                    onRemove = { onEvent(ReaderEvent.OnNoteRemove(it)) },
+                    onCollapse = { onEvent(ReaderEvent.OnToggleNotes) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
         if (state.isFigureDrawerOpen) {
@@ -284,6 +292,10 @@ fun MobileReaderView(
                         onEvent(ReaderEvent.OnToggleFigureDrawer)
                     },
                     pinLabel = stringResource(Res.string.reader_view_figure),
+                    // What was marked in the paper, beside its figures and tables.
+                    extraTab = DrawerExtraTab(stringResource(Res.string.reader_notebook_highlights, state.highlights.size)) {
+                        Highlights(state, isPdf, onEvent)
+                    },
                     showDockToggle = false,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -311,7 +323,7 @@ fun MobileReaderView(
 private val ReaderTopBarHeight = 56.dp
 
 /** The bottom controls' height (slider and toolbar), without the system navigation bar. */
-private val ReaderBottomHeight = 112.dp
+private val ReaderBottomHeight = 120.dp
 
 @Composable
 private fun Frosted(haze: HazeState, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
@@ -404,16 +416,18 @@ private fun FindBar(state: ReaderState, onEvent: (ReaderEvent) -> Unit, haze: Ha
 }
 
 /**
- * Bottom controls: where you are (page n of N, or % for text) with a slider to move there (and,
- * while dragging, a preview of that page), and a frosted toolbar: the PDF / Read mode toggle at the
- * start, Figures & tables in the middle, Notes (highlights and notes) at the end.
+ * Bottom controls, docked to the screen's bottom edge (Material 3 Expressive's docked toolbar),
+ * frosted: where you are (page n of N, or % for text) with a slider to move there (and, while
+ * dragging, a preview of that page); then the PDF / Read mode toggle, Figures, tables and
+ * highlights in the middle, and Note.
  */
 @Composable
 private fun BottomControls(
     isPdf: Boolean,
     position: Int,
     total: Int,
-    annotations: Int,
+    highlights: Int,
+    notes: Int,
     haze: HazeState,
     onJump: (Int) -> Unit,
     onFigures: () -> Unit,
@@ -428,55 +442,47 @@ private fun BottomControls(
     if (!dragging) value = position.coerceIn(1, last).toFloat()
     // 0% at the start, 100% on the last page or block.
     val percent = if (last <= 1) 100 else (((value - 1f) / (last - 1f)) * 100).roundToInt()
-    Column(
-        Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = Dimens.SpaceMd, vertical = Dimens.SpaceXs),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
-    ) {
-        if (dragging && preview != null) preview(value.roundToInt() - 1)
-        Frosted(haze, Modifier.fillMaxWidth().clip(RoundedCornerShape(Dimens.RadiusLarge))) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = Dimens.SpaceMd), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    if (isPdf) stringResource(Res.string.reader_page_n_of, value.roundToInt(), last) else stringResource(Res.string.reader_percent_read, percent),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = colors.fillSecondary,
-                    modifier = Modifier.widthIn(min = 92.dp),
-                )
-                if (last > 1) {
-                    Slider(
-                        value = value,
-                        onValueChange = {
-                            dragging = true
-                            value = it
-                        },
-                        onValueChangeFinished = {
-                            dragging = false
-                            onJump(value.roundToInt() - 1)
-                        },
-                        valueRange = 1f..last.toFloat(),
-                        colors = SliderDefaults.colors(thumbColor = colors.accent, activeTrackColor = colors.accent, inactiveTrackColor = colors.fillTertiary),
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        if (dragging && preview != null) {
+            Box(Modifier.padding(bottom = Dimens.SpaceSm)) { preview(value.roundToInt() - 1) }
         }
-        Frosted(
-            haze,
-            Modifier
-                .fillMaxWidth()
-                .clip(CircleShape)
-                .border(1.dp, colors.paneDivider.copy(alpha = 0.4f), CircleShape),
-        ) {
-            // Three fixed places, so Figures stays centred however wide the toggle is.
-            Box(Modifier.fillMaxWidth().padding(horizontal = Dimens.SpaceXs, vertical = Dimens.SpaceMin)) {
-                if (onToggleMode != null) {
-                    Box(Modifier.align(Alignment.CenterStart)) { ModeToggle(isPdf, onToggleMode) }
+        Frosted(haze, Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = Dimens.SpaceMd, vertical = Dimens.SpaceXs)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        if (isPdf) stringResource(Res.string.reader_page_n_of, value.roundToInt(), last) else stringResource(Res.string.reader_percent_read, percent),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = colors.fillSecondary,
+                        modifier = Modifier.widthIn(min = 92.dp),
+                    )
+                    if (last > 1) {
+                        Slider(
+                            value = value,
+                            onValueChange = {
+                                dragging = true
+                                value = it
+                            },
+                            onValueChangeFinished = {
+                                dragging = false
+                                onJump(value.roundToInt() - 1)
+                            },
+                            valueRange = 1f..last.toFloat(),
+                            colors = SliderDefaults.colors(thumbColor = colors.accent, activeTrackColor = colors.accent, inactiveTrackColor = colors.fillTertiary),
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
-                Box(Modifier.align(Alignment.Center)) {
-                    ToolbarAction(Res.drawable.ic_inventory_2, stringResource(Res.string.reader_figures_tables), null, onFigures)
-                }
-                Box(Modifier.align(Alignment.CenterEnd)) {
-                    ToolbarAction(Res.drawable.ic_sticky_note_2, stringResource(Res.string.reader_notes), annotations, onNotes)
+                // Three fixed places, so the middle action stays centred however wide the pills are.
+                Box(Modifier.fillMaxWidth().padding(vertical = Dimens.SpaceMin)) {
+                    if (onToggleMode != null) {
+                        Box(Modifier.align(Alignment.CenterStart)) { ModeToggle(isPdf, onToggleMode) }
+                    }
+                    Box(Modifier.align(Alignment.Center)) {
+                        ToolbarAction(Res.drawable.ic_inventory_2, stringResource(Res.string.reader_figures_tables), highlights, onFigures)
+                    }
+                    Box(Modifier.align(Alignment.CenterEnd)) {
+                        VibrantPill(Res.drawable.ic_sticky_note_2, stringResource(Res.string.reader_note), notes, onNotes)
+                    }
                 }
             }
         }
@@ -521,41 +527,23 @@ private fun PagePreview(
     }
 }
 
-/** Notes: tabs for the paper's highlights and its notes. */
+/** The paper's highlights (a tab of the Figures sheet): each passage in full; a tap goes to it. */
 @Composable
-private fun Notebook(state: ReaderState, isPdf: Boolean, onEvent: (ReaderEvent) -> Unit) {
-    var tab by remember { mutableIntStateOf(if (state.highlights.isEmpty() && state.notes.isNotEmpty()) 1 else 0) }
-    Column(Modifier.fillMaxSize()) {
-        androidx.compose.material3.PrimaryTabRow(selectedTabIndex = tab, containerColor = Color.Transparent) {
-            androidx.compose.material3.Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(stringResource(Res.string.reader_notebook_highlights, state.highlights.size)) })
-            androidx.compose.material3.Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(stringResource(Res.string.reader_notebook_notes, state.notes.size)) })
-        }
-        if (tab == 0) {
-            val located = state.pdf.locations.map { it.highlightId }.toSet()
-            AnnotationsSidebar(
-                highlights = state.highlights,
-                focused = state.focusedHighlight,
-                missing = if (isPdf) state.highlights.map { it.id }.filterNot { it in located }.toSet() else emptySet(),
-                onClick = {
-                    onEvent(ReaderEvent.OnHighlightClick(it))
-                    onEvent(ReaderEvent.OnToggleNotes)
-                },
-                onComment = { id, text -> onEvent(ReaderEvent.OnHighlightComment(id, text)) },
-                onRemove = { onEvent(ReaderEvent.OnHighlightRemove(it)) },
-                modifier = Modifier.fillMaxWidth(),
-                showTitle = false,
-            )
-        } else {
-            NotesPanel(
-                notes = state.notes,
-                draft = state.noteDraft,
-                onDraftChange = { onEvent(ReaderEvent.OnNoteDraftChange(it)) },
-                onAdd = { onEvent(ReaderEvent.OnNoteAdd) },
-                onRemove = { onEvent(ReaderEvent.OnNoteRemove(it)) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-    }
+private fun Highlights(state: ReaderState, isPdf: Boolean, onEvent: (ReaderEvent) -> Unit) {
+    val located = state.pdf.locations.map { it.highlightId }.toSet()
+    AnnotationsSidebar(
+        highlights = state.highlights,
+        focused = state.focusedHighlight,
+        missing = if (isPdf) state.highlights.map { it.id }.filterNot { it in located }.toSet() else emptySet(),
+        onClick = {
+            onEvent(ReaderEvent.OnHighlightClick(it))
+            onEvent(ReaderEvent.OnToggleFigureDrawer)
+        },
+        onComment = { id, text -> onEvent(ReaderEvent.OnHighlightComment(id, text)) },
+        onRemove = { onEvent(ReaderEvent.OnHighlightRemove(it)) },
+        modifier = Modifier.fillMaxWidth(),
+        showTitle = false,
+    )
 }
 
 /** A toolbar action: icon, a count badge if any, the label for TalkBack. */
@@ -585,9 +573,17 @@ private fun ToolbarAction(icon: org.jetbrains.compose.resources.DrawableResource
  * text), so what a tap does is plain.
  */
 @Composable
-private fun ModeToggle(isPdf: Boolean, onClick: () -> Unit) {
+private fun ModeToggle(isPdf: Boolean, onClick: () -> Unit) = VibrantPill(
+    icon = if (isPdf) Res.drawable.ic_subject else Res.drawable.ic_picture_as_pdf,
+    label = stringResource(if (isPdf) Res.string.reader_to_text else Res.string.reader_to_pdf),
+    count = null,
+    onClick = onClick,
+)
+
+/** A toolbar's main action, vibrant (Material 3 Expressive): the accent, an icon and a word. */
+@Composable
+private fun VibrantPill(icon: org.jetbrains.compose.resources.DrawableResource, label: String, count: Int?, onClick: () -> Unit) {
     val colors = QuireTheme.colors
-    val label = stringResource(if (isPdf) Res.string.reader_to_text else Res.string.reader_to_pdf)
     Row(
         Modifier
             .heightIn(min = 48.dp)
@@ -598,13 +594,16 @@ private fun ModeToggle(isPdf: Boolean, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
     ) {
-        Icon(
-            painterResource(if (isPdf) Res.drawable.ic_subject else Res.drawable.ic_picture_as_pdf),
-            contentDescription = null,
-            tint = colors.onAccent,
-            modifier = Modifier.size(20.dp),
-        )
+        Icon(painterResource(icon), contentDescription = null, tint = colors.onAccent, modifier = Modifier.size(20.dp))
         Text(label, style = MaterialTheme.typography.labelLarge, color = colors.onAccent)
+        if (count != null && count > 0) {
+            Text(
+                count.toString(),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.accent,
+                modifier = Modifier.clip(CircleShape).background(colors.onAccent).padding(horizontal = 6.dp),
+            )
+        }
     }
 }
 

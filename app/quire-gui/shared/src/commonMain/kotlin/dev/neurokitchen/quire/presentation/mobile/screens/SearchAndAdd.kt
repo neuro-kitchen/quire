@@ -75,12 +75,15 @@ fun AddScreen(
     /** What was shared with Quire: identifiers (one per line) or PDF files. */
     identifiers: String = "",
     pdfs: List<String> = emptyList(),
+    /** The tab to open on (the Add menu's choice). */
+    way: AddTab? = null,
     viewModel: LibraryViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         viewModel.onEvent(LibraryEvent.OnShowAddDialog(true))
         projectPath?.let { viewModel.onEvent(LibraryEvent.OnAddProjectSelect(it)) }
+        way?.let { viewModel.onEvent(LibraryEvent.OnAddTabSelect(it)) }
         if (pdfs.isNotEmpty()) {
             viewModel.onEvent(LibraryEvent.OnAddTabSelect(AddTab.Pdf))
             viewModel.onEvent(LibraryEvent.OnAddPdfsPicked(pdfs))
