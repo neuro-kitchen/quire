@@ -60,8 +60,14 @@ quire config set export.typst.omit abstract,file,note
 quire config set export.journal.format bibtex
 quire config set export.journal.ascii true           # é → {\'e}
 quire config set export.journal.months macro       # month = jul, not 7
+quire config set export.journal.encoding windows-1252  # for inputenc's cp1252
 quire export --profile typst -o refs.bib
 ```
+
+A file is written in UTF-8 unless the profile's `encoding` says `utf-8-bom` (UTF-8 starting with
+a byte-order mark, which some Windows tools look for) or `windows-1252` (`.bib` files only: a
+character the code page lacks is written as its LaTeX command, and an export with one that has
+no command is refused rather than written with it lost).
 
 See [Settings](../reference/config.md) for every key. To check that a document's citations are
 all in its bibliography, see [`quire folder check`](writing.md#checking-a-manuscript-quire-folder-check).

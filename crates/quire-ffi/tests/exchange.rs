@@ -4,12 +4,44 @@ mod common;
 use common::fixture;
 
 use quire_ffi::{
-    ExportSelection, export_formats, list_libraries, register_library, rename_library, set_default_library,
+    ExportOptionsRecord, ExportSelection, export_encodings, export_formats, list_libraries, register_library, rename_library, set_default_library,
     unregister_library,
 };
 
 fn whole(format: &str) -> ExportSelection {
-    ExportSelection { project: None, recursive: true, profile: None, format: Some(format.into()) }
+    ExportSelection {
+        project: None,
+        recursive: true,
+        references: vec![],
+        profile: None,
+        options: None,
+        format: Some(format.into()),
+    }
+}
+
+/// The app's export dialog: chosen references, options given directly, a file in its encoding.
+#[tokio::test]
+async fn a_selection_with_options_to_a_file() {
+    let f = fixture().await;
+    assert_eq!(export_encodings(), ["utf-8", "utf-8-bom", "windows-1252"]);
+    let options = ExportOptionsRecord {
+        format: Some("bibtex".into()),
+        omit: vec!["abstract".into()],
+        ascii: false,
+        month_macros: false,
+        preprints_as_articles: false,
+        encoding: Some("utf-8-bom".into()),
+    };
+    let selection = ExportSelection { references: vec!["okeefe1971".into()], options: Some(options), ..whole("bibtex") };
+    let preview = f.library.export(selection.clone()).await.unwrap();
+    assert_eq!(preview.count, 1);
+    assert!(preview.text.starts_with("@article{okeefe1971") && !preview.text.contains("abstract"), "{}", preview.text);
+
+    let file = f.dir.path().join("one.bib");
+    let written = f.library.export_to(selection, file.display().to_string()).await.unwrap();
+    assert_eq!(written.count, 1);
+    assert!(std::fs::read(&file).unwrap().starts_with(b"\xEF\xBB\xBF@article{okeefe1971"));
+    assert!(f.library.export_profiles().await.unwrap().is_empty(), "none in this config");
 }
 
 #[tokio::test]

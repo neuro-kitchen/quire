@@ -62,7 +62,8 @@ class ToolsViewModelTest {
             written += selection to path
             return 1
         }
-        override suspend fun autoExports() = emptyList<dev.neurokitchen.quire.domain.model.AutoExport>()
+        val autos = mutableListOf<dev.neurokitchen.quire.domain.model.AutoExport>()
+        override suspend fun autoExports() = autos.toList()
     }
 
     private class FakeSync : SyncRepository {
@@ -109,17 +110,19 @@ class ToolsViewModelTest {
         assertNull(state.confirm)
     }
 
+    /** The dialog writes the file; Tools closes it, reports it, and lists the file if it is kept updated. */
     @Test
-    fun theExportUsesTheForm() = runTest {
+    fun theExportDialogOpensAndItsSaveIsReported() = runTest {
         val vm = viewModel()
         vm.onEvent(ToolsEvent.OnSectionSelect(ToolsSection.Export))
-        assertEquals(4, vm.state.first { it.formats.isNotEmpty() }.formats.size)
-        vm.onEvent(ToolsEvent.OnExportChange(ExportForm(projectPath = "thesis", recursive = false, format = "csl-json")))
-        vm.onEvent(ToolsEvent.OnExportPreview)
-        assertEquals("@article{a}", vm.state.first { it.exportPreview != null }.exportPreview)
-        vm.onEvent(ToolsEvent.OnExportSave("/tmp/out.json"))
-        assertEquals(Notice.Done(Res.string.tools_exported, listOf(1, "/tmp/out.json")), vm.state.first { it.notice != null }.notice)
-        assertEquals(listOf(ExportSelection("thesis", false, format = "csl-json") to "/tmp/out.json"), exchange.written)
+        vm.onEvent(ToolsEvent.OnShowExport(true))
+        assertTrue(vm.state.first { it.isExportOpen }.isExportOpen)
+        exchange.autos += dev.neurokitchen.quire.domain.model.AutoExport("/tmp/refs.bib", null, true, null, null, "2026-10-21")
+        val done = Notice.Done(Res.string.tools_exported, listOf(3, "/tmp/refs.bib"))
+        vm.onEvent(ToolsEvent.OnExportDone(done))
+        val state = vm.state.first { !it.isExportOpen && it.autoExports.isNotEmpty() }
+        assertEquals(done, state.notice)
+        assertEquals(listOf("/tmp/refs.bib"), state.autoExports.map { it.path })
     }
 
     @Test

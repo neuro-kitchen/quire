@@ -69,6 +69,11 @@ pub const KEYS: &[KeySpec] = &[
         ValueKind::Choice(&["online", "article"]),
         "export profile: preprints as @online (Biber) or @article (Typst)",
     ),
+    key(
+        "export.*.encoding",
+        ValueKind::Choice(&["utf-8", "utf-8-bom", "windows-1252"]),
+        "export profile: the file's encoding (windows-1252: .bib, other characters as LaTeX)",
+    ),
     key("reader.width", ValueKind::Number(40, 120), "reader mode: text column width"),
     key("reader.justify", ValueKind::Bool, "reader mode: justified text"),
     key("reader.spacing", ValueKind::Choice(&["1", "2"]), "reader mode: line spacing"),

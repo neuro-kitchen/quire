@@ -13,7 +13,10 @@ import dev.neurokitchen.quire.data.engine.EngineSettingsRepository
 import dev.neurokitchen.quire.data.engine.EngineSyncRepository
 import dev.neurokitchen.quire.ffi.openLibraryAt
 import dev.neurokitchen.quire.presentation.components.notice.Notice
-import dev.neurokitchen.quire.presentation.screens.tools.ExportForm
+import dev.neurokitchen.quire.presentation.components.export_dialog.ENCODING_WINDOWS_1252
+import dev.neurokitchen.quire.presentation.components.export_dialog.ExportDialogEvent
+import dev.neurokitchen.quire.presentation.components.export_dialog.ExportDialogViewModel
+import dev.neurokitchen.quire.presentation.components.export_dialog.ExportTarget
 import dev.neurokitchen.quire.presentation.screens.tools.ToolsConfirm
 import dev.neurokitchen.quire.presentation.screens.tools.ToolsEvent
 import dev.neurokitchen.quire.presentation.screens.tools.ToolsSection
@@ -67,14 +70,16 @@ class ToolsViewModelEngineTest {
             assertEquals(emptyList(), merged.duplicates)
             vm.onEvent(ToolsEvent.OnDismissNotice)
 
-            vm.onEvent(ToolsEvent.OnSectionSelect(ToolsSection.Export))
-            vm.state.first { it.formats.isNotEmpty() }
-            vm.onEvent(ToolsEvent.OnExportChange(ExportForm(format = "bibtex")))
+            // The export dialog on the engine: BibTeX in Windows-1252.
+            val export = ExportDialogViewModel(ExportTarget(), exchange)
+            export.onEvent(ExportDialogEvent.OnFormat("bibtex"))
+            export.onEvent(ExportDialogEvent.OnEncoding(ENCODING_WINDOWS_1252))
+            assertEquals(1, export.state.first { it.preview?.startsWith("@article") == true && !it.isWorking }.count, "one reference after the merge")
             val out = dir.resolve("out.bib")
-            vm.onEvent(ToolsEvent.OnExportSave(out.toString()))
-            assertTrue(vm.state.first { it.notice != null }.notice is Notice.Done)
-            assertEquals(1, Regex("@article\\{").findAll(Files.readString(out)).count(), "one reference after the merge")
-            vm.onEvent(ToolsEvent.OnDismissNotice)
+            export.onEvent(ExportDialogEvent.OnSave(out.toString(), keepUpdated = false))
+            assertTrue(export.state.first { it.done != null }.done is Notice.Done)
+            assertEquals(1, Regex("@article\\{").findAll(Files.readString(out, Charsets.ISO_8859_1)).count())
+            export.viewModelScope.coroutineContext.job.cancelAndJoin()
 
             vm.onEvent(ToolsEvent.OnSectionSelect(ToolsSection.Sync))
             // A device ID the engine accepts (it checks the form): this device's own.

@@ -1,5 +1,7 @@
 package dev.neurokitchen.quire.presentation.designsystem.components
 
+import dev.neurokitchen.quire.resources.common_clear
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -57,7 +59,7 @@ fun CompactTextField(
                     .height(Dimens.ToolbarButton)
                     .background(colors.background, RoundedCornerShape(Dimens.RadiusLarge))
                     .border(1.dp, colors.border, RoundedCornerShape(Dimens.RadiusLarge))
-                    .padding(horizontal = 8.dp),
+                    .padding(horizontal = Dimens.SpaceXs),
             ) {
                 if (leadingIcon != null) {
                     Icon(painterResource(leadingIcon), null, tint = colors.fillSecondary, modifier = Modifier.size(Dimens.Icon))
@@ -70,7 +72,7 @@ fun CompactTextField(
                 if (value.isNotEmpty() && onClear != null) {
                     Icon(
                         painterResource(Res.drawable.ic_close),
-                        contentDescription = "Clear",
+                        contentDescription = stringResource(Res.string.common_clear),
                         tint = colors.fillSecondary,
                         modifier = Modifier
                             .size(14.dp)

@@ -102,7 +102,7 @@ fun ActivityRail(
                 .padding(bottom = 6.dp)
                 .clip(RoundedCornerShape(Dimens.RadiusSmall))
                 .background(colors.fillQuarternary.copy(alpha = 0.5f))
-                .padding(horizontal = 4.dp, vertical = 4.dp),
+                .padding(horizontal = Dimens.SpaceMin, vertical = Dimens.SpaceMin),
         ) {
             val readCount = state.references.count { it.reading == dev.neurokitchen.quire.domain.model.ReadingStatus.Read }
             val activeDays = minOf(7, (readCount % 7) + 2)
@@ -150,7 +150,7 @@ private fun RailButton(
             .clip(RoundedCornerShape(Dimens.RadiusMedium))
             .background(if (isSelected) colors.accent.copy(alpha = 0.15f) else androidx.compose.ui.graphics.Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(4.dp),
+            .padding(Dimens.SpaceMin),
     ) {
         Icon(
             painterResource(icon),

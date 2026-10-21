@@ -4,6 +4,7 @@ import dev.neurokitchen.quire.domain.model.Highlight
 import dev.neurokitchen.quire.domain.model.Note
 import dev.neurokitchen.quire.domain.model.PageImage
 import dev.neurokitchen.quire.domain.model.PageSize
+import dev.neurokitchen.quire.domain.model.PdfFigure
 import dev.neurokitchen.quire.domain.model.PdfMatch
 import dev.neurokitchen.quire.domain.model.Paper
 import dev.neurokitchen.quire.domain.model.QuoteLocation
@@ -54,4 +55,7 @@ interface PdfRepository {
     suspend fun pageText(path: String, page: Int): String? = null
     /** Every place `query` appears, in page order, at most [limit] (the last word as typed so far). */
     suspend fun search(path: String, query: String, limit: Int = 500): List<PdfMatch> = emptyList()
+
+    /** The PDF's figures, found from their captions (papers read from their PDF have no images). */
+    suspend fun figures(path: String): List<PdfFigure> = emptyList()
 }

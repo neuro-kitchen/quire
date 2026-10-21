@@ -8,6 +8,7 @@
 //! - [`import`]: `.bib` text → cite keys + [`ReferenceData`](quire_model::ReferenceData).
 
 mod ascii;
+pub(crate) use ascii::to_latex;
 mod export;
 mod fields;
 mod import;

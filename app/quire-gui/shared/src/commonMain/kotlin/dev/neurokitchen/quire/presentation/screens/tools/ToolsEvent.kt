@@ -1,5 +1,7 @@
 package dev.neurokitchen.quire.presentation.screens.tools
 
+import dev.neurokitchen.quire.presentation.components.notice.Notice
+
 sealed interface ToolsEvent {
     data class OnSectionSelect(val section: ToolsSection) : ToolsEvent
     data object OnDismissNotice : ToolsEvent
@@ -14,12 +16,9 @@ sealed interface ToolsEvent {
     /** Online (Crossref): retraction and correction notices of references with a DOI. */
     data object OnCheckRetractions : ToolsEvent
 
-    data class OnExportChange(val form: ExportForm) : ToolsEvent
-    data object OnExportPreview : ToolsEvent
-    /** Writes the export to `path` once. */
-    data class OnExportSave(val path: String) : ToolsEvent
-    /** Writes the export to `path` now and after every change. */
-    data class OnKeepUpdated(val path: String) : ToolsEvent
+    data class OnShowExport(val open: Boolean) : ToolsEvent
+    /** The export dialog saved: closes it and reports what it did. */
+    data class OnExportDone(val notice: Notice) : ToolsEvent
     data class OnStopAutoExport(val path: String) : ToolsEvent
     data object OnRunAutoExports : ToolsEvent
 

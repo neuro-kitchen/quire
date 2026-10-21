@@ -1,5 +1,16 @@
 package dev.neurokitchen.quire.presentation.desktop.components
 
+import dev.neurokitchen.quire.resources.appbar_sync_library
+import dev.neurokitchen.quire.resources.appbar_search_or_jump_to
+import dev.neurokitchen.quire.resources.appbar_preferences
+import dev.neurokitchen.quire.resources.appbar_keyboard_shortcuts
+import dev.neurokitchen.quire.resources.appbar_graph
+import dev.neurokitchen.quire.resources.appbar_command_palette_2
+import dev.neurokitchen.quire.resources.appbar_command_palette
+import dev.neurokitchen.quire.resources.appbar_citation_network_graph
+import dev.neurokitchen.quire.resources.appbar_citation_graph
+import dev.neurokitchen.quire.resources.appbar_application_theme
+import dev.neurokitchen.quire.resources.appbar_application_menu
 import dev.neurokitchen.quire.resources.ic_inventory_2
 import dev.neurokitchen.quire.resources.tools_menu
 import androidx.compose.foundation.background
@@ -82,7 +93,7 @@ fun TabBar(
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceMin),
         modifier = modifier
             .fillMaxWidth()
             .height(Dimens.TabBarHeight)
@@ -101,7 +112,7 @@ fun TabBar(
             ) {
                 Icon(
                     painterResource(Res.drawable.ic_menu),
-                    contentDescription = "Application Menu",
+                    contentDescription = stringResource(Res.string.appbar_application_menu),
                     tint = colors.fillPrimary,
                     modifier = Modifier.size(16.dp),
                 )
@@ -120,8 +131,8 @@ fun TabBar(
                     text = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(painterResource(Res.drawable.ic_search), contentDescription = null, tint = colors.fillSecondary, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Command Palette...", style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
+                            Spacer(Modifier.width(Dimens.SpaceXs))
+                            Text(stringResource(Res.string.appbar_command_palette), style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
                             Spacer(Modifier.weight(1f))
                             Text("Ctrl+K", style = MaterialTheme.typography.labelSmall, color = colors.fillTertiary)
                         }
@@ -137,8 +148,8 @@ fun TabBar(
                     text = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(painterResource(Res.drawable.ic_settings), contentDescription = null, tint = colors.fillSecondary, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Preferences...", style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
+                            Spacer(Modifier.width(Dimens.SpaceXs))
+                            Text(stringResource(Res.string.appbar_preferences), style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
                             Spacer(Modifier.weight(1f))
                             Text("Ctrl+,", style = MaterialTheme.typography.labelSmall, color = colors.fillTertiary)
                         }
@@ -154,7 +165,7 @@ fun TabBar(
                     text = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(painterResource(Res.drawable.ic_inventory_2), contentDescription = null, tint = colors.fillSecondary, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(Dimens.SpaceXs))
                             Text(stringResource(Res.string.tools_menu), style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
                         }
                     },
@@ -169,8 +180,8 @@ fun TabBar(
                     text = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(painterResource(Res.drawable.ic_link), contentDescription = null, tint = colors.fillSecondary, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Citation Network Graph...", style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
+                            Spacer(Modifier.width(Dimens.SpaceXs))
+                            Text(stringResource(Res.string.appbar_citation_network_graph), style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
                             Spacer(Modifier.weight(1f))
                             Text("Ctrl+G", style = MaterialTheme.typography.labelSmall, color = colors.fillTertiary)
                         }
@@ -181,14 +192,14 @@ fun TabBar(
                     },
                 )
 
-                HorizontalDivider(color = colors.fillQuarternary, modifier = Modifier.padding(vertical = 4.dp))
+                HorizontalDivider(color = colors.fillQuarternary, modifier = Modifier.padding(vertical = Dimens.SpaceMin))
 
                 // Theme Sub-section
                 Text(
-                    text = "APPLICATION THEME",
+                    text = stringResource(Res.string.appbar_application_theme),
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
                     color = colors.fillTertiary,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                    modifier = Modifier.padding(horizontal = Dimens.SpaceSm, vertical = Dimens.SpaceMin),
                 )
 
                 AppTheme.entries.forEach { theme ->
@@ -202,7 +213,7 @@ fun TabBar(
                                         .clip(CircleShape)
                                         .background(dev.neurokitchen.quire.presentation.designsystem.quireColors(theme).accent),
                                 )
-                                Spacer(Modifier.width(8.dp))
+                                Spacer(Modifier.width(Dimens.SpaceXs))
                                 Text(
                                     text = theme.title,
                                     style = MaterialTheme.typography.bodyMedium.copy(
@@ -223,13 +234,13 @@ fun TabBar(
                     )
                 }
 
-                HorizontalDivider(color = colors.fillQuarternary, modifier = Modifier.padding(vertical = 4.dp))
+                HorizontalDivider(color = colors.fillQuarternary, modifier = Modifier.padding(vertical = Dimens.SpaceMin))
 
                 // Shortcuts Reference
                 DropdownMenuItem(
                     text = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Keyboard Shortcuts...", style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
+                            Text(stringResource(Res.string.appbar_keyboard_shortcuts), style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
                             Spacer(Modifier.weight(1f))
                             Text("Ctrl+/", style = MaterialTheme.typography.labelSmall, color = colors.fillTertiary)
                         }
@@ -245,8 +256,8 @@ fun TabBar(
                     text = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(painterResource(Res.drawable.ic_sync), contentDescription = null, tint = colors.fillSecondary, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Sync Library", style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
+                            Spacer(Modifier.width(Dimens.SpaceXs))
+                            Text(stringResource(Res.string.appbar_sync_library), style = MaterialTheme.typography.bodyMedium, color = colors.fillPrimary)
                             Spacer(Modifier.weight(1f))
                             Text("Ctrl+R", style = MaterialTheme.typography.labelSmall, color = colors.fillTertiary)
                         }
@@ -305,26 +316,26 @@ fun TabBar(
                 .clip(RoundedCornerShape(Dimens.RadiusSmall))
                 .background(colors.fillQuarternary.copy(alpha = 0.5f))
                 .clickable(onClick = onCommandPaletteClick)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
+                .padding(horizontal = Dimens.SpaceXs, vertical = Dimens.SpaceMin),
         ) {
             Icon(
                 painterResource(Res.drawable.ic_search),
-                contentDescription = "Command Palette",
+                contentDescription = stringResource(Res.string.appbar_command_palette_2),
                 tint = colors.fillSecondary,
                 modifier = Modifier.size(13.dp),
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                "Search or jump to...",
+                stringResource(Res.string.appbar_search_or_jump_to),
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                 color = colors.fillTertiary,
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Dimens.SpaceXs))
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(3.dp))
                     .background(colors.fillQuarternary)
-                    .padding(horizontal = 4.dp, vertical = 1.dp),
+                    .padding(horizontal = Dimens.SpaceMin, vertical = 1.dp),
             ) {
                 Text(
                     "Ctrl+K",
@@ -341,17 +352,17 @@ fun TabBar(
                 .clip(RoundedCornerShape(Dimens.RadiusSmall))
                 .background(colors.fillQuarternary.copy(alpha = 0.5f))
                 .clickable(onClick = onCitationGraphClick)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
+                .padding(horizontal = Dimens.SpaceXs, vertical = Dimens.SpaceMin),
         ) {
             Icon(
                 painterResource(Res.drawable.ic_link),
-                contentDescription = "Citation Graph",
+                contentDescription = stringResource(Res.string.appbar_citation_graph),
                 tint = colors.accent,
                 modifier = Modifier.size(13.dp),
             )
             Spacer(Modifier.width(5.dp))
             Text(
-                "Graph",
+                stringResource(Res.string.appbar_graph),
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
                 color = colors.accent,
             )
@@ -378,7 +389,7 @@ private fun Tab(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxHeight()
-            .padding(vertical = 4.dp)
+            .padding(vertical = Dimens.SpaceMin)
             .widthIn(min = 120.dp, max = 240.dp)
             .clip(RoundedCornerShape(Dimens.RadiusBase))
             .background(background)
@@ -396,7 +407,7 @@ private fun Tab(
                     .clip(CircleShape)
                     .background(colors.accent)
             )
-            Spacer(Modifier.width(4.dp))
+            Spacer(Modifier.width(Dimens.SpaceMin))
         }
         Icon(
             painterResource(icon),
@@ -419,7 +430,7 @@ private fun Tab(
                 painterResource(Res.drawable.ic_close),
                 stringResource(Res.string.reader_close_tab),
                 tint = colors.fillSecondary,
-                modifier = Modifier.padding(start = 4.dp).size(14.dp).clickable(onClick = onClose),
+                modifier = Modifier.padding(start = Dimens.SpaceMin).size(14.dp).clickable(onClick = onClose),
             )
         }
     }

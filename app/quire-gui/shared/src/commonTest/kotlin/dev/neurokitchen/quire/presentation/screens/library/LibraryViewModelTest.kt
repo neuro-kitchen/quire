@@ -1,5 +1,8 @@
 package dev.neurokitchen.quire.presentation.screens.library
 
+import dev.neurokitchen.quire.domain.model.ZoteroImport
+import dev.neurokitchen.quire.domain.model.ImportedPdf
+import dev.neurokitchen.quire.domain.model.AddOutcome
 import dev.neurokitchen.quire.presentation.components.notice.Notice
 import dev.neurokitchen.quire.data.repository.SampleLibraryRepository
 import dev.neurokitchen.quire.data.repository.SampleReaderRepository
@@ -50,9 +53,18 @@ class LibraryViewModelTest {
     /** Pasted BibTeX it was given, with the project it was for. */
     private class RecordingExchange : ExchangeRepository {
         val imported = mutableListOf<Pair<String, String?>>()
+        val files = mutableListOf<Pair<String, String?>>()
         override suspend fun importBibText(text: String, projectPath: String?): Int {
             imported += text to projectPath
             return 2
+        }
+        override suspend fun importBib(path: String, projectPath: String?): Int {
+            files += "bib:$path" to projectPath
+            return 3
+        }
+        override suspend fun importZotero(dir: String, projectPath: String?): ZoteroImport {
+            files += "zotero:$dir" to projectPath
+            return ZoteroImport(added = 4, existing = 1, projects = 0, notes = 0, pdfs = 0, highlights = 0, skipped = emptyList())
         }
     }
 
@@ -66,6 +78,13 @@ class LibraryViewModelTest {
             return AttachedPdf(Reference(id = id, citeKey = id, kind = "article-journal", title = "", creators = emptyList(), year = null), isNew = true, path = path, verdict = PdfVerdict.Different)
         }
         override suspend fun browserPage(id: String) = "https://doi.org/10.1038/nature03721"
+
+        val importedPdfs = mutableListOf<Pair<String, String?>>()
+        override suspend fun importPdf(path: String, projectPath: String?): ImportedPdf {
+            importedPdfs += path to projectPath
+            val reference = Reference(id = path, citeKey = path, kind = "article-journal", title = path, creators = emptyList(), year = null)
+            return ImportedPdf(AddOutcome(isNew = true, reference = reference), AttachedPdf(reference, isNew = true, path = path, verdict = PdfVerdict.Identifier))
+        }
     }
 
     private val attachments = FakeAttachments()
@@ -167,6 +186,58 @@ class LibraryViewModelTest {
         vm.onEvent(LibraryEvent.OnAddConfirm)
         assertEquals(Notice.Done(Res.string.notice_imported, listOf(2)), vm.settled { it.notice != null }.notice)
         assertEquals(listOf<Pair<String, String?>>("@article{a, title={A}}" to "thesis"), exchange.imported)
+    }
+
+    /**
+     * The Add button's menu had a second "add by identifier" and "import PDF"; files and Zotero lived
+     * in Tools. One dialog has every way in now.
+     */
+    @Test
+    fun severalIdentifiersAtOnceTheFailedOnesStay() = runTest {
+        val base = SampleLibraryRepository()
+        val asked = mutableListOf<Pair<String, String?>>()
+        val library = object : LibraryRepository by base {
+            override suspend fun addByIdentifier(input: String, projectPath: String?): AddOutcome {
+                asked += input to projectPath
+                if (input == "10.1/bad") throw IllegalStateException("no such DOI")
+                val reference = Reference(id = input, citeKey = input, kind = "article-journal", title = input, creators = emptyList(), year = null)
+                return AddOutcome(isNew = input != "10.1/old", reference = reference)
+            }
+        }
+        val vm = viewModel(library)
+        vm.onEvent(LibraryEvent.OnShowAddDialog(true))
+        vm.onEvent(LibraryEvent.OnAddProjectSelect("thesis"))
+        vm.onEvent(LibraryEvent.OnIdentifierChange("10.1/a\n\n  10.1/bad \n10.1/old"))
+        vm.onEvent(LibraryEvent.OnAddConfirm)
+        val dialog = vm.settled { it.addDialog?.error != null }.addDialog!!
+        assertEquals<List<Pair<String, String?>>>(listOf("10.1/a", "10.1/bad", "10.1/old").map { it to "thesis" }, asked, "each line, into the project chosen")
+        assertEquals("10.1/bad", dialog.identifier, "only the failed line is left to fix")
+        assertTrue(dialog.error!!.contains("no such DOI"))
+    }
+
+    @Test
+    fun pdfFilesAndFilesAreImportedIntoTheChosenProject() = runTest {
+        val vm = viewModel()
+        vm.onEvent(LibraryEvent.OnShowAddDialog(true))
+        vm.onEvent(LibraryEvent.OnAddTabSelect(AddTab.Pdf))
+        vm.onEvent(LibraryEvent.OnAddPdfsPicked(listOf("/a.pdf", "/b.pdf", "/a.pdf")))
+        vm.onEvent(LibraryEvent.OnAddProjectSelect("thesis"))
+        assertEquals(listOf("/a.pdf", "/b.pdf"), vm.settled().addDialog!!.pdfs, "each once")
+        vm.onEvent(LibraryEvent.OnAddConfirm)
+        vm.settled { it.addDialog == null && it.notice != null }
+        assertEquals<List<Pair<String, String?>>>(listOf("/a.pdf" to "thesis", "/b.pdf" to "thesis"), attachments.importedPdfs)
+
+        vm.onEvent(LibraryEvent.OnShowAddDialog(true))
+        vm.onEvent(LibraryEvent.OnAddTabSelect(AddTab.File))
+        vm.onEvent(LibraryEvent.OnAddFilePicked("/refs.bib"))
+        vm.onEvent(LibraryEvent.OnAddConfirm)
+        assertEquals(Notice.Done(Res.string.notice_imported, listOf(3)), vm.settled { it.addDialog == null && it.notice != null }.notice)
+        vm.onEvent(LibraryEvent.OnShowAddDialog(true))
+        vm.onEvent(LibraryEvent.OnAddTabSelect(AddTab.File))
+        vm.onEvent(LibraryEvent.OnAddFilePicked("/home/me/Zotero"))
+        vm.onEvent(LibraryEvent.OnAddConfirm)
+        vm.settled { it.addDialog == null }
+        assertEquals(listOf<Pair<String, String?>>("bib:/refs.bib" to null, "zotero:/home/me/Zotero" to null), exchange.files)
     }
 
     /** The sample repository has no engine: a lookup fails, and the message stays in the dialog. */

@@ -29,5 +29,9 @@ sealed interface ReaderEvent {
     data object OnFindPrevious : ReaderEvent
     data object OnToggleFigureDrawer : ReaderEvent
     data object OnToggleSnapshotMode : ReaderEvent
+    /** New pane sizes (a splitter dragged); saved once the dragging stops. */
+    data class OnLayoutChange(val layout: dev.neurokitchen.quire.domain.repository.ReaderLayout) : ReaderEvent
+    /** Pins a figure or table beside the text or the PDF; `null` unpins it. */
+    data class OnPin(val pinned: Pinned?) : ReaderEvent
     data class OnShowCitation(val citation: dev.neurokitchen.quire.presentation.screens.reader.components.CitationDetail?) : ReaderEvent
 }

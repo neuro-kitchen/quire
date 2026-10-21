@@ -55,8 +55,9 @@ pub use curation::{
 };
 pub use discovery::{AlertCheckRecord, AlertRecord, GraphWorkRecord, SavedSearchRecord, SearchHitRecord};
 pub use exchange::{
-    AnnotationsRecord, AutoExportRecord, AutoExportRun, CiteUseRecord, ExportSelection, ExportedText, ManuscriptRecord,
-    UnknownKeyRecord, ZoteroImportRecord, export_formats,
+    AnnotationsRecord, AutoExportRecord, AutoExportRun, CiteUseRecord, ExportOptionsRecord, ExportProfileRecord,
+    ExportSelection, ExportedText, ManuscriptRecord, UnknownKeyRecord, ZoteroImportRecord, export_encodings,
+    export_formats,
 };
 pub use hub::{EvictionRecord, HubDeviceRecord, HubReportRecord, OpenedPdfRecord};
 pub use libraries::{
@@ -64,8 +65,9 @@ pub use libraries::{
     unregister_library,
 };
 pub use pdf::{
-    PageRect, PageSize, PdfWordRecord, QuoteMatch, RenderedPage, TextMatch, TextRangeRecord, pdf_find,
-    pdf_nearest_glyph, pdf_page_sizes, pdf_page_text, pdf_render_page, pdf_search, pdf_text_range, pdf_word_at,
+    FigureRegion, PageRect, PageSize, PdfWordRecord, QuoteMatch, RenderedPage, TextMatch, TextRangeRecord, pdf_figures,
+    pdf_find, pdf_nearest_glyph, pdf_page_sizes, pdf_page_text, pdf_render_page, pdf_search, pdf_text_range,
+    pdf_word_at,
 };
 pub use reader::{BlockKind, BlockRecord, HighlightRecord, NoteRecord, PaperRecord, ReaderTab, WordRecord};
 pub use records::{Creator, LibraryInfo, ProjectRecord, Query, ReferenceRecord, SortColumn, Source, TagRecord};
@@ -244,6 +246,12 @@ impl QuireLibrary {
             Ok(files.into_iter().map(|(_, path)| path.display().to_string()).collect())
         })
         .await
+    }
+
+    /// Converts again the stored reader texts an older converter made (after an update), in the
+    /// background; returns how many. Opening those papers then does not wait for it.
+    pub async fn rebuild_stale_texts(&self) -> Result<u32> {
+        self.with(|engine| async move { Ok(engine.rebuild_stale_texts().await? as u32) }).await
     }
 
     /// The local file of a figure image (`BlockKind::Image`), downloaded once.

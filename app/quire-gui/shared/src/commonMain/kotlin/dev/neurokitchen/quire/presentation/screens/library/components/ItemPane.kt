@@ -1,5 +1,16 @@
 package dev.neurokitchen.quire.presentation.screens.library.components
 
+import dev.neurokitchen.quire.resources.palette_items
+import dev.neurokitchen.quire.resources.item_quick_look
+import dev.neurokitchen.quire.resources.item_quick_actions
+import dev.neurokitchen.quire.resources.item_new_collection_project
+import dev.neurokitchen.quire.resources.item_library_overview
+import dev.neurokitchen.quire.resources.item_keyboard_shortcuts
+import dev.neurokitchen.quire.resources.item_double_click_any_paper
+import dev.neurokitchen.quire.resources.item_deep_reading_experience
+import dev.neurokitchen.quire.resources.item_backlinks_to
+import dev.neurokitchen.quire.resources.item_add_reference_doi_arxiv
+import dev.neurokitchen.quire.resources.common_link_paper
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import dev.neurokitchen.quire.presentation.designsystem.components.CompactTextField
@@ -206,7 +217,7 @@ fun ItemPane(
                     ) {
                         Icon(painterResource(Res.drawable.ic_description), null, tint = colors.fillPrimary, modifier = Modifier.size(13.dp))
                         Spacer(Modifier.width(Dimens.SpaceMin))
-                        Text("Quick Look", style = MaterialTheme.typography.labelSmall, color = colors.fillPrimary)
+                        Text(stringResource(Res.string.item_quick_look), style = MaterialTheme.typography.labelSmall, color = colors.fillPrimary)
                     }
 
                     // Reading status badge
@@ -232,7 +243,7 @@ fun ItemPane(
                             .height(30.dp)
                             .clip(RoundedCornerShape(Dimens.RadiusSmall))
                             .background(colors.fillQuarternary)
-                            .padding(horizontal = 8.dp),
+                            .padding(horizontal = Dimens.SpaceXs),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
@@ -303,9 +314,9 @@ private fun LibraryDashboard(
                 tint = colors.accent,
                 modifier = Modifier.size(20.dp),
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Dimens.SpaceXs))
             Text(
-                "Library Overview",
+                stringResource(Res.string.item_library_overview),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = colors.fillPrimary,
@@ -315,10 +326,10 @@ private fun LibraryDashboard(
                 modifier = Modifier
                     .clip(RoundedCornerShape(Dimens.RadiusFull))
                     .background(colors.accent.copy(alpha = 0.15f))
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                    .padding(horizontal = Dimens.SpaceXs, vertical = 2.dp),
             ) {
                 Text(
-                    text = "$itemCount items",
+                    text = stringResource(Res.string.palette_items, itemCount),
                     style = MaterialTheme.typography.labelSmall,
                     color = colors.accent,
                     fontWeight = FontWeight.SemiBold,
@@ -343,7 +354,7 @@ private fun LibraryDashboard(
         ) {
             Column(Modifier.padding(Dimens.SpaceSm)) {
                 Text(
-                    "Quick Actions",
+                    stringResource(Res.string.item_quick_actions),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = colors.fillPrimary,
@@ -355,11 +366,11 @@ private fun LibraryDashboard(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(Dimens.RadiusSmall))
                         .clickable(onClick = onAddReference)
-                        .padding(vertical = 6.dp, horizontal = 4.dp),
+                        .padding(vertical = 6.dp, horizontal = Dimens.SpaceMin),
                 ) {
                     Icon(painterResource(Res.drawable.ic_add), null, tint = colors.accent, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Add Reference (DOI, arXiv, BibTeX)", style = MaterialTheme.typography.bodySmall, color = colors.fillPrimary)
+                    Spacer(Modifier.width(Dimens.SpaceXs))
+                    Text(stringResource(Res.string.item_add_reference_doi_arxiv), style = MaterialTheme.typography.bodySmall, color = colors.fillPrimary)
                 }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -367,11 +378,11 @@ private fun LibraryDashboard(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(Dimens.RadiusSmall))
                         .clickable(onClick = onCreateProject)
-                        .padding(vertical = 6.dp, horizontal = 4.dp),
+                        .padding(vertical = 6.dp, horizontal = Dimens.SpaceMin),
                 ) {
                     Icon(painterResource(Res.drawable.ic_create_new_folder), null, tint = colors.accent, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("New Collection / Project", style = MaterialTheme.typography.bodySmall, color = colors.fillPrimary)
+                    Spacer(Modifier.width(Dimens.SpaceXs))
+                    Text(stringResource(Res.string.item_new_collection_project), style = MaterialTheme.typography.bodySmall, color = colors.fillPrimary)
                 }
             }
         }
@@ -384,7 +395,7 @@ private fun LibraryDashboard(
         ) {
             Column(Modifier.padding(Dimens.SpaceSm), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    "Keyboard Shortcuts",
+                    stringResource(Res.string.item_keyboard_shortcuts),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = colors.fillPrimary,
@@ -405,14 +416,14 @@ private fun LibraryDashboard(
         ) {
             Column(Modifier.padding(Dimens.SpaceSm)) {
                 Text(
-                    "Deep Reading Experience",
+                    stringResource(Res.string.item_deep_reading_experience),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = colors.fillPrimary,
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(Dimens.SpaceMin))
                 Text(
-                    "Double-click any paper to open the Reader. Supports PDF view & distraction-free text mode with 6 color themes, font selection, and floating highlight palette.",
+                    stringResource(Res.string.item_double_click_any_paper),
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.fillSecondary,
                 )
@@ -433,7 +444,7 @@ private fun ShortcutRow(shortcut: String, description: String) {
         ) {
             Text(shortcut, style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace, fontSize = 10.sp), color = colors.fillPrimary)
         }
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(Dimens.SpaceXs))
         Text(description, style = MaterialTheme.typography.bodySmall, color = colors.fillSecondary)
     }
 }
@@ -611,8 +622,8 @@ private fun SectionBody(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(painterResource(Res.drawable.ic_link), null, tint = colors.accent, modifier = Modifier.size(11.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("+ Link [[Paper]]", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.SemiBold), color = colors.accent)
+                        Spacer(Modifier.width(Dimens.SpaceMin))
+                        Text(stringResource(Res.string.common_link_paper), style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.SemiBold), color = colors.accent)
                     }
                 }
             }
@@ -622,19 +633,19 @@ private fun SectionBody(
 
             // Backlinks & Mentions Section
             if (reference.citeKey.isNotBlank()) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(Dimens.SpaceXs))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(Dimens.RadiusSmall))
                         .background(colors.fillQuarternary.copy(alpha = 0.5f))
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .padding(horizontal = Dimens.SpaceXs, vertical = Dimens.SpaceMin),
                 ) {
                     Icon(painterResource(Res.drawable.ic_link), null, tint = colors.accent, modifier = Modifier.size(13.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        "BACKLINKS TO [[@${reference.citeKey}]]",
+                        stringResource(Res.string.item_backlinks_to, reference.citeKey),
                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
                         color = colors.accent,
                     )
@@ -660,7 +671,7 @@ private fun SectionBody(
                         modifier = Modifier
                             .clip(RoundedCornerShape(Dimens.RadiusFull))
                             .background(colors.accent.copy(alpha = 0.12f))
-                            .padding(start = 8.dp),
+                            .padding(start = Dimens.SpaceXs),
                     ) {
                         Text("#$tag", style = MaterialTheme.typography.labelSmall, color = colors.accent, fontWeight = FontWeight.Medium)
                         RemoveButton { onEvent(LibraryEvent.OnTagRemove(tag)) }

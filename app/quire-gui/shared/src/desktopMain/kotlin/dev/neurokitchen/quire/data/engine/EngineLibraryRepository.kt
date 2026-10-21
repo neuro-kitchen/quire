@@ -23,6 +23,8 @@ class EngineLibraryRepository(private val session: EngineSession) : LibraryRepos
 
     override suspend fun reopen() = session.reopen()
 
+    override suspend fun rebuildStaleTexts() = withContext(Dispatchers.IO) { session.library().rebuildStaleTexts().toInt() }
+
     override suspend fun addReference(reference: Reference) =
         session.library().addManual(reference.toFields(), reference.projects.firstOrNull()).toDomain()
 

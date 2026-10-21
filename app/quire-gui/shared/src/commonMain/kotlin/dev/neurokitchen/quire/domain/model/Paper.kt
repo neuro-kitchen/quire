@@ -49,6 +49,9 @@ class PageImage(val width: Int, val height: Int, val pixels: ByteArray)
 /** A box on a page, in points from its top-left corner. */
 data class PageRect(val left: Float, val top: Float, val right: Float, val bottom: Float)
 
+/** A figure found on a PDF page from its caption: [rect] (points) is cropped from page [page]. */
+data class PdfFigure(val page: Int, val label: String, val caption: String, val rect: PageRect)
+
 /** Where a highlight's quote is in a PDF. */
 data class QuoteLocation(val highlightId: String, val page: Int, val rects: List<PageRect>)
 

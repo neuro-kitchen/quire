@@ -29,7 +29,7 @@ impl ExportStore for SqliteLibrary<'_> {
 }
 
 fn list(conn: &Connection) -> Result<Vec<AutoExport>> {
-    let sql = "SELECT path, project_id, recursive, profile, format, written_at FROM auto_export ORDER BY path";
+    let sql = "SELECT path, project_id, recursive, profile, format, options, written_at FROM auto_export ORDER BY path";
     all(conn, sql, [], |row| {
         Ok(AutoExport {
             path: row.get("path")?,
@@ -37,6 +37,7 @@ fn list(conn: &Connection) -> Result<Vec<AutoExport>> {
             recursive: row.get::<_, i64>("recursive")? != 0,
             profile: row.get("profile")?,
             format: row.get("format")?,
+            options: row.get("options")?,
             written_at: row.get::<_, Option<i64>>("written_at")?.map(Timestamp::from_millis),
         })
     })
@@ -44,14 +45,15 @@ fn list(conn: &Connection) -> Result<Vec<AutoExport>> {
 
 fn set(conn: &Connection, export: &AutoExport) -> Result<()> {
     let sql =
-        "INSERT OR REPLACE INTO auto_export (path, project_id, recursive, profile, format, created_at, written_at)
-               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)";
+        "INSERT OR REPLACE INTO auto_export (path, project_id, recursive, profile, format, options, created_at, written_at)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)";
     let values = params![
         export.path,
         export.project.map(id_blob),
         i64::from(export.recursive),
         export.profile,
         export.format,
+        export.options,
         Timestamp::now().as_millis(),
         export.written_at.map(|t| t.as_millis()),
     ];

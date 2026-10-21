@@ -3,12 +3,14 @@ package dev.neurokitchen.quire.data.engine
 import dev.neurokitchen.quire.domain.model.Highlight
 import dev.neurokitchen.quire.domain.model.PageImage
 import dev.neurokitchen.quire.domain.model.PageRect
+import dev.neurokitchen.quire.domain.model.PdfFigure
 import dev.neurokitchen.quire.domain.model.PdfMatch
 import dev.neurokitchen.quire.domain.model.PageSize
 import dev.neurokitchen.quire.domain.model.QuoteLocation
 import dev.neurokitchen.quire.domain.model.SelectedTextRange
 import dev.neurokitchen.quire.domain.model.WordLocation
 import dev.neurokitchen.quire.domain.repository.PdfRepository
+import dev.neurokitchen.quire.ffi.pdfFigures
 import dev.neurokitchen.quire.ffi.pdfFind
 import dev.neurokitchen.quire.ffi.pdfNearestGlyph
 import dev.neurokitchen.quire.ffi.pdfPageSizes
@@ -19,7 +21,6 @@ import dev.neurokitchen.quire.ffi.pdfTextRange
 import dev.neurokitchen.quire.ffi.pdfWordAt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.util.LinkedHashMap
 
 /**
  * PDF pages and their text layer through the engine (hayro, pure Rust: no native library to ship).
@@ -63,6 +64,12 @@ class EnginePdfRepository : PdfRepository {
             text = res.text,
             rects = res.rects.map { PageRect(it.left, it.top, it.right, it.bottom) },
         )
+    }
+
+    override suspend fun figures(path: String): List<PdfFigure> = withContext(Dispatchers.IO) {
+        pdfFigures(path).map { f ->
+            PdfFigure(f.page.toInt(), f.label, f.caption, PageRect(f.rect.left, f.rect.top, f.rect.right, f.rect.bottom))
+        }
     }
 
     override suspend fun pageText(path: String, page: Int): String = withContext(Dispatchers.IO) {
