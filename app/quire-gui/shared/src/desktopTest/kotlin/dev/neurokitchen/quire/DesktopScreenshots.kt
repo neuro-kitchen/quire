@@ -1,5 +1,6 @@
 package dev.neurokitchen.quire
 
+import dev.neurokitchen.quire.presentation.mapping.toImageBitmap
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.ImageComposeScene
@@ -210,7 +211,7 @@ class DesktopScreenshots {
         }
         render("desktop-reader-pdf.png") {
             QuireTheme(darkTheme = false, desktop = true) {
-                Surface { ReaderScreen(state, {}, { index, width -> pdf.render(path, index, width) }, { null }) }
+                Surface { ReaderScreen(state, {}, { index, width -> pdf.render(path, index, width).toImageBitmap() }, { null }) }
             }
         }
     }
@@ -231,7 +232,7 @@ class DesktopScreenshots {
         }
         render("desktop-reader-find.png", width = 1100, height = 760) {
             QuireTheme(desktop = true) {
-                Surface { ReaderScreen(state, {}, { index, width -> pdf.render(path, index, width) }, { null }) }
+                Surface { ReaderScreen(state, {}, { index, width -> pdf.render(path, index, width).toImageBitmap() }, { null }) }
             }
         }
     }
@@ -450,7 +451,7 @@ class DesktopScreenshots {
         render("desktop-reader-split.png") {
             QuireTheme(darkTheme = false, desktop = true) {
                 Surface {
-                    ReaderScreen(state, {}, { index, width -> pdf.render(path, index, width) }, { null })
+                    ReaderScreen(state, {}, { index, width -> pdf.render(path, index, width).toImageBitmap() }, { null })
                 }
             }
         }
@@ -472,7 +473,7 @@ class DesktopScreenshots {
         render("desktop-reader-figures.png") {
             QuireTheme(darkTheme = true, desktop = true) {
                 Surface {
-                    ReaderScreen(state, {}, { index, width -> pdf.render(path, index, width) }, { null })
+                    ReaderScreen(state, {}, { index, width -> pdf.render(path, index, width).toImageBitmap() }, { null })
                 }
             }
         }
