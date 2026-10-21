@@ -4,6 +4,7 @@ import dev.neurokitchen.quire.presentation.screens.reader.TextMatch
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -97,6 +99,7 @@ fun TextReaderView(
     findMatches: List<TextMatch> = emptyList(),
     currentFind: Int = 0,
     onProgressChange: (currentBlock: Int, totalBlocks: Int) -> Unit = { _, _ -> },
+    onTapPage: () -> Unit = {},
 ) {
     val tab = tabs.getOrNull(selectedTab) ?: return
     val list = rememberLazyListState()
@@ -143,7 +146,14 @@ fun TextReaderView(
             }
         }
 
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectTapGestures { onTapPage() }
+                },
+            contentAlignment = Alignment.TopCenter,
+        ) {
             LazyColumn(
                 state = list,
                 verticalArrangement = Arrangement.spacedBy(Dimens.SpaceSm),
