@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Obsidian's background (designsystem/Colors.kt), the default theme. -->
+    <color name="quire_background">#FF121316</color>
+</resources>

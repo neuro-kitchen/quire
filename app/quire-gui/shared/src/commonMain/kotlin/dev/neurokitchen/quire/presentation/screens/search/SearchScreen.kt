@@ -96,6 +96,8 @@ fun SearchScreen(
     onReferenceClick: (String) -> Unit,
     onOpenReference: (String, String) -> Unit,
     modifier: Modifier = Modifier,
+    /** Space the results leave at the bottom (the navigation bar over them). */
+    bottomPadding: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
     val colors = QuireTheme.colors
     var activeFilter by remember { mutableStateOf(SearchFilter.All) }
@@ -228,7 +230,7 @@ fun SearchScreen(
                 modifier = Modifier.padding(vertical = 4.dp),
             )
             LazyColumn(
-                contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp),
+                contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp + bottomPadding),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 items(filtered, key = { it.id }) { card ->
