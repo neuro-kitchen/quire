@@ -48,4 +48,5 @@ quire library restore ~/backups/thesis.tar.gz thesis-copy
 A backup is one `.tar.gz` with a consistent copy of the database (taken while quire may be in
 use), the PDFs and the papers' texts. It is not encrypted: keep it somewhere private. A restored
 library is a new library (registered under the name you give) with a new device ID, so it can
-sync with the library it came from without being mistaken for it.
+sync with the library it came from without being mistaken for it. Files the backed-up library kept
+updated (`--keep-updated`) are not kept updated by the restored one: set them again where needed.

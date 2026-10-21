@@ -81,6 +81,9 @@ pub struct HubReport {
     pub files_downloaded: usize,
     /// Files (by hash) the hub is known to hold after this session: here, they may be evicted.
     pub on_hub: Vec<String>,
+    /// Files here the hub said it lacks and did not take (over quota): no longer safe to evict,
+    /// whatever an earlier session said.
+    pub not_on_hub: Vec<String>,
 }
 
 /// The peer a hub is in the change log (its cursor, and the origin of rows pulled from it).
@@ -228,7 +231,10 @@ where
         report.on_hub.extend(present.iter().filter_map(|id| ids.get(id).cloned()));
         let own = Peer { collaborator: false, ..self.peer.clone() };
         for (id, hash) in ids.iter().filter(|(id, _)| !present.contains(id)) {
-            let Some(bytes) = self.replica.read_file(hash, &own).await? else { continue };
+            let Some(bytes) = self.replica.read_file(hash, &own).await? else {
+                report.not_on_hub.push(hash.clone());
+                continue;
+            };
             let sealed = self.key.seal_file(id, &bytes)?;
             protocol::send(
                 self.writer,
@@ -242,7 +248,10 @@ where
                     report.files_uploaded += 1;
                     report.on_hub.push(hash.clone());
                 }
-                Err(SyncError::Hub { code, .. }) if code == ErrorCode::Quota as i32 => report.over_quota += 1,
+                Err(SyncError::Hub { code, .. }) if code == ErrorCode::Quota as i32 => {
+                    report.over_quota += 1;
+                    report.not_on_hub.push(hash.clone());
+                }
                 Err(e) => return Err(e),
             }
         }
