@@ -123,6 +123,7 @@ fun ItemsTable(
                     tint = colors.fillSecondary, modifier = Modifier.size(14.dp),
                 )
             }
+            Spacer(Modifier.width(28.dp))
         }
         HorizontalDivider(color = colors.fillQuarternary)
 
@@ -372,6 +373,22 @@ private fun ItemRow(
                         painterResource(Res.drawable.ic_picture_as_pdf), null,
                         tint = if (isSelected) colors.onAccent else colors.accentRed,
                         modifier = Modifier.size(Dimens.Icon),
+                    )
+                }
+            }
+            Box(Modifier.width(28.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                        .clickable { onQuickLook() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painterResource(Res.drawable.ic_description),
+                        contentDescription = "Quick Look (Space)",
+                        tint = if (isSelected) colors.onAccent else colors.fillTertiary,
+                        modifier = Modifier.size(14.dp),
                     )
                 }
             }

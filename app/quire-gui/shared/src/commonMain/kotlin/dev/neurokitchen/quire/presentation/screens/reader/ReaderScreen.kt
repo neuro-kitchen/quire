@@ -1,16 +1,27 @@
 package dev.neurokitchen.quire.presentation.screens.reader
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import dev.neurokitchen.quire.resources.ic_auto_fix_high
+import org.jetbrains.compose.resources.painterResource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -191,6 +202,41 @@ fun ReaderScreen(
                     onChangeFontSize = { onEvent(ReaderEvent.OnChangeFontSize(it)) },
                 )
                 HorizontalDivider(color = colors.paneDivider)
+
+                // Snapshot Mode Active Guidance Banner
+                if (state.isSnapshotMode) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(colors.accent)
+                            .padding(horizontal = Dimens.SpaceMd, vertical = 6.dp),
+                    ) {
+                        Icon(
+                            painterResource(Res.drawable.ic_auto_fix_high),
+                            contentDescription = null,
+                            tint = colors.onAccent,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "Snapshot Active: Drag a rectangle over any figure or paragraph on the PDF to copy it into notes",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                            color = colors.onAccent,
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            "Done",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = colors.onAccent,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(colors.onAccent.copy(alpha = 0.2f))
+                                .clickable { onEvent(ReaderEvent.OnToggleSnapshotMode) }
+                                .padding(horizontal = 8.dp, vertical = 2.dp),
+                        )
+                    }
+                }
 
                 // In-Reader Search Bar
                 if (state.find.isOpen) {
