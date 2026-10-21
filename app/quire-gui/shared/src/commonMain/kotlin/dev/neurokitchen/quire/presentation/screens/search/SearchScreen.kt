@@ -1,5 +1,6 @@
 package dev.neurokitchen.quire.presentation.screens.search
 
+import dev.neurokitchen.quire.presentation.components.cite.CiteButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -234,12 +235,17 @@ fun SearchScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 items(filtered, key = { it.id }) { card ->
-                    ReferenceCard(card, onEvent = { event ->
-                        when (event) {
-                            is ReferenceCardEvent.OnClick -> onReferenceClick(event.id)
-                            is ReferenceCardEvent.OnOpen -> onOpenReference(event.id, card.title)
-                        }
-                    })
+                    ReferenceCard(
+                        card,
+                        onEvent = { event ->
+                            when (event) {
+                                is ReferenceCardEvent.OnClick -> onReferenceClick(event.id)
+                                is ReferenceCardEvent.OnOpen -> onOpenReference(event.id, card.title)
+                            }
+                        },
+                        showCiteKey = false,
+                        action = { CiteButton(card.id, card.citeKey) },
+                    )
                 }
             }
         }

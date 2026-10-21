@@ -1,5 +1,6 @@
 package dev.neurokitchen.quire.presentation.components.reference_card
 
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -49,6 +50,12 @@ fun ReferenceCard(
     state: ReferenceCardState,
     onEvent: (ReferenceCardEvent) -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * `false` (phones): no cite key over the title, the reading status under it instead, beside
+     * [action] in the bottom corner (Cite).
+     */
+    showCiteKey: Boolean = true,
+    action: (@Composable () -> Unit)? = null,
 ) {
     val colors = QuireTheme.colors
     Card(
@@ -94,12 +101,12 @@ fun ReferenceCard(
             // Main Details
             Column(modifier = Modifier.weight(1f)) {
                 // Top Meta: CiteKey + Reading Status
-                Row(
+                if (showCiteKey) Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    if (state.citeKey.isNotEmpty()) {
+                    if (showCiteKey && state.citeKey.isNotEmpty()) {
                         Text(
                             text = state.citeKey,
                             style = MaterialTheme.typography.labelSmall.copy(
@@ -115,53 +122,10 @@ fun ReferenceCard(
                         Spacer(Modifier.width(1.dp))
                     }
 
-                    // Reading Status Dot & Pill
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(Dimens.RadiusFull))
-                            .background(
-                                when (state.reading) {
-                                    ReadingStatus.Read -> colors.statusRead.copy(alpha = 0.15f)
-                                    ReadingStatus.Reading -> colors.statusReading.copy(alpha = 0.15f)
-                                    ReadingStatus.Unread -> colors.fillQuinary
-                                },
-                            )
-                            .padding(horizontal = 8.dp, vertical = 3.dp),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    when (state.reading) {
-                                        ReadingStatus.Read -> colors.statusRead
-                                        ReadingStatus.Reading -> colors.statusReading
-                                        ReadingStatus.Unread -> colors.fillSecondary
-                                    },
-                                ),
-                        )
-                        Spacer(Modifier.width(5.dp))
-                        Text(
-                            text = when (state.reading) {
-                                ReadingStatus.Read -> "Read"
-                                ReadingStatus.Reading -> "Reading"
-                                ReadingStatus.Unread -> "Unread"
-                            },
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                            ),
-                            color = when (state.reading) {
-                                ReadingStatus.Read -> colors.statusRead
-                                ReadingStatus.Reading -> colors.statusReading
-                                ReadingStatus.Unread -> colors.fillSecondary
-                            },
-                        )
-                    }
+                    ReadingPill(state.reading)
                 }
 
-                Spacer(Modifier.height(6.dp))
+                if (showCiteKey) Spacer(Modifier.height(6.dp))
 
                 // Title
                 Text(
@@ -186,7 +150,67 @@ fun ReferenceCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (!showCiteKey) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(top = Dimens.SpaceXs).heightIn(min = 36.dp),
+                    ) {
+                        ReadingPill(state.reading)
+                        Spacer(Modifier.weight(1f))
+                        action?.invoke()
+                    }
+                }
             }
         }
     }
 }
+
+/** The reading status: a dot and a word, on a pill of its colour. */
+@Composable
+private fun ReadingPill(reading: ReadingStatus) {
+    val colors = QuireTheme.colors
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(Dimens.RadiusFull))
+            .background(
+                when (reading) {
+                    ReadingStatus.Read -> colors.statusRead.copy(alpha = 0.15f)
+                    ReadingStatus.Reading -> colors.statusReading.copy(alpha = 0.15f)
+                    ReadingStatus.Unread -> colors.fillQuinary
+                },
+            )
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(
+                    when (reading) {
+                        ReadingStatus.Read -> colors.statusRead
+                        ReadingStatus.Reading -> colors.statusReading
+                        ReadingStatus.Unread -> colors.fillSecondary
+                    },
+                ),
+        )
+        Spacer(Modifier.width(5.dp))
+        Text(
+            text = when (reading) {
+                ReadingStatus.Read -> "Read"
+                ReadingStatus.Reading -> "Reading"
+                ReadingStatus.Unread -> "Unread"
+            },
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+            ),
+            color = when (reading) {
+                ReadingStatus.Read -> colors.statusRead
+                ReadingStatus.Reading -> colors.statusReading
+                ReadingStatus.Unread -> colors.fillSecondary
+            },
+        )
+    }
+}
+

@@ -1,5 +1,6 @@
 package dev.neurokitchen.quire.presentation.mobile.screens
 
+import dev.neurokitchen.quire.presentation.components.cite.CiteButton
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.lazy.LazyRow
@@ -153,12 +154,17 @@ private fun LazyListScope.section(
     }
     items(cards.take(HOME_SECTION_SIZE), key = { "$title-${it.id}" }) { card ->
         Box(Modifier.padding(horizontal = Dimens.SpaceMd)) {
-            ReferenceCard(card, onEvent = { event ->
-                when (event) {
-                    is ReferenceCardEvent.OnClick -> onOpenDetails(event.id)
-                    is ReferenceCardEvent.OnOpen -> onOpenReader(event.id, card.title)
-                }
-            })
+            ReferenceCard(
+                card,
+                onEvent = { event ->
+                    when (event) {
+                        is ReferenceCardEvent.OnClick -> onOpenDetails(event.id)
+                        is ReferenceCardEvent.OnOpen -> onOpenReader(event.id, card.title)
+                    }
+                },
+                showCiteKey = false,
+                action = { CiteButton(card.id, card.citeKey) },
+            )
         }
     }
 }
@@ -277,12 +283,17 @@ internal fun ReferenceList(
         }
         items(state.references, key = { it.id }) { card ->
             Box(Modifier.padding(horizontal = Dimens.SpaceMd)) {
-                ReferenceCard(card, onEvent = { event ->
-                    when (event) {
-                        is ReferenceCardEvent.OnClick -> onOpenDetails(event.id)
-                        is ReferenceCardEvent.OnOpen -> onOpenReader(event.id, card.title)
-                    }
-                })
+                ReferenceCard(
+                    card,
+                    onEvent = { event ->
+                        when (event) {
+                            is ReferenceCardEvent.OnClick -> onOpenDetails(event.id)
+                            is ReferenceCardEvent.OnOpen -> onOpenReader(event.id, card.title)
+                        }
+                    },
+                    showCiteKey = false,
+                    action = { CiteButton(card.id, card.citeKey) },
+                )
             }
         }
     }
