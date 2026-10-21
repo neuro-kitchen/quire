@@ -6,6 +6,8 @@ import dev.neurokitchen.quire.domain.model.Reference
 import dev.neurokitchen.quire.domain.model.Tag
 import dev.neurokitchen.quire.domain.repository.LibraryDescription
 import dev.neurokitchen.quire.domain.repository.LibraryRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** The library's references and projects through the engine (`quire-ffi`): reading, adding, editing. */
 class EngineLibraryRepository(private val session: EngineSession) : LibraryRepository {
@@ -15,9 +17,9 @@ class EngineLibraryRepository(private val session: EngineSession) : LibraryRepos
     }
 
     override fun references(query: LibraryQuery) =
-        session.reloading { it.references(query.toFfi()).map { record -> record.toDomain() } }
+        session.reloading { withContext(Dispatchers.IO) { it.references(query.toFfi()).map { record -> record.toDomain() } } }
 
-    override fun projects() = session.reloading { it.projects().map { record -> record.toDomain() } }
+    override fun projects() = session.reloading { withContext(Dispatchers.IO) { it.projects().map { record -> record.toDomain() } } }
 
     override suspend fun reopen() = session.reopen()
 
