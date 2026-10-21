@@ -23,6 +23,13 @@ pub enum IoError {
     #[error("unknown export format `{0}` (known: biblatex, bibtex, csl-json, hayagriva)")]
     UnknownFormat(String),
 
+    #[error("unknown encoding `{0}` (known: utf-8, utf-8-bom, windows-1252)")]
+    UnknownEncoding(String),
+
+    /// Text the chosen encoding cannot hold.
+    #[error("{0}")]
+    Encoding(String),
+
     /// Typst's `hayagriva` could not convert or write the entries.
     #[error("Hayagriva: {0}")]
     Hayagriva(String),

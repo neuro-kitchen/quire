@@ -50,7 +50,7 @@ pub use quire_document::pdf::PdfMatch;
 pub use quire_document::{paper_markdown, reading};
 pub use quire_fetch::crossref::{Update, UpdateKind};
 pub use quire_fetch::{Endpoints, FetchError};
-pub use quire_io::{ExportFormat, ExportOptions};
+pub use quire_io::{Encoding, ExportFormat, ExportOptions};
 pub use quire_model::{
     Alert, AlertSource, Attachment, Field, Highlight, HighlightId, Issue, IssueCode, Note, NoteId, PdfAttempt, PdfKind,
     Project, Reading, ReadingStatus, Reference, SavedSearch, Severity, SlugPath, Tag, TagKind,

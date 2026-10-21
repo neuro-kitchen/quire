@@ -41,6 +41,8 @@ pub struct AutoExport {
     pub profile: Option<String>,
     /// Format overriding the profile's, if any (`biblatex`, `hayagriva`, …).
     pub format: Option<String>,
+    /// Options chosen directly (the engine's export profile as JSON), used instead of a profile.
+    pub options: Option<String>,
     pub written_at: Option<Timestamp>,
 }
 

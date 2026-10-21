@@ -7,6 +7,7 @@ use quire_model::Reference;
 
 use crate::bib::{self, BibFormat, BibOptions, PreprintForm};
 use crate::csl;
+use crate::encoding::Encoding;
 use crate::error::{IoError, Result};
 
 /// Output format.
@@ -78,10 +79,20 @@ pub struct ExportOptions {
     pub month_macros: bool,
     /// `.bib` only: preprints as `@online` (Biber) or `@article` (Typst).
     pub preprints: PreprintForm,
+    /// The file's encoding; [`export`] returns text it can hold ([`crate::encoding::fit`]).
+    pub encoding: Encoding,
 }
 
-/// `references` written as `options` says.
+/// `references` written as `options` says, fitted to its encoding (still to be [encoded] when
+/// written to a file).
+///
+/// [encoded]: crate::encoding::encode
 pub fn export(references: &[Reference], options: &ExportOptions) -> Result<String> {
+    let text = write(references, options)?;
+    crate::encoding::fit(&text, options.encoding, options.format)
+}
+
+fn write(references: &[Reference], options: &ExportOptions) -> Result<String> {
     match options.format {
         ExportFormat::Biblatex | ExportFormat::Bibtex => {
             let format = if options.format == ExportFormat::Bibtex { BibFormat::Bibtex } else { BibFormat::Biblatex };

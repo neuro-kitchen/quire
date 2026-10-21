@@ -103,6 +103,7 @@ pub async fn run(context: &Context, args: &ExportArgs) -> anyhow::Result<()> {
         recursive,
         profile: args.profile.clone().or_else(|| folder.and_then(|f| f.profile.clone())),
         format,
+        ..ExportRequest::default()
     };
     let output = args
         .output
@@ -119,8 +120,8 @@ pub async fn run(context: &Context, args: &ExportArgs) -> anyhow::Result<()> {
             output::hint("Kept updated after every change; `quire export auto` lists such files.");
         }
         Some(path) => {
-            let (text, count) = engine.export(&request).await?;
-            let wrote = quire_engine::write_if_changed(&path, &text)?;
+            // In the profile's encoding.
+            let (_, count, wrote) = engine.export_to(&request, &path).await?;
             let label = if wrote { "written" } else { "unchanged" };
             output::note(
                 Tone::Ok,
