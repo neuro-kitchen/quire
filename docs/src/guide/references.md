@@ -10,6 +10,13 @@ quire add https://www.nature.com/articles/s41586-020-2649-2
 quire import refs.bib -p thesis        # a BibTeX / BibLaTeX file
 ```
 
+Paste identifiers as you find them: bare (`10.1038/nature12373`, `2101.00001v2`, `PMC7614242`),
+labelled (`doi:`, `arXiv:`, `pmid:`, `pmcid:`), or as links from doi.org, arxiv.org (`abs` or
+`pdf`), PubMed or PubMed Central, with whatever the browser added after them (`?context=cs`,
+`#sec1`). An arXiv DOI (`10.48550/arXiv.1706.03762`) is the arXiv paper, and a bare number is read
+as a PubMed ID. DOIs are compared ignoring case, and all versions of an arXiv paper are one
+reference.
+
 Each identifier goes through a chain of sources until one answers: DOI content negotiation →
 Crossref → the source's own API (arXiv, NCBI) → the page's JSON-LD → its `citation_*` tags.
 Every failed attempt is recorded with the reference, so `ref check` can show what went wrong.
