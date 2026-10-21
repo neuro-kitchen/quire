@@ -42,7 +42,13 @@ fun QuireTheme(
     desktop: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val colors = quireColors(appTheme)
+    // "System" follows the device's light or dark setting, and changes with it.
+    val resolved = if (appTheme == AppTheme.System) {
+        if (isSystemInDarkTheme()) AppTheme.Obsidian else AppTheme.PaperLight
+    } else {
+        appTheme
+    }
+    val colors = quireColors(resolved)
     val scheme = if (colors.isDark) {
         darkColorScheme(
             primary = colors.accent, onPrimary = colors.onAccent,

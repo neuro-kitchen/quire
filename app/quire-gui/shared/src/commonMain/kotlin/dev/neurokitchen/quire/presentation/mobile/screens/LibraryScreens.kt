@@ -48,7 +48,6 @@ import dev.neurokitchen.quire.presentation.mobile.navigation.ShelfKey
 import dev.neurokitchen.quire.presentation.screens.library.LibraryEvent
 import dev.neurokitchen.quire.presentation.screens.library.LibraryState
 import dev.neurokitchen.quire.presentation.screens.library.LibraryViewModel
-import dev.neurokitchen.quire.presentation.screens.library.components.ReferenceDetailPane
 import dev.neurokitchen.quire.resources.Res
 import dev.neurokitchen.quire.resources.destination_library
 import dev.neurokitchen.quire.resources.home_continue
@@ -238,24 +237,6 @@ fun ShelfScreen(
         ReferenceList(state, onOpenDetails, onOpenReader, Modifier.hazeSource(chrome.haze))
         MobileTopBar(title, onBack, chrome.haze)
     }
-}
-
-/** A paper's details, opened from any list. */
-@Composable
-fun DetailsScreen(
-    id: String,
-    onBack: () -> Unit,
-    onOpenReader: (String, String) -> Unit,
-    viewModel: LibraryViewModel = koinViewModel(),
-) {
-    LaunchedEffect(id) { viewModel.onEvent(LibraryEvent.OnReferenceClick(id)) }
-    val state by viewModel.state.collectAsStateWithLifecycle()
-    val selected = state.selected ?: return
-    ReferenceDetailPane(
-        reference = selected,
-        onClose = onBack,
-        onOpen = { onOpenReader(selected.id, selected.title) },
-    )
 }
 
 @Composable
