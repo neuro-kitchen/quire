@@ -120,6 +120,8 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(libs.compose.uiTooling)
+            // The system file picker (activity results).
+            implementation(libs.androidx.activity.compose)
         }
         getByName("desktopMain") {
             // The engine's Kotlin API, generated from quire-ffi (see the Rust engine section below).
