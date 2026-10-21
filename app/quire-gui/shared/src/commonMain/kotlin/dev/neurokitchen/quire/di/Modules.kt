@@ -24,6 +24,7 @@ import dev.neurokitchen.quire.presentation.screens.settings.SettingsViewModel
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.module.dsl.viewModelOf
+import dev.neurokitchen.quire.presentation.components.cite.CiteViewModel
 import dev.neurokitchen.quire.presentation.components.export_dialog.ExportDialogViewModel
 import dev.neurokitchen.quire.presentation.components.export_dialog.ExportTarget
 import org.koin.dsl.module
@@ -59,6 +60,7 @@ val viewModelModule = module {
     viewModelOf(::SettingsViewModel)
     viewModelOf(::DesktopViewModel)
     viewModelOf(::ToolsViewModel)
+    viewModelOf(::CiteViewModel)
     // One per open paper: its reference ID and title come as parameters.
     viewModel { (id: String, title: String) -> ReaderViewModel(id, title, get(), get(), preferences = getOrNull()) }
     // One per export dialog: what it exports comes as a parameter.

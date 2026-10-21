@@ -523,10 +523,20 @@
     <string name="reader_page_n">Page %1$s</string>
     <string name="reader_notebook_highlights">Highlights (%1$s)</string>
     <string name="reader_note">Note</string>
-    <string name="add_menu_identifier">DOI, arXiv or link</string>
-    <string name="add_menu_pdf">PDF files</string>
+    <string name="add_menu_identifier">DOI or link</string>
+    <string name="add_menu_pdf">PDF</string>
     <string name="add_menu_bib">.bib file</string>
     <string name="add_menu_paste">Paste BibTeX</string>
-    <string name="add_menu_manual">Type it in</string>
+    <string name="add_menu_manual">Manual</string>
     <string name="common_close">Close</string>
+    <string name="add_screen_identifier">Add by DOI or link</string>
+    <string name="add_screen_pdf">Add PDFs</string>
+    <string name="add_screen_bib">Import a .bib file</string>
+    <string name="add_screen_paste">Paste BibTeX</string>
+    <string name="add_screen_manual">New reference</string>
+    <string name="cite_copy">Copy citation</string>
+    <string name="cite_key">Cite key (@key)</string>
+    <string name="cite_biblatex">BibLaTeX</string>
+    <string name="cite_bibtex">BibTeX</string>
+    <string name="cite_csl_json">CSL-JSON</string>
 </resources>

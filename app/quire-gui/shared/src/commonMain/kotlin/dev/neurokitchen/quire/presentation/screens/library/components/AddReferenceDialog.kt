@@ -114,6 +114,8 @@ fun AddReferenceContent(
     projects: List<Pair<String, String>>,
     modifier: Modifier = Modifier,
     scrollableTabs: Boolean = false,
+    /** `false`: one way in only (the phone's Add screens, one per way): no tabs. */
+    showTabs: Boolean = true,
 ) {
     val picker = rememberFilePicker { kind, paths ->
         when (kind) {
@@ -138,7 +140,9 @@ fun AddReferenceContent(
                 )
             }
         }
-        if (scrollableTabs) {
+        if (!showTabs) {
+            // No tabs.
+        } else if (scrollableTabs) {
             PrimaryScrollableTabRow(
                 selectedTabIndex = state.tab.ordinal,
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -152,7 +156,7 @@ fun AddReferenceContent(
                 modifier = Modifier.clip(RoundedCornerShape(Dimens.RadiusSmall)),
             ) { tabs() }
         }
-        Spacer(Modifier.height(Dimens.SpaceMd))
+        if (showTabs) Spacer(Modifier.height(Dimens.SpaceMd))
         when (state.tab) {
             AddTab.Identifier -> IdentifierTab(state, onEvent)
             AddTab.Pdf -> PdfTab(state, onEvent, picker)

@@ -1,5 +1,10 @@
 package dev.neurokitchen.quire.presentation.mobile.components
 
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -16,7 +21,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -96,19 +100,25 @@ fun AddFabMenu(onAdd: (AddTab) -> Unit, bottom: Dp, modifier: Modifier = Modifie
             AnimatedVisibility(visible = open, enter = fadeIn() + scaleIn(transformOrigin = TransformOrigin(1f, 1f)), exit = fadeOut() + scaleOut(transformOrigin = TransformOrigin(1f, 1f))) {
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(Dimens.SpaceXs)) {
                     AddWays.forEach { (tab, label, icon) ->
-                        // Its text is not exposed to TalkBack by this ExtendedFloatingActionButton.
-                        val name = stringResource(label)
-                        ExtendedFloatingActionButton(
+                        // Flat pills in one tonal colour (Expressive's FAB menu items).
+                        Surface(
                             onClick = {
                                 open = false
                                 onAdd(tab)
                             },
-                            icon = { Icon(painterResource(icon), contentDescription = null) },
-                            text = { Text(name) },
-                            containerColor = colors.cardBackground,
+                            shape = CircleShape,
+                            color = colors.surfaceContainerHigh,
                             contentColor = colors.fillPrimary,
-                            modifier = Modifier.semantics { contentDescription = name },
-                        )
+                        ) {
+                            Row(
+                                Modifier.height(48.dp).padding(horizontal = Dimens.SpaceMd),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
+                            ) {
+                                Icon(painterResource(icon), contentDescription = null, tint = colors.accent, modifier = Modifier.size(20.dp))
+                                Text(stringResource(label), style = MaterialTheme.typography.labelLarge)
+                            }
+                        }
                     }
                 }
             }
