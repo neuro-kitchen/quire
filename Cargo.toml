@@ -149,6 +149,13 @@ uniffi = "0.32.2"
 # The apps' native library (`app/`, `quire-ffi`), without debug info (with it the library is
 # ~500 MB inside the app's jar). Symbols stay: UniFFI reads its metadata from them.
 # `app-dev` for development builds; `-Pquire.release` builds `app-release`.
+# Debug builds and tests: line tables only (panics and backtraces still name file and line), not
+# full debug info. Full debug info made the ~40 test binaries (each linking iroh, reqwest, hayro,
+# SQLite) slow and memory-hungry to link and filled `target/` (73 GB in one checkout, 2026-10-21).
+# Use `CARGO_PROFILE_DEV_DEBUG=full` for a debugger session.
+[profile.dev]
+debug = "line-tables-only"
+
 [profile.app-dev]
 inherits = "dev"
 debug = false
