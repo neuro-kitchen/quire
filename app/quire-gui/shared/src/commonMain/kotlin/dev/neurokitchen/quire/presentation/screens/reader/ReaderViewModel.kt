@@ -1,5 +1,6 @@
 package dev.neurokitchen.quire.presentation.screens.reader
 
+import dev.neurokitchen.quire.presentation.platform.pageCacheBytes
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -50,6 +51,9 @@ class ReaderViewModel(
     /** Where pane sizes are kept; `null`: not kept. */
     private val preferences: PreferencesRepository? = null,
 ) : ViewModel(), PdfTextLayer {
+    /** Rendered pages kept, in bytes of pixels: what the platform can spare (128 MB on the desktop). */
+    private val pageCacheLimit = pageCacheBytes()
+
     private val _state = MutableStateFlow(
         ReaderState(referenceId = referenceId, title = title, layout = preferences?.preferences?.value?.readerLayout ?: ReaderLayout()),
     )
@@ -57,7 +61,7 @@ class ReaderViewModel(
 
     /**
      * Rendered pages as images by (index, width step), most recently used last, within
-     * [PAGE_CACHE_BYTES]. Widths are rounded up to [WIDTH_STEP], so resizing a little or zooming
+     * [pageCacheLimit]. Widths are rounded up to [WIDTH_STEP], so resizing a little or zooming
      * back reuses a render; renders in progress are shared, not started twice.
      */
     private val pages = LinkedHashMap<Pair<Int, Int>, ImageBitmap>()
@@ -108,6 +112,7 @@ class ReaderViewModel(
             ReaderEvent.OnZoomIn -> zoom { it * ZOOM_STEP }
             ReaderEvent.OnZoomOut -> zoom { it / ZOOM_STEP }
             ReaderEvent.OnZoomReset -> zoom { 1f }
+            is ReaderEvent.OnSetZoom -> zoom { event.zoom }
             is ReaderEvent.OnHighlight -> act {
                 val quote = event.quote.replace(Regex("\\s+"), " ").trim()
                 val prefix = event.prefix.replace(Regex("\\s+"), " ").trim()
@@ -215,7 +220,7 @@ class ReaderViewModel(
         pages[key] = image
         pageBytes += image.bytes
         // Least recently used first (insertion order is common stdlib; an access-ordered map is JVM-only).
-        while (pageBytes > PAGE_CACHE_BYTES && pages.size > 1) {
+        while (pageBytes > pageCacheLimit && pages.size > 1) {
             val oldest = pages.keys.first()
             pages.remove(oldest)?.let { pageBytes -= it.bytes }
         }
@@ -308,8 +313,6 @@ class ReaderViewModel(
     }
 
     private companion object {
-        /** Rendered pages kept, in bytes of pixels (~10 pages at 1400 px, ~3 at 2800 px). */
-        const val PAGE_CACHE_BYTES = 128L * 1024 * 1024
         /** Pages rendered ahead of the one asked for. */
         const val AHEAD = 2
         /** Width of the pages figures are cut from (a width step: rendered as asked). */

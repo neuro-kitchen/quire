@@ -185,6 +185,8 @@ fun MobileReaderView(
                     onTapPage = toggleChrome,
                     contentPadding = padding,
                     jumpToPage = jump,
+                    onPinchZoom = { onEvent(ReaderEvent.OnSetZoom(it)) },
+                    selectAfterLongPress = true,
                 )
                 state.isLoading && state.tabs.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(stringResource(Res.string.reader_loading), color = QuireTheme.colors.fillSecondary, style = MaterialTheme.typography.bodyLarge)

@@ -8,6 +8,8 @@ sealed interface ReaderEvent {
     data object OnZoomIn : ReaderEvent
     data object OnZoomOut : ReaderEvent
     data object OnZoomReset : ReaderEvent
+    /** A pinch ended at this zoom (1 = fit the pane's width). */
+    data class OnSetZoom(val zoom: Float) : ReaderEvent
     /** Text selected in the text view: `prefix` is what comes just before it in its block. */
     data class OnHighlight(val quote: String, val prefix: String, val color: String = "yellow") : ReaderEvent
     data class OnHighlightClick(val id: String) : ReaderEvent
