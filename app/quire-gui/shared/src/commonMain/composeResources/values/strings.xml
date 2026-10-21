@@ -1,6 +1,8 @@
 <resources>
     <string name="app_name">quire</string>
+    <string name="destination_home">Home</string>
     <string name="destination_library">Library</string>
+    <string name="destination_search">Search</string>
     <string name="destination_settings">Settings</string>
 
     <!-- Library: sources and toolbars -->

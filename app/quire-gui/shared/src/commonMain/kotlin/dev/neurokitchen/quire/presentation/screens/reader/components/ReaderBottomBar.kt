@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -271,65 +272,156 @@ fun ReaderBottomBar(
             )
         }
 
-        // Collapsed Main Bar
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+        // Redesigned Modern Reader Control Bar (54dp + navigationBarsPadding)
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(30.dp)
-                .clickable { isExpanded = !isExpanded }
-                .padding(horizontal = 12.dp),
+                .navigationBarsPadding(),
         ) {
-            // Left: Ellipsized Document Title
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f, fill = false).padding(end = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp)
+                    .padding(horizontal = 12.dp),
             ) {
-                Text(
-                    text = title.ifEmpty { "Untitled Document" },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-                    color = colors.fillSecondary,
-                )
-            }
-
-            // Center: Kindle-Style Reading Progress
-            Text(
-                text = if (total > 0) {
-                    if (mode == ReaderMode.Pdf) "Page $safeCurrent of $safeTotal • $progressPercent% read"
-                    else "Part $safeCurrent of $safeTotal • $progressPercent% read"
-                } else {
-                    "Reading..."
-                },
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
-                color = colors.fillPrimary,
-                modifier = Modifier.padding(horizontal = 8.dp),
-            )
-
-            // Right: Reader Metrics & Expand Icon
+            // Left: Interactive Reading Progress Pill (Click to toggle details drawer)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(Dimens.RadiusFull))
+                    .background(colors.fillQuinary)
+                    .border(1.dp, colors.border.copy(alpha = 0.5f), RoundedCornerShape(Dimens.RadiusFull))
+                    .clickable { isExpanded = !isExpanded }
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
             ) {
-                Text(
-                    text = if (mode == ReaderMode.Pdf) "${zoomPercent}%" else "${readerFont.title} • ${fontSizeSp}px",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                    color = colors.fillTertiary,
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(
+                            when (reading) {
+                                ReadingStatus.Read -> colors.statusRead
+                                ReadingStatus.Reading -> colors.statusReading
+                                ReadingStatus.Unread -> colors.fillSecondary
+                            }
+                        )
                 )
-
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = if (total > 0) {
+                        if (mode == ReaderMode.Pdf) "p. $safeCurrent/$safeTotal • $progressPercent%"
+                        else "pt. $safeCurrent/$safeTotal • $progressPercent%"
+                    } else "Reading",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
+                    color = colors.fillPrimary,
+                )
+                Spacer(Modifier.width(4.dp))
                 Icon(
                     painterResource(Res.drawable.ic_expand_more),
-                    contentDescription = if (isExpanded) "Collapse Bar" else "Expand Bar",
+                    contentDescription = if (isExpanded) "Collapse Details" else "Expand Details",
                     tint = colors.fillSecondary,
                     modifier = Modifier
                         .size(14.dp)
                         .rotate(if (isExpanded) 180f else 0f),
                 )
             }
+
+            // Center: Document Title
+            Text(
+                text = title.ifEmpty { "Document" },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                color = colors.fillSecondary,
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .padding(horizontal = 8.dp),
+            )
+
+            // Right: Reader Panel Triggers (Highlights, Notes, Figures)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                // Annotations Button with Badge
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                        .background(if (highlightsCount > 0) colors.accent.copy(alpha = 0.12f) else colors.fillQuinary)
+                        .border(1.dp, if (highlightsCount > 0) colors.accent.copy(alpha = 0.4f) else colors.border.copy(alpha = 0.4f), RoundedCornerShape(Dimens.RadiusSmall))
+                        .clickable(onClick = onToggleAnnotations)
+                        .padding(horizontal = 8.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Icon(
+                            painterResource(Res.drawable.ic_inventory_2),
+                            contentDescription = "Annotations",
+                            tint = if (highlightsCount > 0) colors.accent else colors.fillSecondary,
+                            modifier = Modifier.size(15.dp),
+                        )
+                        if (highlightsCount > 0) {
+                            Text(
+                                text = "$highlightsCount",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
+                                color = colors.accent,
+                            )
+                        }
+                    }
+                }
+
+                // Notes Button with Badge
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                        .background(if (notesCount > 0) colors.accent.copy(alpha = 0.12f) else colors.fillQuinary)
+                        .border(1.dp, if (notesCount > 0) colors.accent.copy(alpha = 0.4f) else colors.border.copy(alpha = 0.4f), RoundedCornerShape(Dimens.RadiusSmall))
+                        .clickable(onClick = onToggleNotes)
+                        .padding(horizontal = 8.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Icon(
+                            painterResource(Res.drawable.ic_sticky_note_2),
+                            contentDescription = "Notes",
+                            tint = if (notesCount > 0) colors.accent else colors.fillSecondary,
+                            modifier = Modifier.size(15.dp),
+                        )
+                        if (notesCount > 0) {
+                            Text(
+                                text = "$notesCount",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
+                                color = colors.accent,
+                            )
+                        }
+                    }
+                }
+
+                // Figures Drawer Button
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                        .background(colors.fillQuinary)
+                        .border(1.dp, colors.border.copy(alpha = 0.4f), RoundedCornerShape(Dimens.RadiusSmall))
+                        .clickable(onClick = onToggleFigures),
+                ) {
+                    Icon(
+                        painterResource(Res.drawable.ic_auto_fix_high),
+                        contentDescription = "Figures & Tables",
+                        tint = colors.fillSecondary,
+                        modifier = Modifier.size(15.dp),
+                    )
+                }
+            }
         }
     }
+}
 }
 
 @Composable

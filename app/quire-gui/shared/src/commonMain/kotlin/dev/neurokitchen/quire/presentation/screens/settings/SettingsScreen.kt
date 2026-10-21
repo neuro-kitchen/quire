@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -85,59 +87,112 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     val colors = QuireTheme.colors
-    Row(modifier.fillMaxSize()) {
-        SettingsSidebar(state.section, onClick = { onEvent(SettingsEvent.OnSectionClick(it)) }, Modifier.width(200.dp))
-        VerticalDivider(color = colors.paneDivider)
-        Column(Modifier.weight(1f).padding(Dimens.SpaceMd)) {
-            // Category Header
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(state.section.displayTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = colors.fillPrimary)
-                    Text(
-                        if (state.configPath.isNotEmpty()) stringResource(Res.string.settings_file_location, state.configPath)
-                        else "Configure preferences, appearance, shortcuts, and sync",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.fillSecondary,
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val isNarrow = maxWidth < 600.dp
+        if (isNarrow) {
+            Column(Modifier.fillMaxSize()) {
+                // Category tabs: horizontal scrollable chips
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(colors.cardBackground)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(SettingsSection.entries) { section ->
+                        val selected = section == state.section
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(Dimens.RadiusFull))
+                                .background(if (selected) colors.accent else colors.fillQuinary)
+                                .border(
+                                    1.dp,
+                                    if (selected) colors.accent else colors.border.copy(alpha = 0.5f),
+                                    RoundedCornerShape(Dimens.RadiusFull),
+                                )
+                                .clickable { onEvent(SettingsEvent.OnSectionClick(section)) }
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                        ) {
+                            Text(
+                                text = section.displayTitle,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (selected) colors.onAccent else colors.fillPrimary,
+                                ),
+                            )
+                        }
+                    }
+                }
+                HorizontalDivider(color = colors.paneDivider)
+                SettingsCategoryContent(state, onEvent, Modifier.fillMaxSize().padding(Dimens.SpaceMd))
+            }
+        } else {
+            // Desktop side-by-side
+            Row(Modifier.fillMaxSize()) {
+                SettingsSidebar(state.section, onClick = { onEvent(SettingsEvent.OnSectionClick(it)) }, Modifier.width(200.dp))
+                VerticalDivider(color = colors.paneDivider)
+                SettingsCategoryContent(state, onEvent, Modifier.weight(1f).padding(Dimens.SpaceMd))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsCategoryContent(
+    state: SettingsState,
+    onEvent: (SettingsEvent) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = QuireTheme.colors
+    Column(modifier) {
+        // Category Header
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(state.section.displayTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = colors.fillPrimary)
+                Text(
+                    if (state.configPath.isNotEmpty()) stringResource(Res.string.settings_file_location, state.configPath)
+                    else "Configure preferences, appearance, shortcuts, and sync",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.fillSecondary,
+                )
+            }
+        }
+        HorizontalDivider(color = colors.fillQuarternary, modifier = Modifier.padding(vertical = Dimens.SpaceSm))
+
+        val error = state.error
+        when {
+            error != null -> Column {
+                Text(stringResource(Res.string.settings_load_failed), color = colors.accentRed, style = MaterialTheme.typography.titleMedium)
+                Text(error, color = colors.fillSecondary, style = MaterialTheme.typography.bodyMedium)
+            }
+            state.section == SettingsSection.Appearance -> AppearanceSectionView(state.appTheme, onEvent)
+            state.section == SettingsSection.Shortcuts -> ShortcutsSectionView()
+            state.section == SettingsSection.Reader -> ReaderDefaultsSectionView(state.readerFont, state.readerTheme, state.readerFontSize, onEvent)
+            state.section == SettingsSection.ConfigFile -> RawConfigEditor(
+                state.raw,
+                onChange = { onEvent(SettingsEvent.OnRawChange(it)) },
+                onSave = { onEvent(SettingsEvent.OnRawSave) },
+                onRevert = { onEvent(SettingsEvent.OnRawRevert) },
+            )
+            else -> LazyColumn(Modifier.weight(1f)) {
+                items(state.fields, key = { it.key }) { field ->
+                    SettingRow(
+                        field,
+                        onDraftChange = { onEvent(SettingsEvent.OnDraftChange(field.key, it)) },
+                        onApply = { onEvent(SettingsEvent.OnApply(field.key)) },
+                        onReset = { onEvent(SettingsEvent.OnReset(field.key)) },
                     )
                 }
-            }
-            HorizontalDivider(color = colors.fillQuarternary, modifier = Modifier.padding(vertical = Dimens.SpaceSm))
-
-            val error = state.error
-            when {
-                error != null -> Column {
-                    Text(stringResource(Res.string.settings_load_failed), color = colors.accentRed, style = MaterialTheme.typography.titleMedium)
-                    Text(error, color = colors.fillSecondary, style = MaterialTheme.typography.bodyMedium)
+                if (!state.isLoading && state.fields.isEmpty()) {
+                    item { Text(stringResource(Res.string.settings_none_named), color = colors.fillSecondary, style = MaterialTheme.typography.bodyMedium) }
                 }
-                state.section == SettingsSection.Appearance -> AppearanceSectionView(state.appTheme, onEvent)
-                state.section == SettingsSection.Shortcuts -> ShortcutsSectionView()
-                state.section == SettingsSection.Reader -> ReaderDefaultsSectionView(state.readerFont, state.readerTheme, state.readerFontSize, onEvent)
-                state.section == SettingsSection.ConfigFile -> RawConfigEditor(
-                    state.raw,
-                    onChange = { onEvent(SettingsEvent.OnRawChange(it)) },
-                    onSave = { onEvent(SettingsEvent.OnRawSave) },
-                    onRevert = { onEvent(SettingsEvent.OnRawRevert) },
-                )
-                else -> LazyColumn(Modifier.weight(1f)) {
-                    items(state.fields, key = { it.key }) { field ->
-                        SettingRow(
-                            field,
-                            onDraftChange = { onEvent(SettingsEvent.OnDraftChange(field.key, it)) },
-                            onApply = { onEvent(SettingsEvent.OnApply(field.key)) },
-                            onReset = { onEvent(SettingsEvent.OnReset(field.key)) },
-                        )
-                    }
-                    if (!state.isLoading && state.fields.isEmpty()) {
-                        item { Text(stringResource(Res.string.settings_none_named), color = colors.fillSecondary, style = MaterialTheme.typography.bodyMedium) }
-                    }
-                    item {
-                        Text(
-                            "${stringResource(Res.string.settings_version)} ${state.version}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.fillTertiary,
-                            modifier = Modifier.padding(top = Dimens.SpaceLg),
-                        )
-                    }
+                item {
+                    Text(
+                        "${stringResource(Res.string.settings_version)} ${state.version}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.fillTertiary,
+                        modifier = Modifier.padding(top = Dimens.SpaceLg),
+                    )
                 }
             }
         }

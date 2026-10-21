@@ -238,7 +238,7 @@ fun CitationGraphDialog(
 
                         // Calculate node coordinates in circular/cluster layout
                         nodes.forEachIndexed { i, node ->
-                            val angle = (i.toFloat() / nodes.size.toFloat()) * 2f * Math.PI.toFloat()
+                            val angle = (i.toFloat() / nodes.size.toFloat()) * 2f * kotlin.math.PI.toFloat()
                             val dist = if (i % 2 == 0) radiusOrbit else radiusOrbit * 0.55f
                             node.x = centerX + dist * cos(angle)
                             node.y = centerY + dist * sin(angle)

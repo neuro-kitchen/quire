@@ -41,6 +41,7 @@ data class QuireColors(
     val surfaceContainer: Color = if (isDark) Color(0xFF262626) else Color(0xFFF1F5F9),
     val surfaceContainerHigh: Color = if (isDark) Color(0xFF2E3135) else Color(0xFFE2E8F0),
     val surfaceContainerHighest: Color = if (isDark) Color(0xFF3B3E43) else Color(0xFFCBD5E1),
+    val cardBackground: Color = if (isDark) Color(0xFF1E1E1E) else Color(0xFFF8FAFC),
     val highlightYellow: Color = if (isDark) Color(0x66FBBF24) else Color(0xFFFEF08A),
     val highlightGreen: Color = if (isDark) Color(0x6634D399) else Color(0xFFBBF7D0),
     val highlightBlue: Color = if (isDark) Color(0x6638BDF8) else Color(0xFFBAE6FD),
