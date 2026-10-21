@@ -13,20 +13,30 @@ use crate::error::{EngineError, Result};
 /// started in the background with its output discarded: browsers print their own diagnostics
 /// (Chrome's zygote errors), which would otherwise land in a front end's screen or prompts.
 pub fn open(target: &str) -> Result<()> {
-    let mut command = if cfg!(target_os = "macos") {
-        Command::new("open")
-    } else if cfg!(target_os = "windows") {
-        let mut start = Command::new("cmd");
-        start.args(["/C", "start", ""]);
-        start
-    } else {
-        Command::new("xdg-open")
-    };
+    let mut command = Command::new(opener(target)?);
     command.arg(target).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
     let mut child = command.spawn().map_err(EngineError::file(Path::new(target)))?;
     // `xdg-open` returns once the browser has the URL; reap it on its own thread.
     std::thread::spawn(move || child.wait());
     Ok(())
+}
+
+/// The program that opens `target` (given to it as one argument). Targets come from references
+/// (URLs from imported files, web pages, collaborators), so: never through `cmd /C start`, whose
+/// parsing runs what follows a `&` (in every query string); and never one that starts with `-`,
+/// which `open`/`xdg-open` would read as an option.
+fn opener(target: &str) -> Result<&'static str> {
+    if target.trim_start().starts_with('-') {
+        return Err(EngineError::Config(format!("not a URL or a file to open: `{target}`")));
+    }
+    Ok(if cfg!(target_os = "macos") {
+        "open"
+    } else if cfg!(target_os = "windows") {
+        // Explorer hands a URL to the default browser and a file to its application, unparsed.
+        "explorer"
+    } else {
+        "xdg-open"
+    })
 }
 
 /// Page images for OCR: dots per inch (Tesseract reads best at about 300).
@@ -119,4 +129,19 @@ fn run(command: &mut Command, name: &str) -> Result<()> {
     }
     let message = String::from_utf8_lossy(&output.stderr);
     Err(EngineError::Pdf(format!("{name} failed: {}", message.trim())))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Opening went through `cmd /C start` on Windows, which runs whatever follows a `&` in a URL
+    /// (`https://x.org/?a=1&calc`); and a target starting with `-` is an option to `open`.
+    #[test]
+    fn targets_are_never_parsed_by_a_shell_nor_taken_as_options() {
+        let program = opener("https://x.org/paper?a=1&calc").unwrap();
+        assert!(["open", "explorer", "xdg-open"].contains(&program), "{program}");
+        assert!(opener("-a Calculator").is_err());
+        assert!(opener("  --help").is_err());
+    }
 }

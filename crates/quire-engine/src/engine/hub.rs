@@ -34,10 +34,15 @@ impl Engine {
         self.after_hub_sync(report?).await
     }
 
-    /// Records the files the hub holds (they may be evicted here now), then keeps within the cache.
+    /// Records which files the hub holds (they may be evicted here now) and which it lacks (they may
+    /// not, whatever an earlier session said), then keeps within the cache.
     async fn after_hub_sync(&self, report: HubReport) -> Result<HubReport> {
-        let on_hub = report.on_hub.clone();
-        self.run(move |lib| lib.mark_on_hub(&on_hub)).await?;
+        let (on_hub, not_on_hub) = (report.on_hub.clone(), report.not_on_hub.clone());
+        self.run(move |lib| {
+            lib.clear_on_hub(&not_on_hub)?;
+            lib.mark_on_hub(&on_hub)
+        })
+        .await?;
         self.evict_pdfs().await?;
         Ok(report)
     }

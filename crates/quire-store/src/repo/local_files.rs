@@ -52,6 +52,15 @@ impl SqliteLibrary<'_> {
         Ok(())
     }
 
+    /// Records that the hub does not hold these files (any more): they are not evicted.
+    pub fn clear_on_hub(&self, hashes: &[String]) -> Result<()> {
+        let mut statement = self.conn.prepare("UPDATE file_local SET on_hub = 0 WHERE hash = ?1").or_core()?;
+        for hash in hashes {
+            statement.execute([hash]).or_core()?;
+        }
+        Ok(())
+    }
+
     /// Records that the file `hash` was opened now (eviction keeps the most recently opened).
     pub fn touch_file(&self, hash: &str) -> Result<()> {
         self.conn

@@ -36,7 +36,9 @@ cd ~/papers/thesis
 quire folder new -p thesis -r -o refs.bib
 ```
 
-This writes `quire.toml` in the folder. Inside it (and its subfolders), `quire add` puts new
+This writes `quire.toml` in the folder (its `output` must be a file in the folder or below it, so a
+`quire.toml` that came with a downloaded folder cannot make quire write elsewhere; `quire export -o`
+writes anywhere). Inside it (and its subfolders), `quire add` puts new
 references into `thesis`, `quire export` and `quire list` work on that project without flags, and
 `refs.bib` is kept updated. `quire folder show` prints the settings that apply; `--all` works on
 the whole library instead.
