@@ -3,14 +3,20 @@ package dev.neurokitchen.quire.presentation.screens.reader.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -44,6 +50,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
@@ -170,17 +177,59 @@ fun PdfPagesView(
 
         Box(
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(Dimens.SpaceMd)
+                .align(Alignment.BottomCenter)
+                .padding(bottom = Dimens.SpaceMd)
                 .clip(RoundedCornerShape(Dimens.RadiusFull))
-                .background(QuireTheme.colors.background.copy(alpha = 0.9f))
+                .background(QuireTheme.colors.background.copy(alpha = 0.92f))
+                .border(1.dp, QuireTheme.colors.border.copy(alpha = 0.5f), RoundedCornerShape(Dimens.RadiusFull))
                 .shadow(4.dp, RoundedCornerShape(Dimens.RadiusFull))
                 .padding(horizontal = 12.dp, vertical = 6.dp),
         ) {
-            Text(
-                text = stringResource(Res.string.reader_page_of, firstVisiblePage, pages.size, "${(zoom * 100).roundToInt()}%"),
-                style = MaterialTheme.typography.labelSmall,
-                color = QuireTheme.colors.fillPrimary,
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val readingProgress = if (pages.isNotEmpty()) (firstVisiblePage.toFloat() / pages.size.toFloat()).coerceIn(0f, 1f) else 0f
+                // Mini visual progress bar
+                Box(
+                    modifier = Modifier
+                        .width(36.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(QuireTheme.colors.fillQuarternary),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(readingProgress)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(QuireTheme.colors.accent),
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = stringResource(Res.string.reader_page_of, firstVisiblePage, pages.size, "${(zoom * 100).roundToInt()}%"),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = QuireTheme.colors.fillPrimary,
+                )
+            }
+        }
+
+        // Reading Progress Bar at the top of the PDF viewport
+        val readingProgress by remember {
+            derivedStateOf {
+                if (pages.isNotEmpty()) (firstVisiblePage.toFloat() / pages.size.toFloat()).coerceIn(0f, 1f) else 0f
+            }
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(3.dp)
+                .background(QuireTheme.colors.border.copy(alpha = 0.25f))
+                .align(Alignment.TopCenter),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(readingProgress)
+                    .fillMaxHeight()
+                    .background(QuireTheme.colors.accent),
             )
         }
     }

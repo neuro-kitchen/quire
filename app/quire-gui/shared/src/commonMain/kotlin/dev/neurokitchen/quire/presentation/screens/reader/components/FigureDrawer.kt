@@ -42,6 +42,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -55,6 +56,7 @@ import dev.neurokitchen.quire.presentation.designsystem.QuireTheme
 import dev.neurokitchen.quire.presentation.mapping.loadImageFile
 import dev.neurokitchen.quire.resources.Res
 import dev.neurokitchen.quire.resources.ic_close
+import dev.neurokitchen.quire.resources.ic_inventory_2
 import org.jetbrains.compose.resources.painterResource
 
 data class ExtractedFigure(
@@ -67,7 +69,7 @@ data class ExtractedFigure(
 data class ExtractedTable(
     val id: String,
     val title: String,
-    val content: String,
+    val rows: List<List<String>>,
 )
 
 @Composable
@@ -101,6 +103,17 @@ fun FigureDrawer(
                         )
                     )
                     figIndex++
+                } else if (tab.kind == PaperTabKind.Figures && block.kind is BlockKind.Heading) {
+                    val caption = tab.blocks.getOrNull(i + 1)?.text ?: ""
+                    list.add(
+                        ExtractedFigure(
+                            id = "fig-$figIndex",
+                            title = block.text.ifEmpty { "Figure $figIndex" },
+                            caption = caption,
+                            imageUrl = "",
+                        )
+                    )
+                    figIndex++
                 }
             }
         }
@@ -111,18 +124,57 @@ fun FigureDrawer(
         val list = mutableListOf<ExtractedTable>()
         var tblIndex = 1
         tabs.forEach { tab ->
-            tab.blocks.forEach { block ->
-                if (block.kind is BlockKind.TableRow) {
+            var currentHeading = ""
+            val currentRows = mutableListOf<List<String>>()
+
+            fun flushCurrentTable() {
+                if (currentRows.isNotEmpty()) {
+                    val title = currentHeading.ifEmpty { "Table $tblIndex" }
                     list.add(
                         ExtractedTable(
                             id = "tbl-$tblIndex",
-                            title = "Table $tblIndex",
-                            content = block.text,
+                            title = title,
+                            rows = currentRows.toList(),
                         )
                     )
                     tblIndex++
+                    currentRows.clear()
+                    currentHeading = ""
                 }
             }
+
+            tab.blocks.forEach { block ->
+                when (block.kind) {
+                    is BlockKind.Heading -> {
+                        flushCurrentTable()
+                        if (block.text.contains("table", ignoreCase = true) || tab.kind == PaperTabKind.Tables) {
+                            currentHeading = block.text
+                        }
+                    }
+                    is BlockKind.TableRow -> {
+                        val rawText = block.text.trim().removePrefix("|").removeSuffix("|")
+                        val cells = if ("\t" in rawText) {
+                            rawText.split("\t")
+                        } else if ("|" in rawText) {
+                            rawText.split("|").map { it.trim() }
+                        } else {
+                            listOf(rawText)
+                        }
+                        if (cells.any { it.isNotBlank() }) {
+                            currentRows.add(cells)
+                        }
+                    }
+                    else -> {
+                        if (block.text.contains("table", ignoreCase = true)) {
+                            flushCurrentTable()
+                            currentHeading = block.text
+                        } else if (currentRows.size >= 15 && block.text.isBlank()) {
+                            flushCurrentTable()
+                        }
+                    }
+                }
+            }
+            flushCurrentTable()
         }
         list
     }
@@ -186,7 +238,10 @@ fun FigureDrawer(
         // Content List
         if (selectedTab == 0) {
             if (figures.isEmpty()) {
-                DrawerEmptyState("No extracted figures in this document")
+                DrawerEmptyState(
+                    title = "No Extracted Figures",
+                    message = "This document does not contain standalone raster figures in its text layer.\n\nTip: Use the Snapshot tool in the toolbar to capture figures directly from the PDF into notes.",
+                )
             } else {
                 LazyColumn(
                     contentPadding = PaddingValues(12.dp),
@@ -204,7 +259,10 @@ fun FigureDrawer(
             }
         } else {
             if (tables.isEmpty()) {
-                DrawerEmptyState("No extracted tables in this document")
+                DrawerEmptyState(
+                    title = "No Extracted Tables",
+                    message = "No structured tables were extracted from this document's text layer.",
+                )
             } else {
                 LazyColumn(
                     contentPadding = PaddingValues(12.dp),
@@ -366,28 +424,77 @@ private fun TableCard(table: ExtractedTable) {
             .border(1.dp, colors.border.copy(alpha = 0.5f), RoundedCornerShape(Dimens.RadiusBase))
             .padding(10.dp),
     ) {
-        Text(
-            text = table.title,
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
-            color = colors.accent,
-        )
-        Spacer(Modifier.height(6.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(colors.fillQuarternary.copy(alpha = 0.3f))
-                .padding(8.dp),
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Text(
-                text = table.content,
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                    fontSize = 10.sp,
-                ),
-                color = colors.fillPrimary,
-                maxLines = 4,
+                text = table.title,
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
+                color = colors.accent,
+                modifier = Modifier.weight(1f, fill = false),
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "${table.rows.size} rows",
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                color = colors.fillTertiary,
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                .border(1.dp, colors.border.copy(alpha = 0.35f), RoundedCornerShape(Dimens.RadiusSmall)),
+        ) {
+            val maxVisibleRows = 6
+            table.rows.take(maxVisibleRows).forEachIndexed { rowIndex, cells ->
+                val isHeader = rowIndex == 0
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(if (isHeader) colors.sidepane else if (rowIndex % 2 == 1) colors.background else colors.sidepane.copy(alpha = 0.4f))
+                        .padding(horizontal = 8.dp, vertical = 5.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    cells.forEach { cell ->
+                        Text(
+                            text = cell,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontSize = 10.sp,
+                                fontWeight = if (isHeader) FontWeight.SemiBold else FontWeight.Normal,
+                                fontFamily = if (isHeader) null else androidx.compose.ui.text.font.FontFamily.Monospace,
+                            ),
+                            color = if (isHeader) colors.fillPrimary else colors.fillSecondary,
+                            modifier = Modifier.weight(1f, fill = false),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                if (rowIndex < minOf(table.rows.size - 1, maxVisibleRows - 1)) {
+                    HorizontalDivider(color = colors.border.copy(alpha = 0.2f))
+                }
+            }
+            if (table.rows.size > maxVisibleRows) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(colors.sidepane.copy(alpha = 0.7f))
+                        .padding(vertical = 4.dp),
+                ) {
+                    Text(
+                        "+ ${table.rows.size - maxVisibleRows} more rows",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                        color = colors.fillTertiary,
+                    )
+                }
+            }
         }
     }
 }
@@ -418,7 +525,7 @@ private fun DrawerTabChip(
 }
 
 @Composable
-private fun DrawerEmptyState(message: String) {
+private fun DrawerEmptyState(title: String, message: String) {
     val colors = QuireTheme.colors
     Box(
         contentAlignment = Alignment.Center,
@@ -426,10 +533,28 @@ private fun DrawerEmptyState(message: String) {
             .fillMaxSize()
             .padding(24.dp),
     ) {
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodySmall,
-            color = colors.fillTertiary,
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(
+                painterResource(Res.drawable.ic_inventory_2),
+                contentDescription = null,
+                tint = colors.fillTertiary,
+                modifier = Modifier.size(32.dp),
+            )
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.fillPrimary,
+            )
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.fillSecondary,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
