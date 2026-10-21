@@ -102,9 +102,10 @@ prost = "0.14.4"
 # Library backups (`quire library backup`): one .tar.gz
 tar = "0.4.46"
 flate2 = "1.1.10"
-# EPUB containers (`quire-document::epub`): deflate only, through flate2 (pure Rust); no C codecs
-# or crypto.
-zip = { version = "9.0.5", default-features = false, features = ["deflate-flate2"] }
+# EPUB containers (`quire-document::epub`): deflate only, through flate2 with zlib-rs (pure Rust; a
+# backend must be named: `deflate-flate2` alone left crates built on their own without one); no C
+# codecs or crypto.
+zip = { version = "9.0.5", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 pdf-inspector = "1.25.2"
 # PDF objects (the parser pdf-inspector uses): revealing invisible OCR text layers
 lopdf = "0.45.0"
