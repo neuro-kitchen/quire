@@ -111,14 +111,22 @@ pub async fn run(context: &Context, args: &ExportArgs) -> anyhow::Result<()> {
     match output {
         Some(path) if args.keep_updated => {
             let (path, count) = engine.keep_updated(&request, &path).await?;
-            output::report(Tone::Ok, "written", format!("{count} references to {}", path.display()));
+            output::report(
+                Tone::Ok,
+                "written",
+                format!("{} to {}", output::count(count, "reference", "references"), path.display()),
+            );
             output::hint("Kept updated after every change; `quire export auto` lists such files.");
         }
         Some(path) => {
             let (text, count) = engine.export(&request).await?;
             let wrote = quire_engine::write_if_changed(&path, &text)?;
             let label = if wrote { "written" } else { "unchanged" };
-            output::note(Tone::Ok, label, format!("{count} references to {}", path.display()));
+            output::note(
+                Tone::Ok,
+                label,
+                format!("{} to {}", output::count(count, "reference", "references"), path.display()),
+            );
         }
         None => print!("{}", engine.export(&request).await?.0),
     }
@@ -155,9 +163,11 @@ async fn list_auto(context: &Context) -> anyhow::Result<()> {
 pub fn report_auto(results: &[(String, AutoExportOutcome)], all: bool) {
     for (path, outcome) in results {
         match outcome {
-            AutoExportOutcome::Written(count) => {
-                output::note(Tone::Ok, "updated", format!("{path} ({count} references)"))
-            }
+            AutoExportOutcome::Written(count) => output::note(
+                Tone::Ok,
+                "updated",
+                format!("{path} ({})", output::count(*count, "reference", "references")),
+            ),
             AutoExportOutcome::Unchanged if all => output::note(Tone::Info, "unchanged", path),
             AutoExportOutcome::Unchanged => {}
             AutoExportOutcome::Failed(error) => output::note(Tone::Error, "not updated", format!("{path}: {error}")),

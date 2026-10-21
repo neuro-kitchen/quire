@@ -98,7 +98,11 @@ pub async fn run(context: &Context, args: &FolderArgs) -> anyhow::Result<()> {
                 output::report(
                     Tone::Ok,
                     "written",
-                    format!("{count} references to {} (kept updated)", written.display()),
+                    format!(
+                        "{} to {} (kept updated)",
+                        output::count(count, "reference", "references"),
+                        written.display()
+                    ),
                 );
             }
         }

@@ -35,7 +35,11 @@ pub async fn run(engine: &Engine, args: &ImportArgs) -> anyhow::Result<()> {
             Added::Existing(reference) => output::report(Tone::Warn, "existing", output::summary(reference)),
         }
     }
-    output::hint(format!("{} entries: {new} new, {} already in the library", results.len(), results.len() - new));
+    output::hint(format!(
+        "{}: {new} new, {} already in the library",
+        output::count(results.len(), "entry", "entries"),
+        results.len() - new
+    ));
     Ok(())
 }
 
@@ -58,13 +62,13 @@ async fn zotero(engine: &Engine, folder: &Path, args: &ImportArgs) -> anyhow::Re
         output::report(Tone::Warn, "skipped", line);
     }
     output::hint(format!(
-        "{} new, {} already here; {} projects, {} notes, {} PDFs, {} highlights",
+        "{} new, {} already here; {}, {}, {}, {}",
         report.added.len(),
         report.existing,
-        report.projects,
-        report.notes,
-        report.pdfs,
-        report.highlights
+        output::count(report.projects, "project", "projects"),
+        output::count(report.notes, "note", "notes"),
+        output::count(report.pdfs, "PDF", "PDFs"),
+        output::count(report.highlights, "highlight", "highlights")
     ));
     Ok(())
 }

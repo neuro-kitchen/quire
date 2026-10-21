@@ -95,7 +95,11 @@ pub async fn run(engine: &Engine, args: &TagArgs) -> anyhow::Result<()> {
         }
         Action::Delete { name } => {
             let count = engine.delete_tag(name).await?;
-            output::report(Tone::Info, "deleted", format!("{name} (was on {count} references)"));
+            output::report(
+                Tone::Info,
+                "deleted",
+                format!("{name} (was on {})", output::count(count, "reference", "references")),
+            );
         }
         Action::Color { name, color, key } => {
             let color = (!color.eq_ignore_ascii_case("none")).then_some(color.as_str());

@@ -39,10 +39,23 @@ pub fn truncate(text: &str, width: usize) -> String {
     format!("{}…", cut.trim_end())
 }
 
+/// `n` with its noun: `1 reference`, `2 references`, `0 references`.
+pub fn count(n: impl TryInto<u64>, one: &str, many: &str) -> String {
+    let n: u64 = n.try_into().unwrap_or(u64::MAX);
+    format!("{n} {}", if n == 1 { one } else { many })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// Messages said "1 entries", "trashed thesis and 1 subprojects", "1 pages".
+    #[test]
+    fn counts_agree_with_their_noun() {
+        assert_eq!(count(1usize, "entry", "entries"), "1 entry");
+        assert_eq!(count(2u32, "entry", "entries"), "2 entries");
+        assert_eq!(count(0u64, "page", "pages"), "0 pages");
+    }
     #[test]
     fn truncates_long_titles() {
         assert_eq!(truncate("short", 10), "short");

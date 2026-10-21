@@ -40,7 +40,7 @@ pub async fn list(context: &Context, args: &ListArgs) -> anyhow::Result<()> {
                     Some(PdfKind::Mixed) => ", partly scanned",
                     _ => "",
                 };
-                let facts = format!("{} pages{kind}", attachment.pages.unwrap_or(0));
+                let facts = format!("{}{kind}", output::count(attachment.pages.unwrap_or(0), "page", "pages"));
                 anstream::println!(
                     "{}  {}  {}",
                     style::paint(style::KEY, &reference.cite_key),
@@ -227,7 +227,7 @@ pub async fn extract(context: &Context, args: &ExtractArgs) -> anyhow::Result<()
             }
         }
     }
-    output::hint(format!("{done} texts extracted, {failed} failed"));
+    output::hint(format!("{} extracted, {failed} failed", output::count(done, "text", "texts")));
     Ok(())
 }
 

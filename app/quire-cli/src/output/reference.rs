@@ -85,7 +85,7 @@ pub fn block(reference: &Reference, context: &Context) -> String {
         add("note", format!("{title}  {}", paint(style::DIM, id)));
     }
     for (attachment, path) in pdfs {
-        let pages = attachment.pages.map(|p| format!("  ({p} pages)")).unwrap_or_default();
+        let pages = attachment.pages.map(|p| format!("  ({})", super::count(p, "page", "pages"))).unwrap_or_default();
         add("pdf", format!("{}{}", path.display(), paint(style::DIM, pages)));
     }
     if reference.meta.is_deleted() {

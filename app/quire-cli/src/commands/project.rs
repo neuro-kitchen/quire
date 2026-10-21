@@ -134,7 +134,11 @@ pub async fn run(engine: &Engine, args: &ProjectArgs) -> anyhow::Result<()> {
         }
         Action::Rm { path, recursive } => {
             let count = engine.remove_project(path, *recursive).await?;
-            let extra = if count > 1 { format!(" and {} subprojects", count - 1) } else { String::new() };
+            let extra = if count > 1 {
+                format!(" and {}", output::count(count - 1, "subproject", "subprojects"))
+            } else {
+                String::new()
+            };
             output::report(Tone::Info, "trashed", format!("{}{extra}", style::paint(style::KEY, path)));
         }
     }
