@@ -6,6 +6,7 @@ import dev.neurokitchen.quire.resources.figures_no_extracted_tables
 import dev.neurokitchen.quire.resources.figures_no_extracted_figures
 import dev.neurokitchen.quire.resources.figures_loading_figure
 import dev.neurokitchen.quire.resources.figures_figures_tables
+import dev.neurokitchen.quire.resources.reader_figures_tables
 import dev.neurokitchen.quire.resources.figures_figure_preview
 import dev.neurokitchen.quire.resources.figures_figure
 import dev.neurokitchen.quire.resources.figures_enlarged_figure
@@ -96,6 +97,9 @@ data class ExtractedTable(
 
 enum class FigureDockSide { Left, Right }
 
+/** A tab of the drawer besides Figures and Tables: its chip's label and what it shows. */
+class DrawerExtraTab(val label: String, val content: @Composable () -> Unit)
+
 @Composable
 fun FigureDrawer(
     isOpen: Boolean,
@@ -114,6 +118,8 @@ fun FigureDrawer(
     pinLabel: String? = null,
     /** The desktop's dock-left/right toggle (not on a phone). */
     showDockToggle: Boolean = true,
+    /** A third tab after Figures and Tables (the phone's highlights). */
+    extraTab: DrawerExtraTab? = null,
 ) {
     if (!isOpen) return
     val openLabel = pinLabel ?: stringResource(Res.string.reader_open_beside)
@@ -239,7 +245,7 @@ fun FigureDrawer(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = stringResource(Res.string.figures_figures_tables),
+                    text = stringResource(if (extraTab != null) Res.string.reader_figures_tables else Res.string.figures_figures_tables),
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp,
@@ -294,6 +300,7 @@ fun FigureDrawer(
         ) {
             DrawerTabChip("Figures (${shownFigures.size})", selected = selectedTab == 0) { selectedTab = 0 }
             DrawerTabChip("Tables (${tables.size})", selected = selectedTab == 1) { selectedTab = 1 }
+            extraTab?.let { DrawerTabChip(it.label, selected = selectedTab == 2) { selectedTab = 2 } }
         }
 
         HorizontalDivider(color = colors.border.copy(alpha = 0.4f), modifier = Modifier.padding(top = Dimens.SpaceXs))
@@ -324,7 +331,7 @@ fun FigureDrawer(
                     }
                 }
             }
-        } else {
+        } else if (selectedTab == 1 || extraTab == null) {
             if (tables.isEmpty()) {
                 DrawerEmptyState(
                     title = stringResource(Res.string.figures_no_extracted_tables),
@@ -341,6 +348,8 @@ fun FigureDrawer(
                     }
                 }
             }
+        } else {
+            extraTab.content()
         }
     }
 

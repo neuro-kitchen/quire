@@ -43,6 +43,8 @@ sealed interface Route : NavKey {
         val identifiers: String = "",
         /** Shared PDF files (paths in the cache), to add. */
         val pdfs: List<String> = emptyList(),
+        /** The way in to show first (an `AddTab` name), from the Add menu. */
+        val way: String? = null,
     ) : Route
 }
 

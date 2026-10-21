@@ -519,8 +519,14 @@
     <string name="add_subtitle_phone">By identifier, from PDF files or a .bib file, pasted BibTeX, or typed in</string>
     <string name="reader_to_text">Read mode</string>
     <string name="reader_to_pdf">PDF</string>
-    <string name="reader_figures_tables">Figures and tables</string>
+    <string name="reader_figures_tables">Figures, tables and highlights</string>
     <string name="reader_page_n">Page %1$s</string>
     <string name="reader_notebook_highlights">Highlights (%1$s)</string>
-    <string name="reader_notebook_notes">Notes (%1$s)</string>
+    <string name="reader_note">Note</string>
+    <string name="add_menu_identifier">DOI, arXiv or link</string>
+    <string name="add_menu_pdf">PDF files</string>
+    <string name="add_menu_bib">.bib file</string>
+    <string name="add_menu_paste">Paste BibTeX</string>
+    <string name="add_menu_manual">Type it in</string>
+    <string name="common_close">Close</string>
 </resources>
