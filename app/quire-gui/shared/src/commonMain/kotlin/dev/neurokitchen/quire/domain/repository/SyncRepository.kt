@@ -1,5 +1,7 @@
 package dev.neurokitchen.quire.domain.repository
 
+import dev.neurokitchen.quire.domain.model.HubDevice
+import dev.neurokitchen.quire.domain.model.HubReport
 import dev.neurokitchen.quire.domain.model.ProjectMember
 import dev.neurokitchen.quire.domain.model.SyncReport
 
@@ -22,4 +24,13 @@ interface SyncRepository {
     suspend fun shareProject(path: String, userId: String, name: String, role: String): ProjectMember = unsupported()
     suspend fun unshareProject(path: String, userId: String): Unit = unsupported()
     suspend fun projectMembers(path: String): List<ProjectMember> = unsupported()
+
+    /** Syncs through the hub (setting `hub.id`); [code] registers this person the first time. */
+    suspend fun syncWithHub(code: String? = null): HubReport = unsupported()
+    /** This person's devices the hub knows. */
+    suspend fun hubDevices(): List<HubDevice> = unsupported()
+    /** Makes the hub refuse [device] of this person from now on (a lost phone). */
+    suspend fun revokeHubDevice(device: String): Unit = unsupported()
+    /** What to keep safe before syncing through a hub (it cannot recover the library). */
+    suspend fun recoveryKit(): String = unsupported()
 }

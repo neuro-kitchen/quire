@@ -1,6 +1,8 @@
 package dev.neurokitchen.quire.domain.repository
 
 import dev.neurokitchen.quire.domain.model.AttachedPdf
+import dev.neurokitchen.quire.domain.model.Eviction
+import dev.neurokitchen.quire.domain.model.OpenedPdf
 import dev.neurokitchen.quire.domain.model.ImportedPdf
 import dev.neurokitchen.quire.domain.model.PdfCheck
 import dev.neurokitchen.quire.domain.model.PdfFetch
@@ -29,4 +31,13 @@ interface AttachmentRepository {
     suspend fun fillAbstract(id: String, fromPdf: Boolean = true): String? = unsupported()
     /** Forgets a paper's stored text so the reader converts it again; returns how many texts. */
     suspend fun forgetText(id: String): Int = unsupported()
+
+    /** The PDF of [id], fetched first if it is not here (the hub, another own device, the source). */
+    suspend fun openPdf(id: String): OpenedPdf = unsupported()
+    /** Keeps (or stops keeping) the PDFs of [id] downloaded on this device. */
+    suspend fun keepOffline(id: String, keep: Boolean = true): Boolean = unsupported()
+    /** Keeps (or stops keeping) the PDFs of the project at [path] (and subprojects) downloaded. */
+    suspend fun keepProjectOffline(path: String, keep: Boolean = true): Boolean = unsupported()
+    /** Removes PDFs past `files.cache_mb` (only those the hub holds; never one kept offline). */
+    suspend fun evictPdfs(): Eviction = unsupported()
 }
