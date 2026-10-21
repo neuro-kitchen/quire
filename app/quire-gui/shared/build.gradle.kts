@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.androidMultiplatformLibrary)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.kotlinSerialization)
 }
 
 // ── The Rust engine ────────────────────────────────────────────────────────────────────────────
@@ -105,6 +106,12 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
             api(libs.koin.core)
             implementation(libs.koin.compose.viewmodel)
+            implementation(libs.navigation3.ui)
+            implementation(libs.lifecycle.viewmodel.navigation3)
+            implementation(libs.kotlinx.serialization.core)
+            implementation(libs.haze)
+            implementation(libs.haze.blur)
+            implementation(libs.haze.blur.materials)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
