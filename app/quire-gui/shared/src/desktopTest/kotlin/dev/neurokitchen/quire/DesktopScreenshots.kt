@@ -1,5 +1,8 @@
 package dev.neurokitchen.quire
 
+import kotlinx.coroutines.withTimeout
+import dev.neurokitchen.quire.presentation.screens.reader.components.ExtractedTable
+import dev.neurokitchen.quire.presentation.screens.reader.Pinned
 import dev.neurokitchen.quire.presentation.components.export_dialog.ENCODING_ASCII
 import dev.neurokitchen.quire.presentation.components.export_dialog.ENCODING_WINDOWS_1252
 import dev.neurokitchen.quire.presentation.components.export_dialog.ENCODING_UTF8_BOM
@@ -491,6 +494,33 @@ class DesktopScreenshots {
         vm.onEvent(ReaderEvent.OnModeChange(ReaderMode.Split))
         val state = runBlocking { vm.state.first { !it.isLoading && it.mode == ReaderMode.Split } }
         render("desktop-reader-split.png") {
+            QuireTheme(darkTheme = false, desktop = true) {
+                Surface {
+                    ReaderScreen(state, {}, { index, width -> pdf.render(path, index, width).toImageBitmap() }, { null })
+                }
+            }
+        }
+    }
+
+    /** Three columns: the text, the PDF, and a table pinned beside them (side panes closed). */
+    @Test
+    fun readerWithAPinnedTable() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        val reader = SampleReaderRepository(fakePdfs = true)
+        val pdf = SamplePdfRepository()
+        val vm = ReaderViewModel("3", "The hippocampus as a spatial map", reader, pdf)
+        vm.onEvent(ReaderEvent.OnModeChange(ReaderMode.Split))
+        vm.onEvent(ReaderEvent.OnToggleAnnotations)
+        vm.onEvent(ReaderEvent.OnToggleNotes)
+        val table = ExtractedTable(
+            id = "t1",
+            title = "Table 1. Units recorded",
+            rows = listOf(listOf("Rat", "Units", "Place cells", "%"), listOf("R1", "23", "8", "34.8"), listOf("R2", "19", "5", "26.3"), listOf("R3", "34", "12", "35.3")),
+        )
+        vm.onEvent(ReaderEvent.OnPin(Pinned.Table(table)))
+        val state = runBlocking { withTimeout(10_000) { vm.state.first { !it.isLoading && !it.pdf.isLoading && it.panes.size == 3 } } }
+        val path = state.pdf.path!!
+        render("desktop-reader-pinned.png") {
             QuireTheme(darkTheme = false, desktop = true) {
                 Surface {
                     ReaderScreen(state, {}, { index, width -> pdf.render(path, index, width).toImageBitmap() }, { null })

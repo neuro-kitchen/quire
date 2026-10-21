@@ -1,5 +1,9 @@
 package dev.neurokitchen.quire.presentation.screens.reader
 
+import dev.neurokitchen.quire.presentation.screens.reader.components.PinnedPane
+import dev.neurokitchen.quire.presentation.designsystem.components.fitted
+import dev.neurokitchen.quire.presentation.designsystem.components.ResizableRow
+import dev.neurokitchen.quire.domain.repository.ReaderLayout
 import dev.neurokitchen.quire.domain.model.PdfFigure
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,7 +30,6 @@ import org.jetbrains.compose.resources.painterResource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -97,10 +100,9 @@ fun ReaderScreen(
 ) {
     val colors = QuireTheme.colors
     var selection by remember(state.referenceId) { mutableStateOf<Pair<String, String>?>(null) }
-    var sidebarWidthDp by remember { mutableFloatStateOf(260f) }
-    var notesWidthDp by remember { mutableFloatStateOf(280f) }
-    var figureDrawerWidthDp by remember { mutableFloatStateOf(320f) }
-    var figureDockSide by remember { mutableStateOf(FigureDockSide.Right) }
+    val layout = state.layout
+    val figureDockSide = if (layout.drawerOnLeft) FigureDockSide.Left else FigureDockSide.Right
+    val setLayout = { changed: ReaderLayout -> onEvent(ReaderEvent.OnLayoutChange(changed)) }
     var readingProgressCurrent by remember(state.referenceId) { mutableIntStateOf(1) }
     var readingProgressTotal by remember(state.referenceId) { mutableIntStateOf(1) }
     val rootFocusRequester = remember { FocusRequester() }
@@ -164,11 +166,11 @@ fun ReaderScreen(
                     onComment = { id, text -> onEvent(ReaderEvent.OnHighlightComment(id, text)) },
                     onRemove = { onEvent(ReaderEvent.OnHighlightRemove(it)) },
                     onCollapse = { onEvent(ReaderEvent.OnToggleAnnotations) },
-                    modifier = Modifier.width(sidebarWidthDp.dp),
+                    modifier = Modifier.width(layout.annotationsWidth.dp),
                 )
                 DraggableSplitter(
                     onDelta = { delta ->
-                        sidebarWidthDp = (sidebarWidthDp + delta).coerceIn(180f, 450f)
+                        setLayout(layout.copy(annotationsWidth = (layout.annotationsWidth + delta).toInt().coerceIn(180, 450)))
                     },
                 )
             }
@@ -181,12 +183,13 @@ fun ReaderScreen(
                     loadPdfFigure = loadPdfFigure,
                     onClose = { onEvent(ReaderEvent.OnToggleFigureDrawer) },
                     dockSide = figureDockSide,
-                    onToggleDockSide = { figureDockSide = FigureDockSide.Right },
-                    modifier = Modifier.width(figureDrawerWidthDp.dp),
+                    onToggleDockSide = { setLayout(layout.copy(drawerOnLeft = false)) },
+                    onPin = { onEvent(ReaderEvent.OnPin(it)) },
+                    modifier = Modifier.width(layout.drawerWidth.dp),
                 )
                 DraggableSplitter(
                     onDelta = { delta ->
-                        figureDrawerWidthDp = (figureDrawerWidthDp + delta).coerceIn(240f, 550f)
+                        setLayout(layout.copy(drawerWidth = (layout.drawerWidth + delta).toInt().coerceIn(240, 550)))
                     },
                 )
             }
@@ -284,76 +287,39 @@ fun ReaderScreen(
                 }
 
                 StatusLine(state)
-                Box(Modifier.weight(1f).fillMaxWidth()) {
-                    when {
-                        state.mode == ReaderMode.Split && state.pdf.pages.isNotEmpty() -> {
-                            var splitWeight by remember { mutableFloatStateOf(0.5f) }
-                            Row(Modifier.fillMaxSize()) {
-                                Box(Modifier.weight(splitWeight).fillMaxHeight()) {
-                                    TextReaderView(
-                                        tabs = state.tabs,
-                                        selectedTab = state.selectedTab,
-                                        highlights = state.highlights,
-                                        focused = state.focusedHighlight,
-                                        readerTheme = state.readerTheme,
-                                        readerFont = state.readerFont,
-                                        fontSizeSp = state.fontSizeSp,
-                                        onTabClick = { onEvent(ReaderEvent.OnTabClick(it)) },
-                                        onSelection = { selection = it },
-                                        onHighlight = { quote, prefix, color ->
-                                            onEvent(ReaderEvent.OnHighlight(quote, prefix, color))
-                                        },
-                                        onAddNote = { body ->
-                                            onEvent(ReaderEvent.OnNoteDraftChange(body))
-                                            onEvent(ReaderEvent.OnNoteAdd)
-                                        },
-                                        loadFigure = loadFigure,
-                                        findMatches = if (state.find.isOpen) state.find.textMatches else emptyList(),
-                                        currentFind = state.find.current,
-                                        onProgressChange = { cur, tot ->
-                                            readingProgressCurrent = cur
-                                            readingProgressTotal = tot
-                                        },
-                                    )
-                                }
-                                DraggableSplitter(
-                                    onDelta = { delta ->
-                                        splitWeight = (splitWeight + delta / 800f).coerceIn(0.25f, 0.75f)
-                                    },
-                                )
-                                Box(Modifier.weight(1f - splitWeight).fillMaxHeight()) {
-                                    PdfPagesView(
-                                        pages = state.pdf.pages,
-                                        zoom = state.pdf.zoom,
-                                        locations = state.pdf.locations,
-                                        focused = state.focusedHighlight,
-                                        loadPage = loadPage,
-                            renderedNear = renderedNear,
-                                        readerTheme = state.readerTheme,
-                                        textLayer = textLayer,
-                                        matches = if (state.find.isOpen) state.find.pdfMatches else emptyList(),
-                                        currentMatch = state.find.current,
-                                        isSnapshotMode = state.isSnapshotMode,
-                                        onHighlight = { quote, prefix, color ->
-                                            onEvent(ReaderEvent.OnHighlight(quote, prefix, color))
-                                        },
-                                        onAddNote = { body ->
-                                            onEvent(ReaderEvent.OnNoteDraftChange(body))
-                                            onEvent(ReaderEvent.OnNoteAdd)
-                                        },
-                                        onAddSnapshot = { rect, page ->
-                                            onEvent(ReaderEvent.OnNoteDraftChange("[Area Snapshot p. ${page + 1}: (${rect.left.toInt()}, ${rect.top.toInt()}) - (${rect.right.toInt()}, ${rect.bottom.toInt()})]"))
-                                            onEvent(ReaderEvent.OnNoteAdd)
-                                        },
-                                        onProgressChange = { cur, tot ->
-                                            readingProgressCurrent = cur
-                                            readingProgressTotal = tot
-                                        },
-                                    )
-                                }
-                            }
+                val progress = { cur: Int, tot: Int ->
+                    readingProgressCurrent = cur
+                    readingProgressTotal = tot
+                }
+                val pane: @Composable (ReaderPane) -> Unit = { kind ->
+                    when (kind) {
+                        ReaderPane.Text -> if (state.isLoading && state.tabs.isEmpty()) {
+                            Message(stringResource(Res.string.reader_loading))
+                        } else {
+                            TextReaderView(
+                                tabs = state.tabs,
+                                selectedTab = state.selectedTab,
+                                highlights = state.highlights,
+                                focused = state.focusedHighlight,
+                                readerTheme = state.readerTheme,
+                                readerFont = state.readerFont,
+                                fontSizeSp = state.fontSizeSp,
+                                onTabClick = { onEvent(ReaderEvent.OnTabClick(it)) },
+                                onSelection = { selection = it },
+                                onHighlight = { quote, prefix, color ->
+                                    onEvent(ReaderEvent.OnHighlight(quote, prefix, color))
+                                },
+                                onAddNote = { body ->
+                                    onEvent(ReaderEvent.OnNoteDraftChange(body))
+                                    onEvent(ReaderEvent.OnNoteAdd)
+                                },
+                                loadFigure = loadFigure,
+                                findMatches = if (state.find.isOpen) state.find.textMatches else emptyList(),
+                                currentFind = state.find.current,
+                                onProgressChange = progress,
+                            )
                         }
-                        state.mode == ReaderMode.Pdf && state.pdf.pages.isNotEmpty() -> PdfPagesView(
+                        ReaderPane.Pdf -> PdfPagesView(
                             pages = state.pdf.pages,
                             zoom = state.pdf.zoom,
                             locations = state.pdf.locations,
@@ -376,37 +342,28 @@ fun ReaderScreen(
                                 onEvent(ReaderEvent.OnNoteDraftChange("[Area Snapshot p. ${page + 1}: (${rect.left.toInt()}, ${rect.top.toInt()}) - (${rect.right.toInt()}, ${rect.bottom.toInt()})]"))
                                 onEvent(ReaderEvent.OnNoteAdd)
                             },
-                            onProgressChange = { cur, tot ->
-                                readingProgressCurrent = cur
-                                readingProgressTotal = tot
-                            },
+                            onProgressChange = progress,
                         )
-                        state.isLoading && state.tabs.isEmpty() -> Message(stringResource(Res.string.reader_loading))
-                        else -> TextReaderView(
-                            tabs = state.tabs,
-                            selectedTab = state.selectedTab,
-                            highlights = state.highlights,
-                            focused = state.focusedHighlight,
-                            readerTheme = state.readerTheme,
-                            readerFont = state.readerFont,
-                            fontSizeSp = state.fontSizeSp,
-                            onTabClick = { onEvent(ReaderEvent.OnTabClick(it)) },
-                            onSelection = { selection = it },
-                            onHighlight = { quote, prefix, color ->
-                                onEvent(ReaderEvent.OnHighlight(quote, prefix, color))
-                            },
-                            onAddNote = { body ->
-                                onEvent(ReaderEvent.OnNoteDraftChange(body))
-                                onEvent(ReaderEvent.OnNoteAdd)
-                            },
-                            loadFigure = loadFigure,
-                            findMatches = if (state.find.isOpen) state.find.textMatches else emptyList(),
-                            currentFind = state.find.current,
-                            onProgressChange = { cur, tot ->
-                                readingProgressCurrent = cur
-                                readingProgressTotal = tot
-                            },
-                        )
+                        ReaderPane.Pinned -> state.pinned?.let { pinned ->
+                            PinnedPane(
+                                pinned = pinned,
+                                loadFigure = loadFigure,
+                                loadPdfFigure = loadPdfFigure,
+                                onClose = { onEvent(ReaderEvent.OnPin(null)) },
+                            )
+                        }
+                    }
+                }
+                val panes = state.panes
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    if (panes.size == 1) {
+                        pane(panes.single())
+                    } else {
+                        val layout = state.layout
+                        ResizableRow(
+                            fractions = fitted(if (panes.size == 2) layout.two else layout.three, panes.size),
+                            onResize = { f -> onEvent(ReaderEvent.OnLayoutChange(if (panes.size == 2) layout.copy(two = f) else layout.copy(three = f))) },
+                        ) { index -> pane(panes[index]) }
                     }
                 }
 
@@ -431,7 +388,7 @@ fun ReaderScreen(
             if (!state.isNotesCollapsed) {
                 DraggableSplitter(
                     onDelta = { delta ->
-                        notesWidthDp = (notesWidthDp - delta).coerceIn(200f, 500f)
+                        setLayout(layout.copy(notesWidth = (layout.notesWidth - delta).toInt().coerceIn(200, 500)))
                     },
                 )
                 NotesPanel(
@@ -441,13 +398,13 @@ fun ReaderScreen(
                     onAdd = { onEvent(ReaderEvent.OnNoteAdd) },
                     onRemove = { onEvent(ReaderEvent.OnNoteRemove(it)) },
                     onCollapse = { onEvent(ReaderEvent.OnToggleNotes) },
-                    modifier = Modifier.width(notesWidthDp.dp),
+                    modifier = Modifier.width(layout.notesWidth.dp),
                 )
             }
             if (state.isFigureDrawerOpen && figureDockSide == FigureDockSide.Right) {
                 DraggableSplitter(
                     onDelta = { delta ->
-                        figureDrawerWidthDp = (figureDrawerWidthDp - delta).coerceIn(240f, 550f)
+                        setLayout(layout.copy(drawerWidth = (layout.drawerWidth - delta).toInt().coerceIn(240, 550)))
                     },
                 )
                 FigureDrawer(
@@ -458,8 +415,9 @@ fun ReaderScreen(
                     loadPdfFigure = loadPdfFigure,
                     onClose = { onEvent(ReaderEvent.OnToggleFigureDrawer) },
                     dockSide = figureDockSide,
-                    onToggleDockSide = { figureDockSide = FigureDockSide.Left },
-                    modifier = Modifier.width(figureDrawerWidthDp.dp),
+                    onToggleDockSide = { setLayout(layout.copy(drawerOnLeft = true)) },
+                    onPin = { onEvent(ReaderEvent.OnPin(it)) },
+                    modifier = Modifier.width(layout.drawerWidth.dp),
                 )
             }
         }

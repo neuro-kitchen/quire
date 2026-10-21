@@ -1,5 +1,10 @@
 package dev.neurokitchen.quire.presentation.screens.reader
 
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import dev.neurokitchen.quire.domain.repository.ReaderLayout
+import dev.neurokitchen.quire.domain.repository.PreferencesRepository
 import dev.neurokitchen.quire.domain.model.SelectedTextRange
 import dev.neurokitchen.quire.domain.model.WordLocation
 import kotlinx.coroutines.flow.collectLatest
@@ -28,6 +33,9 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** How long pane sizes stay unchanged before they are saved. */
+private const val LAYOUT_SAVE_DELAY_MS = 500L
+
 /**
  * One open paper: its PDF pages and text tabs, highlights (shown in both) and notes. Opens on the
  * PDF when there is one, else on the text.
@@ -39,8 +47,12 @@ class ReaderViewModel(
     private val pdf: PdfRepository,
     /** Where rendered pixels become images (off the UI thread). */
     private val work: CoroutineDispatcher = Dispatchers.Default,
+    /** Where pane sizes are kept; `null`: not kept. */
+    private val preferences: PreferencesRepository? = null,
 ) : ViewModel(), PdfTextLayer {
-    private val _state = MutableStateFlow(ReaderState(referenceId = referenceId, title = title))
+    private val _state = MutableStateFlow(
+        ReaderState(referenceId = referenceId, title = title, layout = preferences?.preferences?.value?.readerLayout ?: ReaderLayout()),
+    )
     val state: StateFlow<ReaderState> = _state.asStateFlow()
 
     /**
@@ -56,6 +68,12 @@ class ReaderViewModel(
     private val findQuery = MutableStateFlow("")
 
     init {
+        // Pane sizes, saved once a drag has stopped for a moment (not on every move).
+        preferences?.let { prefs ->
+            viewModelScope.launch {
+                _state.map { it.layout }.distinctUntilChanged().drop(1).debounce(LAYOUT_SAVE_DELAY_MS).collect { prefs.setReaderLayout(it) }
+            }
+        }
         viewModelScope.launch {
             findQuery.debounce(FIND_DELAY_MS).collectLatest { query -> find(query) }
         }
@@ -124,6 +142,8 @@ class ReaderViewModel(
             }
             ReaderEvent.OnToggleSnapshotMode -> _state.update { it.copy(isSnapshotMode = !it.isSnapshotMode) }
             is ReaderEvent.OnShowCitation -> _state.update { it.copy(activeCitation = event.citation) }
+            is ReaderEvent.OnLayoutChange -> _state.update { it.copy(layout = event.layout) }
+            is ReaderEvent.OnPin -> _state.update { it.copy(pinned = event.pinned) }
         }
     }
 
