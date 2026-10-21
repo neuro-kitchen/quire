@@ -156,14 +156,8 @@ fun FigureDrawer(
                         }
                     }
                     is BlockKind.TableRow -> {
-                        val rawText = block.text.trim().removePrefix("|").removeSuffix("|")
-                        val cells = if ("\t" in rawText) {
-                            rawText.split("\t")
-                        } else if ("|" in rawText) {
-                            rawText.split("|").map { it.trim() }
-                        } else {
-                            listOf(rawText)
-                        }
+                        // One word per cell, as the engine keeps them (joined text loses the columns).
+                        val cells = block.words.map { it.text }
                         if (cells.any { it.isNotBlank() }) {
                             currentRows.add(cells)
                         }
@@ -474,57 +468,14 @@ private fun TableCard(table: ExtractedTable) {
             )
         }
         Spacer(Modifier.height(8.dp))
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Dimens.RadiusSmall))
-                .border(1.dp, colors.border.copy(alpha = 0.35f), RoundedCornerShape(Dimens.RadiusSmall)),
-        ) {
-            val maxVisibleRows = 6
-            table.rows.take(maxVisibleRows).forEachIndexed { rowIndex, cells ->
-                val isHeader = rowIndex == 0
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(if (isHeader) colors.sidepane else if (rowIndex % 2 == 1) colors.background else colors.sidepane.copy(alpha = 0.4f))
-                        .padding(horizontal = 8.dp, vertical = 5.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    cells.forEach { cell ->
-                        Text(
-                            text = cell,
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontSize = 10.sp,
-                                fontWeight = if (isHeader) FontWeight.SemiBold else FontWeight.Normal,
-                                fontFamily = if (isHeader) null else androidx.compose.ui.text.font.FontFamily.Monospace,
-                            ),
-                            color = if (isHeader) colors.fillPrimary else colors.fillSecondary,
-                            modifier = Modifier.weight(1f, fill = false),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-                if (rowIndex < minOf(table.rows.size - 1, maxVisibleRows - 1)) {
-                    HorizontalDivider(color = colors.border.copy(alpha = 0.2f))
-                }
-            }
-            if (table.rows.size > maxVisibleRows) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(colors.sidepane.copy(alpha = 0.7f))
-                        .padding(vertical = 4.dp),
-                ) {
-                    Text(
-                        "+ ${table.rows.size - maxVisibleRows} more rows",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                        color = colors.fillTertiary,
-                    )
-                }
-            }
-        }
+        PaperTable(
+            rows = table.rows,
+            textStyle = MaterialTheme.typography.bodySmall,
+            textColor = colors.fillPrimary,
+            lineColor = colors.border.copy(alpha = 0.5f),
+            stripeColor = colors.sidepane.copy(alpha = 0.6f),
+            maxColumnWidth = 220.dp,
+        )
     }
 }
 
