@@ -1,15 +1,18 @@
 # quire sync hub, self-hosted. Your devices push their encrypted library here and pull each
 # other's changes; the hub cannot read any of it (`.knowledge/sync-hub.md`).
 #
-#   curl -fsSLO https://raw.githubusercontent.com/neuro-kitchen/quire/main/deploy/docker-compose.yml
 #   docker compose up -d          (or: podman compose up -d)
 #   docker compose logs hub       shows the hub's ID and the one-time setup code
 #   quire sync hub add <hub-id> <setup-code>     on your first device
 #
+# The book's "Self-hosting the hub" chapter has the rest: building the image yourself, starting
+# at boot with Podman, upgrades, backups.
+#
 # No port to open: devices reach the hub by its ID over iroh (QUIC), through your router.
 services:
   hub:
-    image: ghcr.io/neuro-kitchen/quire-hub:${QUIRE_HUB_VERSION:-latest}
+    # A published image, or one you built (`QUIRE_HUB_IMAGE=localhost/quire-hub`, `QUIRE_HUB_VERSION=local`).
+    image: ${QUIRE_HUB_IMAGE:-ghcr.io/neuro-kitchen/quire-hub}:${QUIRE_HUB_VERSION:-latest}
     restart: unless-stopped
     volumes:
       - quire-hub-data:/data
@@ -18,6 +21,8 @@ services:
       QUIRE_HUB_QUOTA_MB: ${QUIRE_HUB_QUOTA_MB:-0}
       # Your own iroh relay (optional; default: the public relays).
       QUIRE_HUB_RELAY: ${QUIRE_HUB_RELAY:-}
+      # Sessions served at once.
+      QUIRE_HUB_MAX_SESSIONS: ${QUIRE_HUB_MAX_SESSIONS:-64}
       RUST_LOG: ${RUST_LOG:-quire_hub=info,warn}
     healthcheck:
       test: ["CMD", "/usr/local/bin/quire-hub", "health"]

@@ -15,12 +15,13 @@ You can run the hub yourself (a container, below) or use ours (paid; coming).
 
 You need Docker or Podman on a machine that stays on (a home server, a NAS, a small cloud server).
 No port to open, no domain, no certificate: devices reach the hub by its ID over QUIC
-([iroh](https://iroh.computer)), through your router.
+([iroh](https://iroh.computer)), through your router. [Self-hosting the hub](self-hosting.md) has
+every step: building the image, Compose or one command, starting at boot (Podman too), people,
+upgrades, backups and troubleshooting. In short, with the image built or published:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/neuro-kitchen/quire/main/deploy/docker-compose.yml
-docker compose up -d                  # or: podman compose up -d
-docker compose logs hub               # the hub's ID and a one-time setup code
+podman compose up -d                  # or: docker compose up -d (in the folder of docker-compose.yml)
+podman compose logs hub               # the hub's ID and a one-time setup code
 ```
 
 The log shows:
@@ -30,11 +31,8 @@ quire hub 0.1.0 — ID: d1e51fbfeb45e4be67631dba763049feb5cccb750a3c1d60fdb6c3ff
 Setup code (first device, once): EZYF-Y4KP-95M7
 ```
 
-Settings (in a `.env` file next to `docker-compose.yml`, see `.env.example`): `QUIRE_HUB_QUOTA_MB`
-(storage limit per person), `QUIRE_HUB_RELAY` (your own iroh relay), `QUIRE_HUB_VERSION`.
-
-Everything the hub keeps is in its volume (`quire-hub-data`): back it up like any volume. It holds
-only sealed data, so the backup is as private as the hub.
+Everything the hub keeps is in its volume (`quire-hub-data`), its key included: see
+[Backups](self-hosting.md#backups).
 
 ## Connect your devices
 
