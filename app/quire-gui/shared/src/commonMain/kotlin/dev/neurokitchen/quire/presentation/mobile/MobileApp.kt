@@ -1,5 +1,16 @@
 package dev.neurokitchen.quire.presentation.mobile
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import dev.neurokitchen.quire.presentation.mobile.components.RailWidth
+import dev.neurokitchen.quire.presentation.mobile.components.MobileNavigationRail
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.BoxWithConstraints
+import dev.neurokitchen.quire.presentation.mobile.share.sharedIdentifiers
+import dev.neurokitchen.quire.presentation.mobile.share.SharedItem
+import dev.neurokitchen.quire.presentation.mobile.share.ShareInbox
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.tween
@@ -70,42 +81,69 @@ fun MobileApp() {
         SystemBarsAppearance(darkTheme = QuireTheme.colors.isDark)
         val navigation = rememberMobileNavigation()
         val haze = rememberHazeState()
+        // Shared with Quire (Android's share sheet, "Open with"): Add, filled in.
+        val shared by ShareInbox.item.collectAsStateWithLifecycle()
+        LaunchedEffect(shared) {
+            when (val item = ShareInbox.take()) {
+                is SharedItem.Text -> navigation.open { Route.Add(it, identifiers = sharedIdentifiers(item.text).joinToString("\n")) }
+                is SharedItem.Files -> navigation.open { Route.Add(it, pdfs = item.paths) }
+                null -> {}
+            }
+        }
         val showBar = navigation.isAtTabRoot
-        val chrome = MobileChrome(haze, bottomBar = if (showBar) bottomBarSpace() else 0.dp)
-        CompositionLocalProvider(LocalMobileChrome provides chrome) {
-            Box(Modifier.fillMaxSize().background(QuireTheme.colors.background)) {
-                NavDisplay(
-                    entries = navigation.entries(entryProvider(navigation)),
-                    onBack = navigation::back,
-                    modifier = Modifier.fillMaxSize(),
-                    transitionSpec = { push() },
-                    popTransitionSpec = { pop() },
-                    predictivePopTransitionSpec = { pop() },
-                )
-                if (showBar) {
-                    if (navigation.tab == Tab.Home || navigation.tab == Tab.Library) {
+        BoxWithConstraints(Modifier.fillMaxSize().background(QuireTheme.colors.background)) {
+            // Wide windows (tablets, unfolded phones): the tabs as a rail at the start, always shown.
+            val wide = maxWidth >= WideWindow
+            val chrome = MobileChrome(haze, bottomBar = if (showBar && !wide) bottomBarSpace() else 0.dp)
+            CompositionLocalProvider(LocalMobileChrome provides chrome) {
+                Box(Modifier.fillMaxSize().padding(start = if (wide) RailWidth else 0.dp)) {
+                    NavDisplay(
+                        entries = navigation.entries(entryProvider(navigation)),
+                        onBack = navigation::back,
+                        modifier = Modifier.fillMaxSize(),
+                        transitionSpec = { push() },
+                        popTransitionSpec = { pop() },
+                        predictivePopTransitionSpec = { pop() },
+                    )
+                    if (showBar && (navigation.tab == Tab.Home || navigation.tab == Tab.Library)) {
+                        val addLabel = stringResource(Res.string.add_title)
                         ExtendedFloatingActionButton(
                             onClick = { navigation.open { Route.Add(it) } },
                             icon = { Icon(painterResource(Res.drawable.ic_add), contentDescription = null) },
-                            text = { Text(stringResource(Res.string.add_title)) },
+                            text = { Text(addLabel) },
                             containerColor = QuireTheme.colors.accent,
                             contentColor = QuireTheme.colors.onAccent,
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
-                                .padding(end = Dimens.SpaceMd, bottom = chrome.bottomBar + Dimens.SpaceMd),
+                                .padding(end = Dimens.SpaceMd, bottom = chrome.bottomBar + Dimens.SpaceMd)
+                                // Named for TalkBack (its text alone was not in the accessibility tree).
+                                .semantics { contentDescription = addLabel },
                         )
                     }
-                    MobileNavigationBar(
+                    if (showBar && !wide) {
+                        MobileNavigationBar(
+                            current = navigation.tab,
+                            onSelect = navigation::select,
+                            haze = haze,
+                            modifier = Modifier.align(Alignment.BottomCenter),
+                        )
+                    }
+                }
+                if (wide) {
+                    MobileNavigationRail(
                         current = navigation.tab,
                         onSelect = navigation::select,
                         haze = haze,
-                        modifier = Modifier.align(Alignment.BottomCenter),
+                        modifier = Modifier.width(RailWidth).fillMaxHeight(),
                     )
                 }
             }
         }
     }
 }
+
+/** Material's medium window width: from here the tabs are a rail, not a bottom bar. */
+private val WideWindow = 600.dp
 
 private fun entryProvider(navigation: MobileNavigation) = entryProvider<NavKey> {
     val openDetails = { id: String -> navigation.open { tab -> Route.Details(tab, id) } }
@@ -137,7 +175,7 @@ private fun entryProvider(navigation: MobileNavigation) = entryProvider<NavKey> 
         ReaderRoute(id = key.id, title = key.title, onBack = navigation::back)
     }
     entry<Route.Add> { key ->
-        AddScreen(projectPath = key.projectPath, onDone = navigation::back)
+        AddScreen(projectPath = key.projectPath, onDone = navigation::back, identifiers = key.identifiers, pdfs = key.pdfs)
     }
 }
 

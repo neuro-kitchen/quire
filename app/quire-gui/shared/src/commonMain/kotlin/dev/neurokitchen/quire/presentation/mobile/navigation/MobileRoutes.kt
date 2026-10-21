@@ -36,7 +36,14 @@ sealed interface Route : NavKey {
     @Serializable data class SettingsPage(val tab: Tab, val page: MobileSettingsPage) : Route
 
     /** Adding references (every way in). */
-    @Serializable data class Add(val tab: Tab, val projectPath: String? = null) : Route
+    @Serializable data class Add(
+        val tab: Tab,
+        val projectPath: String? = null,
+        /** Shared identifiers (one per line), to add. */
+        val identifiers: String = "",
+        /** Shared PDF files (paths in the cache), to add. */
+        val pdfs: List<String> = emptyList(),
+    ) : Route
 }
 
 /**
