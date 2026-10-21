@@ -13,7 +13,7 @@ terminal interface, the local server and the apps are thin front ends over one f
 | `quire-fetch` | the network: metadata, PDF and full-text lookup (doi.org, Crossref, arXiv, NCBI, Europe PMC, Unpaywall) |
 | `quire-engine` | the facade: config, libraries, file store, exports, jobs; async API |
 | `quire-sync` | sync sessions and the iroh (QUIC) transport |
-| `quire-server` | `quire serve`, the endpoint for the browser extension |
+| `quire-connector` | `quire serve`, the endpoint for the browser extension |
 | `quire-document` | a paper's content in any format: PDF checks, rendering and text layer (hayro); PDF, arXiv HTML and JATS → the reader's Markdown; the reading model |
 | `quire-ffi` | the engine for the Kotlin apps (UniFFI): flat records, `suspend` functions, PDF pages |
 | `quire-testkit` | test fixtures (a tiny PDF, the services' recorded responses); dev-dependency only |
