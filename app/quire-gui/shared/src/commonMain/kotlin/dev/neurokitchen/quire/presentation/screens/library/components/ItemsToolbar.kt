@@ -12,16 +12,23 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +44,7 @@ import dev.neurokitchen.quire.presentation.designsystem.components.ToolbarIconBu
 import dev.neurokitchen.quire.resources.Res
 import dev.neurokitchen.quire.resources.ic_add
 import dev.neurokitchen.quire.resources.ic_attach_file
+import dev.neurokitchen.quire.resources.ic_expand_more
 import dev.neurokitchen.quire.resources.ic_info
 import dev.neurokitchen.quire.resources.ic_search
 import dev.neurokitchen.quire.resources.ic_sticky_note_2
@@ -76,50 +84,92 @@ fun ItemsToolbar(
             .background(colors.toolbar)
             .padding(horizontal = Dimens.SpaceSm),
     ) {
-        // Unified Primary Add Reference button
+        // Unified Primary Add Reference button with integrated dropdown
+        var addMenuOpen by remember { mutableStateOf(false) }
+        val pickTitle = stringResource(Res.string.pick_pdf)
+
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .height(30.dp)
                 .clip(RoundedCornerShape(Dimens.RadiusBase))
-                .background(colors.accent)
-                .clickable(onClick = onAddReference)
-                .padding(horizontal = 10.dp),
+                .background(colors.accent),
         ) {
-            Icon(
-                painterResource(Res.drawable.ic_add),
-                contentDescription = null,
-                tint = colors.onAccent,
-                modifier = Modifier.size(16.dp),
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text = stringResource(Res.string.add_title),
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = colors.onAccent,
-            )
-            Spacer(Modifier.width(6.dp))
-            Box(
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(colors.onAccent.copy(alpha = 0.2f))
-                    .padding(horizontal = 4.dp, vertical = 1.dp),
+                    .clickable(onClick = onAddReference)
+                    .padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
             ) {
+                Icon(
+                    painterResource(Res.drawable.ic_add),
+                    contentDescription = null,
+                    tint = colors.onAccent,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(6.dp))
                 Text(
-                    text = "Ctrl+N",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                    text = stringResource(Res.string.add_title),
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                     color = colors.onAccent,
                 )
+                Spacer(Modifier.width(6.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(colors.onAccent.copy(alpha = 0.2f))
+                        .padding(horizontal = 4.dp, vertical = 1.dp),
+                ) {
+                    Text(
+                        text = "Ctrl+N",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                        color = colors.onAccent,
+                    )
+                }
+            }
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .clickable { addMenuOpen = true }
+                    .padding(horizontal = 6.dp),
+            ) {
+                Icon(
+                    painterResource(Res.drawable.ic_expand_more),
+                    contentDescription = "Add Options",
+                    tint = colors.onAccent,
+                    modifier = Modifier.size(14.dp),
+                )
+                DropdownMenu(expanded = addMenuOpen, onDismissRequest = { addMenuOpen = false }) {
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(painterResource(Res.drawable.ic_search), null, tint = colors.fillSecondary, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Add by Identifier (DOI, arXiv)...", style = MaterialTheme.typography.bodyMedium)
+                            }
+                        },
+                        onClick = {
+                            addMenuOpen = false
+                            onAddReference()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(painterResource(Res.drawable.ic_attach_file), null, tint = colors.fillSecondary, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Import PDF File...", style = MaterialTheme.typography.bodyMedium)
+                            }
+                        },
+                        onClick = {
+                            addMenuOpen = false
+                            pickFile(pickTitle, listOf("pdf"))?.let { onImportPdf?.invoke(it) }
+                        },
+                    )
+                }
             }
         }
-
-        ToolbarIconButton(Res.drawable.ic_sticky_note_2, stringResource(Res.string.library_new_note), onClick = {})
-        val pickTitle = stringResource(Res.string.pick_pdf)
-        ToolbarIconButton(
-            Res.drawable.ic_attach_file,
-            stringResource(Res.string.library_add_attachment),
-            onClick = { pickFile(pickTitle, listOf("pdf"))?.let { onImportPdf?.invoke(it) } },
-        )
 
         Spacer(Modifier.weight(1f))
 

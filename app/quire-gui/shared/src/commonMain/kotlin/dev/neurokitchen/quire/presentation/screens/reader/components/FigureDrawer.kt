@@ -72,12 +72,16 @@ data class ExtractedTable(
     val rows: List<List<String>>,
 )
 
+enum class FigureDockSide { Left, Right }
+
 @Composable
 fun FigureDrawer(
     isOpen: Boolean,
     tabs: List<PaperTab>,
     loadFigure: suspend (String) -> String?,
     onClose: () -> Unit,
+    dockSide: FigureDockSide = FigureDockSide.Right,
+    onToggleDockSide: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (!isOpen) return
@@ -179,11 +183,17 @@ fun FigureDrawer(
         list
     }
 
+    val borderShape = if (dockSide == FigureDockSide.Right) {
+        RoundedCornerShape(topStart = Dimens.RadiusBase, bottomStart = Dimens.RadiusBase)
+    } else {
+        RoundedCornerShape(topEnd = Dimens.RadiusBase, bottomEnd = Dimens.RadiusBase)
+    }
+
     Column(
         modifier = modifier
             .fillMaxHeight()
             .background(colors.sidepane)
-            .border(1.dp, colors.border, RoundedCornerShape(topStart = Dimens.RadiusBase, bottomStart = Dimens.RadiusBase)),
+            .border(1.dp, colors.border, borderShape),
     ) {
         // Drawer Header
         Row(
@@ -205,20 +215,39 @@ fun FigureDrawer(
                 )
             }
 
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(24.dp)
-                    .clip(CircleShape)
-                    .background(colors.fillQuarternary.copy(alpha = 0.6f))
-                    .clickable(onClick = onClose),
-            ) {
-                Icon(
-                    painterResource(Res.drawable.ic_close),
-                    contentDescription = "Close Drawer",
-                    tint = colors.fillSecondary,
-                    modifier = Modifier.size(14.dp),
-                )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                // Dock Toggle button (VS Code style movable dock)
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .height(24.dp)
+                        .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                        .background(colors.fillQuarternary.copy(alpha = 0.6f))
+                        .clickable(onClick = onToggleDockSide)
+                        .padding(horizontal = 7.dp),
+                ) {
+                    Text(
+                        text = if (dockSide == FigureDockSide.Right) "← Dock Left" else "Dock Right →",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Medium),
+                        color = colors.fillSecondary,
+                    )
+                }
+
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(colors.fillQuarternary.copy(alpha = 0.6f))
+                        .clickable(onClick = onClose),
+                ) {
+                    Icon(
+                        painterResource(Res.drawable.ic_close),
+                        contentDescription = "Close Drawer",
+                        tint = colors.fillSecondary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
             }
         }
 

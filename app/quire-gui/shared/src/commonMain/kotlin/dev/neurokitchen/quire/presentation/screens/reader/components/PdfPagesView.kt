@@ -104,6 +104,7 @@ fun PdfPagesView(
     onHighlight: (quote: String, prefix: String, color: String) -> Unit = { _, _, _ -> },
     onAddNote: (body: String) -> Unit = {},
     onAddSnapshot: (rect: PageRect, pageIndex: Int) -> Unit = { _, _ -> },
+    onProgressChange: (page: Int, total: Int) -> Unit = { _, _ -> },
 ) {
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -116,6 +117,10 @@ fun PdfPagesView(
     var selection by remember { mutableStateOf<ActivePdfSelection?>(null) }
     val firstVisiblePage by remember { derivedStateOf { list.firstVisibleItemIndex + 1 } }
     val themeColors = readerColors(readerTheme)
+
+    LaunchedEffect(firstVisiblePage, pages.size) {
+        onProgressChange(firstVisiblePage, pages.size)
+    }
 
     BoxWithConstraints(modifier.fillMaxSize().background(themeColors.background)) {
         val pageWidth = min(maxWidth - Dimens.SpaceLg * 2, MaxPageWidth) * zoom
@@ -172,64 +177,6 @@ fun PdfPagesView(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = Dimens.SpaceLg),
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = Dimens.SpaceMd)
-                .clip(RoundedCornerShape(Dimens.RadiusFull))
-                .background(QuireTheme.colors.background.copy(alpha = 0.92f))
-                .border(1.dp, QuireTheme.colors.border.copy(alpha = 0.5f), RoundedCornerShape(Dimens.RadiusFull))
-                .shadow(4.dp, RoundedCornerShape(Dimens.RadiusFull))
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val readingProgress = if (pages.isNotEmpty()) (firstVisiblePage.toFloat() / pages.size.toFloat()).coerceIn(0f, 1f) else 0f
-                // Mini visual progress bar
-                Box(
-                    modifier = Modifier
-                        .width(36.dp)
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(QuireTheme.colors.fillQuarternary),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(readingProgress)
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(QuireTheme.colors.accent),
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = stringResource(Res.string.reader_page_of, firstVisiblePage, pages.size, "${(zoom * 100).roundToInt()}%"),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = QuireTheme.colors.fillPrimary,
-                )
-            }
-        }
-
-        // Reading Progress Bar at the top of the PDF viewport
-        val readingProgress by remember {
-            derivedStateOf {
-                if (pages.isNotEmpty()) (firstVisiblePage.toFloat() / pages.size.toFloat()).coerceIn(0f, 1f) else 0f
-            }
-        }
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(3.dp)
-                .background(QuireTheme.colors.border.copy(alpha = 0.25f))
-                .align(Alignment.TopCenter),
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(readingProgress)
-                    .fillMaxHeight()
-                    .background(QuireTheme.colors.accent),
             )
         }
     }
