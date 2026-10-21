@@ -36,4 +36,6 @@ url.workspace = true
 
 [dev-dependencies]
 quire-testkit.workspace = true
+# The hub as a test fixture only (sessions over pipes); the engine does not depend on it.
+quire-hub.workspace = true
 wiremock.workspace = true

@@ -44,6 +44,17 @@ pub const KEYS: &[KeySpec] = &[
     key("library.default", ValueKind::LibraryName, "library used when none is chosen"),
     key("libraries.*.path", ValueKind::Path, "folder of a registered library (see `quire library new`)"),
     key("peers.*.id", ValueKind::DeviceId, "a device to sync with: its ID (`quire sync id` on it)"),
+    key("hub.id", ValueKind::DeviceId, "the sync hub this device syncs through: its ID (`quire-hub id`)"),
+    key(
+        "files.download",
+        ValueKind::Choice(&["all", "on-open"]),
+        "download every PDF at sync (all), or as they are opened (on-open)",
+    ),
+    key(
+        "files.cache_mb",
+        ValueKind::Number(0, 10_000_000),
+        "space for PDFs in MB; past it, files the hub holds are removed here (0: no limit)",
+    ),
     key("access.downloads", ValueKind::Path, "folder your browser saves downloads to (default: ~/Downloads)"),
     key(
         "export.*.format",

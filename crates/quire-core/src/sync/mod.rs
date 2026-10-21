@@ -132,6 +132,17 @@ pub struct MergeSummary {
     pub dropped_identifiers: Vec<(String, String)>,
 }
 
+/// Several deliveries' summaries as one (a hub session merges per delivery).
+impl std::ops::AddAssign for MergeSummary {
+    fn add_assign(&mut self, other: Self) {
+        self.applied += other.applied;
+        self.kept += other.kept;
+        self.refused += other.refused;
+        self.renamed.extend(other.renamed);
+        self.dropped_identifiers.extend(other.dropped_identifiers);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

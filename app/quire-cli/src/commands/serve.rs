@@ -1,10 +1,10 @@
-//! `serve`: the local endpoint for a browser extension (`quire-server`). Listens on 127.0.0.1;
+//! `serve`: the local endpoint for a browser extension (`quire-connector`). Listens on 127.0.0.1;
 //! requests need the token `--token` prints (kept in the system keyring). Runs until Ctrl-C.
 
 use std::sync::Arc;
 
 use clap::Args;
-use quire_server::{DEFAULT_PORT, token};
+use quire_connector::{DEFAULT_PORT, token};
 
 use crate::context::Context;
 use crate::output::{self, Tone, style};
@@ -46,7 +46,7 @@ pub async fn run(context: &Context, args: &ServeArgs) -> anyhow::Result<()> {
     );
     output::hint(format!("Token kept {kept} (`quire serve --token` prints it). Ctrl-C stops."));
     tokio::select! {
-        result = quire_server::serve(engine, args.port, token) => result.map_err(|e| anyhow::anyhow!("port {}: {e}", args.port))?,
+        result = quire_connector::serve(engine, args.port, token) => result.map_err(|e| anyhow::anyhow!("port {}: {e}", args.port))?,
         _ = tokio::signal::ctrl_c() => output::report(Tone::Info, "stopped", "Ctrl-C"),
     }
     Ok(())

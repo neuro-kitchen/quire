@@ -15,6 +15,8 @@ mod highlights;
 mod imports;
 mod issues;
 mod links;
+mod local_files;
+pub use local_files::{FileState, KeepTarget};
 mod members;
 mod notes;
 mod projects;

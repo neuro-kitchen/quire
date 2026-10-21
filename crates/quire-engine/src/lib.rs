@@ -34,9 +34,9 @@ pub mod zotero;
 pub use config::Config;
 pub use engine::{
     AbstractOutcome, AlertCheck, Attached, AutoExportInfo, AutoExportOutcome, Change, CiteUse, DuplicateGroup, Engine,
-    ExportRequest, GraphEntry, GraphKind, ManuscriptCheck, OcrOutcome, OpenOptions, PaperText, PdfOutcome, PdfStatus,
-    ProjectSummary, RetractionCheck, SEARCH_LIMIT, TextSource, UnknownKey, ZoteroImport, online_candidate,
-    suggest_keys, write_if_changed,
+    Eviction, ExportRequest, GraphEntry, GraphKind, ManuscriptCheck, OcrOutcome, OpenOptions, OpenedPdf, PaperText,
+    PdfOutcome, PdfSource, PdfStatus, ProjectSummary, RetractionCheck, SEARCH_LIMIT, TextSource, UnknownKey,
+    ZoteroImport, online_candidate, suggest_keys, write_if_changed,
 };
 pub use error::{EngineError, Result};
 pub use folder::FolderFile;
@@ -56,6 +56,7 @@ pub use quire_model::{
     Project, Reading, ReadingStatus, Reference, SavedSearch, Severity, SlugPath, Tag, TagKind,
 };
 pub use quire_model::{ProjectMember, Role as MemberRole, UserId};
+pub use quire_sync::hub::{HubReport, SyncOptions as HubOptions};
 pub use quire_sync::transport::is_device_id;
 pub use quire_sync::{Report as SyncReport, Side as SyncSide};
 pub use secrets::Store as SecretStore;
