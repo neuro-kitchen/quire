@@ -1,5 +1,7 @@
 package dev.neurokitchen.quire.presentation.screens.reader.components
 
+import dev.neurokitchen.quire.resources.notes_collapse_notes
+import dev.neurokitchen.quire.resources.common_link_paper
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -73,7 +75,7 @@ fun NotesPanel(
     Column(modifier.fillMaxHeight().background(colors.sidepane).padding(Dimens.SpaceSm)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(bottom = Dimens.SpaceMin),
         ) {
             Text(stringResource(Res.string.reader_notes), style = MaterialTheme.typography.titleMedium, color = colors.fillPrimary)
             Spacer(Modifier.weight(1f))
@@ -81,7 +83,7 @@ fun NotesPanel(
                 IconButton(onClick = onCollapse, modifier = Modifier.size(24.dp)) {
                     Icon(
                         painterResource(Res.drawable.ic_close),
-                        contentDescription = "Collapse Notes",
+                        contentDescription = stringResource(Res.string.notes_collapse_notes),
                         tint = colors.fillSecondary,
                         modifier = Modifier.size(16.dp),
                     )
@@ -120,12 +122,12 @@ fun NotesPanel(
                         val next = if (draft.isEmpty() || draft.endsWith(" ")) draft + "[[citeKey]]" else "$draft [[citeKey]]"
                         onDraftChange(next)
                     }
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .padding(horizontal = Dimens.SpaceXs, vertical = Dimens.SpaceMin),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(painterResource(Res.drawable.ic_link), null, tint = colors.accent, modifier = Modifier.size(12.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("+ Link [[Paper]]", style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold), color = colors.accent)
+                    Spacer(Modifier.width(Dimens.SpaceMin))
+                    Text(stringResource(Res.string.common_link_paper), style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold), color = colors.accent)
                 }
             }
             Spacer(Modifier.weight(1f))
@@ -173,9 +175,9 @@ fun NotesPanel(
                             wikilinkRegex.findAll(note.body).map { it.groupValues[1] }.toList()
                         }
                         if (links.isNotEmpty()) {
-                            Spacer(Modifier.height(4.dp))
+                            Spacer(Modifier.height(Dimens.SpaceMin))
                             @OptIn(ExperimentalLayoutApi::class)
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceMin)) {
                                 links.forEach { key ->
                                     Box(
                                         modifier = Modifier
@@ -194,7 +196,7 @@ fun NotesPanel(
                             }
                         }
 
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(Dimens.SpaceMin))
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth(),

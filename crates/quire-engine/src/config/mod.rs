@@ -11,7 +11,7 @@ pub mod keys;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 pub use edit::{set, unset};
 pub use keys::{KEYS, KeySpec, ValueKind};
@@ -121,8 +121,9 @@ pub struct ReaderSettings {
     pub ocr_language: Option<String>,
 }
 
-/// How to write an export (Better BibTeX's export options).
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+/// How to write an export (Better BibTeX's export options). Also the options the app's export
+/// dialog chooses, stored with a file it keeps updated.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default)]
 pub struct ExportProfile {
     /// `biblatex` (default), `bibtex`, `csl-json`, `hayagriva`.
@@ -135,6 +136,8 @@ pub struct ExportProfile {
     pub months: Option<String>,
     /// .bib preprints: `online` (default, for Biber) or `article` (for Typst).
     pub preprints: Option<String>,
+    /// The file's encoding: `utf-8` (default), `utf-8-bom`, `windows-1252` (.bib).
+    pub encoding: Option<String>,
 }
 
 impl Config {

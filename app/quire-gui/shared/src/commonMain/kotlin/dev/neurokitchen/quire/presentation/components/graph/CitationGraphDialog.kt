@@ -1,5 +1,11 @@
 package dev.neurokitchen.quire.presentation.components.graph
 
+import dev.neurokitchen.quire.resources.graph_nodes_citations
+import dev.neurokitchen.quire.resources.graph_local_citation_network_graph
+import dev.neurokitchen.quire.resources.graph_close_graph
+import dev.neurokitchen.quire.resources.graph_click_to_open_paper
+import dev.neurokitchen.quire.resources.graph_click_any_node_to
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -117,13 +123,13 @@ fun CitationGraphDialog(
 
     Dialog(onDismissRequest = onDismissRequest) {
         Surface(
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(Dimens.RadiusLarge),
             color = colors.sidepane,
             shadowElevation = 24.dp,
             modifier = Modifier
                 .width(860.dp)
                 .height(640.dp)
-                .border(1.dp, colors.border.copy(alpha = 0.8f), RoundedCornerShape(16.dp)),
+                .border(1.dp, colors.border.copy(alpha = 0.8f), RoundedCornerShape(Dimens.RadiusLarge)),
         ) {
             Column(Modifier.fillMaxSize()) {
                 // Header
@@ -143,7 +149,7 @@ fun CitationGraphDialog(
                         )
                         Spacer(Modifier.width(10.dp))
                         Text(
-                            "LOCAL CITATION NETWORK GRAPH",
+                            stringResource(Res.string.graph_local_citation_network_graph),
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp,
@@ -156,10 +162,10 @@ fun CitationGraphDialog(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(Dimens.RadiusFull))
                                 .background(colors.accent.copy(alpha = 0.15f))
-                                .padding(horizontal = 8.dp, vertical = 2.dp),
+                                .padding(horizontal = Dimens.SpaceXs, vertical = 2.dp),
                         ) {
                             Text(
-                                "${nodes.size} nodes • ${edges.size} citations",
+                                stringResource(Res.string.graph_nodes_citations, nodes.size, edges.size),
                                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.SemiBold),
                                 color = colors.accent,
                             )
@@ -176,7 +182,7 @@ fun CitationGraphDialog(
                     ) {
                         Icon(
                             painterResource(Res.drawable.ic_close),
-                            contentDescription = "Close Graph",
+                            contentDescription = stringResource(Res.string.graph_close_graph),
                             tint = colors.fillSecondary,
                             modifier = Modifier.size(16.dp),
                         )
@@ -232,7 +238,7 @@ fun CitationGraphDialog(
 
                         // Calculate node coordinates in circular/cluster layout
                         nodes.forEachIndexed { i, node ->
-                            val angle = (i.toFloat() / nodes.size.toFloat()) * 2f * Math.PI.toFloat()
+                            val angle = (i.toFloat() / nodes.size.toFloat()) * 2f * kotlin.math.PI.toFloat()
                             val dist = if (i % 2 == 0) radiusOrbit else radiusOrbit * 0.55f
                             node.x = centerX + dist * cos(angle)
                             node.y = centerY + dist * sin(angle)
@@ -298,16 +304,16 @@ fun CitationGraphDialog(
                     // Hovered Paper Card Info Overlay
                     selectedNode?.let { sel ->
                         Surface(
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(Dimens.RadiusMedium),
                             color = colors.sidepane.copy(alpha = 0.95f),
                             shadowElevation = 8.dp,
                             modifier = Modifier
                                 .align(Alignment.BottomStart)
-                                .padding(16.dp)
+                                .padding(Dimens.SpaceMd)
                                 .width(360.dp)
-                                .border(1.dp, colors.border, RoundedCornerShape(10.dp)),
+                                .border(1.dp, colors.border, RoundedCornerShape(Dimens.RadiusMedium)),
                         ) {
-                            Column(Modifier.padding(12.dp)) {
+                            Column(Modifier.padding(Dimens.SpaceSm)) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -324,7 +330,7 @@ fun CitationGraphDialog(
                                         color = colors.fillTertiary,
                                     )
                                 }
-                                Spacer(Modifier.height(4.dp))
+                                Spacer(Modifier.height(Dimens.SpaceMin))
                                 Text(
                                     text = sel.title,
                                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 12.sp),
@@ -332,7 +338,7 @@ fun CitationGraphDialog(
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
                                 )
-                                Spacer(Modifier.height(8.dp))
+                                Spacer(Modifier.height(Dimens.SpaceXs))
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier
@@ -342,10 +348,10 @@ fun CitationGraphDialog(
                                             onOpenPaper(sel.id, sel.title)
                                             onDismissRequest()
                                         }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                        .padding(horizontal = Dimens.SpaceXs, vertical = Dimens.SpaceMin),
                                 ) {
                                     Text(
-                                        "Click to Open Paper in Reader",
+                                        stringResource(Res.string.graph_click_to_open_paper),
                                         style = MaterialTheme.typography.labelSmall.copy(color = colors.onAccent, fontWeight = FontWeight.Bold, fontSize = 10.sp),
                                     )
                                 }
@@ -367,14 +373,14 @@ fun CitationGraphDialog(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceMd),
                     ) {
                         GraphLegendPill("Read", colors.statusRead)
                         GraphLegendPill("Reading", colors.statusReading)
                         GraphLegendPill("Unread", colors.accent)
                     }
                     Text(
-                        "Click any node to open paper",
+                        stringResource(Res.string.graph_click_any_node_to),
                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                         color = colors.fillTertiary,
                     )

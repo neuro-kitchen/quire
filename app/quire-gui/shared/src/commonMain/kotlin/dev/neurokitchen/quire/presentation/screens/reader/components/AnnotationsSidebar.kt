@@ -1,5 +1,6 @@
 package dev.neurokitchen.quire.presentation.screens.reader.components
 
+import dev.neurokitchen.quire.resources.annotations_collapse_annotations
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -75,7 +76,7 @@ fun AnnotationsSidebar(
                 IconButton(onClick = onCollapse, modifier = Modifier.size(24.dp)) {
                     Icon(
                         painterResource(Res.drawable.ic_close),
-                        contentDescription = "Collapse Annotations",
+                        contentDescription = stringResource(Res.string.annotations_collapse_annotations),
                         tint = colors.fillSecondary,
                         modifier = Modifier.size(16.dp),
                     )
@@ -129,7 +130,7 @@ private fun Annotation(
     val shape = RoundedCornerShape(Dimens.RadiusBase)
     Column(
         Modifier
-            .padding(vertical = 4.dp)
+            .padding(vertical = Dimens.SpaceMin)
             .fillMaxWidth()
             .background(colors.background, shape)
             .border(if (isFocused) 2.dp else 1.dp, if (isFocused) colors.accent else colors.border, shape)
@@ -154,7 +155,7 @@ private fun Annotation(
             value = draft,
             onValueChange = { draft = it },
             placeholder = stringResource(Res.string.reader_add_comment),
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = Dimens.SpaceMin),
         )
         Row {
             if (draft != highlight.comment.orEmpty()) TextButton(onClick = { onComment(draft) }) { Text(stringResource(Res.string.reader_save_comment)) }

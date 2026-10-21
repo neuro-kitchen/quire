@@ -88,6 +88,7 @@ pub async fn run(context: &Context, args: &FolderArgs) -> anyhow::Result<()> {
                 recursive: *recursive,
                 profile: profile.clone(),
                 format: format.as_deref().map(str::parse).transpose()?,
+                ..ExportRequest::default()
             };
             // Check the project and profile exist before writing the file.
             engine.export(&request).await?;

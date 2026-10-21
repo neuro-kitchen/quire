@@ -1,5 +1,8 @@
 package dev.neurokitchen.quire.presentation.screens.tools
 
+import dev.neurokitchen.quire.presentation.designsystem.components.DialogConfirm
+import dev.neurokitchen.quire.presentation.designsystem.components.DialogCancel
+import dev.neurokitchen.quire.presentation.designsystem.components.DialogShell
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -16,11 +19,9 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -45,7 +46,6 @@ import dev.neurokitchen.quire.resources.ic_inventory_2
 import dev.neurokitchen.quire.resources.ic_library_books
 import dev.neurokitchen.quire.resources.ic_subject
 import dev.neurokitchen.quire.resources.ic_sync
-import dev.neurokitchen.quire.resources.name_cancel
 import dev.neurokitchen.quire.resources.tools_confirm
 import dev.neurokitchen.quire.resources.tools_confirm_key_body
 import dev.neurokitchen.quire.resources.tools_confirm_key_title
@@ -158,11 +158,15 @@ private fun Confirm(confirm: ToolsConfirm, onEvent: (ToolsEvent) -> Unit) {
             stringResource(Res.string.tools_confirm),
         )
     }
-    AlertDialog(
-        onDismissRequest = { onEvent(ToolsEvent.OnConfirm(null)) },
-        title = { Text(title) },
-        text = { Text(body) },
-        confirmButton = { TextButton(onClick = { onEvent(ToolsEvent.OnConfirmed) }) { Text(action) } },
-        dismissButton = { TextButton(onClick = { onEvent(ToolsEvent.OnConfirm(null)) }) { Text(stringResource(Res.string.name_cancel)) } },
-    )
+    DialogShell(
+        title = title,
+        subtitle = body,
+        width = 460.dp,
+        onDismiss = { onEvent(ToolsEvent.OnConfirm(null)) },
+        actions = {
+            DialogCancel({ onEvent(ToolsEvent.OnConfirm(null)) })
+            // A merge removes the other reference: the destructive colour.
+            DialogConfirm(action, { onEvent(ToolsEvent.OnConfirmed) }, destructive = confirm is ToolsConfirm.Merge)
+        },
+    ) {}
 }

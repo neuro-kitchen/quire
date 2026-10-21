@@ -1,5 +1,24 @@
 package dev.neurokitchen.quire.presentation.screens.library
 
+import dev.neurokitchen.quire.presentation.components.export_dialog.ExportTarget
+import dev.neurokitchen.quire.presentation.components.export_dialog.ExportDialog
+import dev.neurokitchen.quire.presentation.components.notice.Notice
+import dev.neurokitchen.quire.presentation.components.notice.NoticeBar
+import dev.neurokitchen.quire.resources.search_invalid
+import org.jetbrains.compose.resources.stringResource
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
+import org.jetbrains.compose.resources.pluralStringResource
+import dev.neurokitchen.quire.resources.drag_references
+import dev.neurokitchen.quire.resources.Res
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -17,9 +36,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -27,13 +44,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,7 +58,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -55,20 +68,15 @@ import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.neurokitchen.quire.domain.model.LibrarySource
-import dev.neurokitchen.quire.presentation.components.notice.Notice
-import dev.neurokitchen.quire.presentation.components.notice.NoticeBar
 import dev.neurokitchen.quire.presentation.components.reference_card.ReferenceCard
 import dev.neurokitchen.quire.presentation.components.reference_card.ReferenceCardEvent
 import dev.neurokitchen.quire.presentation.designsystem.Dimens
@@ -89,8 +97,6 @@ import dev.neurokitchen.quire.presentation.screens.library.components.ProjectsPa
 import dev.neurokitchen.quire.presentation.screens.library.components.QuickLookModal
 import dev.neurokitchen.quire.presentation.screens.library.components.ReferenceDetailPane
 import dev.neurokitchen.quire.presentation.screens.library.components.ReferenceDrag
-import dev.neurokitchen.quire.resources.Res
-import dev.neurokitchen.quire.resources.drag_references
 import dev.neurokitchen.quire.resources.ic_add
 import dev.neurokitchen.quire.resources.ic_delete
 import dev.neurokitchen.quire.resources.ic_draft
@@ -100,11 +106,7 @@ import dev.neurokitchen.quire.resources.ic_library_books
 import dev.neurokitchen.quire.resources.library_my_library
 import dev.neurokitchen.quire.resources.library_trash
 import dev.neurokitchen.quire.resources.library_unfiled
-import dev.neurokitchen.quire.resources.search_invalid
-import kotlin.math.roundToInt
 import org.jetbrains.compose.resources.painterResource
-import org.jetbrains.compose.resources.pluralStringResource
-import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
 /** Zotero's three panes need about this much (its minimum pane widths add up to ~930). */
@@ -217,7 +219,15 @@ fun LibraryScreen(
         }
     }
 
-    state.addDialog?.let { dialog -> AddReferenceDialog(dialog, onEvent) }
+    state.addDialog?.let { dialog -> AddReferenceDialog(dialog, onEvent, projects = state.projectChoices) }
+    state.exportDialog?.let { target ->
+        ExportDialog(
+            target = target,
+            projects = state.projectChoices,
+            onDismiss = { onEvent(LibraryEvent.OnShowExport(null)) },
+            onDone = { onEvent(LibraryEvent.OnExportDone(it)) },
+        )
+    }
 
     val uriHandler = LocalUriHandler.current
     LaunchedEffect(state.pageToOpen) {
@@ -311,7 +321,6 @@ private fun ThreePanes(
                 onToggleInspector = { onEvent(LibraryEvent.OnToggleInspector) },
                 isInspectorCollapsed = state.isInspectorCollapsed,
                 onSaveSearch = { onEvent(LibraryEvent.OnNameDialog(NameDialog.SaveSearch(state.query))) },
-                onImportPdf = { onEvent(LibraryEvent.OnImportPdf(it)) },
             )
             HorizontalDivider(color = QuireTheme.colors.paneDivider)
             state.searchError?.let { SearchError(it) }
@@ -335,6 +344,7 @@ private fun ThreePanes(
                     onSelectAll = { onEvent(LibraryEvent.OnSelectAll) },
                     onClearSelection = { onEvent(LibraryEvent.OnClearSelection) },
                     onCreateCollectionFromSelected = { onEvent(LibraryEvent.OnNameDialog(NameDialog.NewProject(withIds = state.selectedIds))) },
+                    onExportSelected = { onEvent(LibraryEvent.OnShowExport(ExportTarget(references = state.selectedIds.toList()))) },
                     onQuickLook = { onEvent(LibraryEvent.OnToggleQuickLook(true)) },
                     drag = drag,
                     onDropOnProject = { ids, path -> onEvent(LibraryEvent.OnBatchAddToProject(ids, path)) },

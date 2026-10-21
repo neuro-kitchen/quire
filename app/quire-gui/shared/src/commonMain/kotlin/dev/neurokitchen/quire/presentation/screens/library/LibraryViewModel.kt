@@ -1,5 +1,6 @@
 package dev.neurokitchen.quire.presentation.screens.library
 
+import dev.neurokitchen.quire.presentation.components.export_dialog.ExportTarget
 import dev.neurokitchen.quire.presentation.components.notice.Notice
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -29,6 +30,8 @@ import dev.neurokitchen.quire.resources.field_publication
 import dev.neurokitchen.quire.resources.field_publisher
 import dev.neurokitchen.quire.resources.field_volume
 import dev.neurokitchen.quire.resources.notice_added
+import dev.neurokitchen.quire.resources.tools_zotero_imported
+import dev.neurokitchen.quire.resources.notice_added_many
 import dev.neurokitchen.quire.resources.notice_added_to_project
 import dev.neurokitchen.quire.resources.notice_already_in_library
 import dev.neurokitchen.quire.resources.notice_imported
@@ -48,7 +51,6 @@ import dev.neurokitchen.quire.resources.notice_pdf_present
 import dev.neurokitchen.quire.resources.notice_pdf_attached
 import dev.neurokitchen.quire.resources.notice_pdf_other_paper
 import dev.neurokitchen.quire.resources.notice_pdfs_removed
-import dev.neurokitchen.quire.resources.tools_exported
 import dev.neurokitchen.quire.resources.notice_no_publisher_page
 import dev.neurokitchen.quire.resources.notice_nothing_changed
 import dev.neurokitchen.quire.resources.notice_refetched
@@ -145,6 +147,7 @@ class LibraryViewModel(
                 query = query.text,
                 source = query.source,
                 projects = projectRows(projects, query.source, view.expandedProjects),
+                projectChoices = projects.map { it.path to it.name },
                 tags = tagRows(libraryTags, references, query.tags),
                 sort = query.sort,
                 ascending = query.ascending,
@@ -162,6 +165,7 @@ class LibraryViewModel(
                 isSidebarCollapsed = view.isSidebarCollapsed,
                 isInspectorCollapsed = view.isInspectorCollapsed,
                 addDialog = view.addDialog,
+                exportDialog = view.exportDialog,
                 nameDialog = view.nameDialog,
                 confirm = view.confirm,
                 notice = view.notice,
@@ -263,7 +267,13 @@ class LibraryViewModel(
                 library.createProject(event.name, event.parentPath)
                 Notice.Done(Res.string.notice_project_created, listOf(event.name))
             }
-            is LibraryEvent.OnShowAddDialog -> view.update { it.copy(addDialog = if (event.show) AddDialogState() else null) }
+            is LibraryEvent.OnShowAddDialog -> view.update {
+                it.copy(addDialog = if (event.show) AddDialogState(project = projectInView()) else null)
+            }
+            is LibraryEvent.OnAddPdfsPicked -> dialog { it.copy(pdfs = (it.pdfs + event.paths).distinct(), error = null) }
+            is LibraryEvent.OnAddPdfRemove -> dialog { it.copy(pdfs = it.pdfs - event.path) }
+            is LibraryEvent.OnAddFilePicked -> dialog { it.copy(file = event.path, error = null) }
+            is LibraryEvent.OnAddProjectSelect -> dialog { it.copy(project = event.projectPath) }
             is LibraryEvent.OnAddTabSelect -> dialog { it.copy(tab = event.tab, error = null) }
             is LibraryEvent.OnIdentifierChange -> dialog { it.copy(identifier = event.identifier, preview = null, error = null) }
             is LibraryEvent.OnManualChange -> dialog { it.copy(manual = event.entry, error = null) }
@@ -273,9 +283,23 @@ class LibraryViewModel(
                 dialog { it.copy(isWorking = false, preview = ReferenceCardState.from(preview)) }
             }
             LibraryEvent.OnAddConfirm -> working { dialog ->
-                val project = projectInView()
+                val project = dialog.project
                 val notice = when (dialog.tab) {
-                    AddTab.Identifier -> added(library.addByIdentifier(dialog.identifier.trim(), project))
+                    AddTab.Identifier -> addIdentifiers(dialog, project) ?: return@working
+                    AddTab.Pdf -> {
+                        val outcomes = dialog.pdfs.map { attachments.importPdf(it, project).added }
+                        outcomes.singleOrNull()?.let(::added)
+                            ?: Notice.Done(Res.string.notice_added_many, listOf(outcomes.count { it.isNew }, outcomes.count { !it.isNew }))
+                    }
+                    AddTab.File -> {
+                        val file = dialog.file ?: return@working
+                        if (file.endsWith(".bib", ignoreCase = true)) {
+                            Notice.Done(Res.string.notice_imported, listOf(exchange.importBib(file, project)))
+                        } else {
+                            val imported = exchange.importZotero(file, project)
+                            Notice.Done(Res.string.tools_zotero_imported, listOf(imported.added, imported.existing))
+                        }
+                    }
                     AddTab.Manual -> {
                         val outcome = library.addReference(dialog.manual.toReference(project))
                         val tags = dialog.manual.tags.split(',').map { it.trim() }.filter { it.isNotEmpty() }
@@ -418,20 +442,14 @@ class LibraryViewModel(
                 reloadSavedSearches()
                 Notice.Done(Res.string.notice_search_removed, listOf(event.name))
             }
-            is LibraryEvent.OnImportPdf -> act { added(attachments.importPdf(event.path, projectInView()).added) }
             is LibraryEvent.OnTagColor -> act {
                 library.colorTag(event.name, event.color)
                 null
             }
             LibraryEvent.OnToggleSidebar -> view.update { it.copy(isSidebarCollapsed = !it.isSidebarCollapsed) }
             is LibraryEvent.OnToggleQuickLook -> view.update { it.copy(isQuickLookOpen = event.open ?: !it.isQuickLookOpen) }
-            is LibraryEvent.OnExportProject -> act {
-                val count = exchange.exportTo(
-                    dev.neurokitchen.quire.domain.model.ExportSelection(projectPath = event.projectId, recursive = true, format = "biblatex"),
-                    event.path,
-                )
-                Notice.Done(Res.string.tools_exported, listOf(count, event.path))
-            }
+            is LibraryEvent.OnShowExport -> view.update { it.copy(exportDialog = event.target) }
+            is LibraryEvent.OnExportDone -> view.update { it.copy(exportDialog = null, notice = event.notice) }
         }
     }
 
@@ -454,6 +472,34 @@ class LibraryViewModel(
         view.update { options -> options.copy(addDialog = options.addDialog?.let(change)) }
 
     /** Runs the dialog's `action`; a failure stays in the dialog (to correct and retry). */
+    /**
+     * Adds each identifier of the dialog (one per line). All added: the notice; some failed: the
+     * dialog keeps only those lines, with why, and `null`.
+     */
+    private suspend fun addIdentifiers(dialog: AddDialogState, project: String?): Notice? {
+        val inputs = dialog.identifier.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        val outcomes = mutableListOf<AddOutcome>()
+        val failed = mutableListOf<Pair<String, String>>()
+        for (input in inputs) {
+            try {
+                outcomes += library.addByIdentifier(input, project)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                failed += input to (e.message ?: e.toString())
+            }
+        }
+        if (failed.isNotEmpty()) {
+            // A single input keeps the engine's message as it was.
+            val why = failed.singleOrNull()?.second?.takeIf { inputs.size == 1 }
+                ?: failed.joinToString("\n") { (input, message) -> "$input: $message" }
+            dialog { it.copy(isWorking = false, identifier = failed.joinToString("\n") { it.first }, error = why) }
+            return null
+        }
+        return outcomes.singleOrNull()?.let(::added)
+            ?: Notice.Done(Res.string.notice_added_many, listOf(outcomes.count { it.isNew }, outcomes.count { !it.isNew }))
+    }
+
     private fun working(action: suspend (AddDialogState) -> Unit) {
         val current = view.value.addDialog ?: return
         dialog { it.copy(isWorking = true, error = null) }
@@ -501,6 +547,7 @@ class LibraryViewModel(
         val isSidebarCollapsed: Boolean = false,
         val isInspectorCollapsed: Boolean = false,
         val addDialog: AddDialogState? = null,
+        val exportDialog: ExportTarget? = null,
         val nameDialog: NameDialog? = null,
         val confirm: Confirm? = null,
         val notice: Notice? = null,

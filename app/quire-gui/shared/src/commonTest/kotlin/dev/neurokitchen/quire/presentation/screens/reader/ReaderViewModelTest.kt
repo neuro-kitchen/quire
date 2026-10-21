@@ -1,5 +1,10 @@
 package dev.neurokitchen.quire.presentation.screens.reader
 
+import kotlinx.coroutines.test.runCurrent
+import dev.neurokitchen.quire.presentation.screens.reader.components.ExtractedFigure
+import dev.neurokitchen.quire.domain.repository.ReaderLayout
+import dev.neurokitchen.quire.domain.repository.GuiPreferences
+import dev.neurokitchen.quire.data.repository.SamplePreferencesRepository
 import kotlin.test.assertTrue
 import dev.neurokitchen.quire.domain.repository.ReaderRepository
 import dev.neurokitchen.quire.domain.repository.PdfRepository
@@ -20,6 +25,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import dev.neurokitchen.quire.domain.model.PageImage
+import dev.neurokitchen.quire.domain.model.PdfFigure
 import kotlin.test.assertNotNull
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -182,6 +188,32 @@ class ReaderViewModelTest {
         assertEquals(1, pdf.renders.count { it.first == 1 }, "page 2 came from the render ahead")
     }
 
+    /**
+     * Papers read from their PDF have no figure images; the drawer shows figures cropped from the
+     * pages. They are looked for only once the drawer opens (it renders pages).
+     */
+    @Test
+    fun pdfFiguresLoadWhenTheDrawerOpensAndAreCroppedFromThePage() = runTest(dispatcher) {
+        var asked = 0
+        val figure = PdfFigure(1, "Figure 2", "Figure 2. Firing.", PageRect(72f, 100f, 378f, 253f))
+        val pdf = object : PdfRepository by CountingPdf() {
+            override suspend fun figures(path: String): List<PdfFigure> = listOf(figure).also { asked++ }
+        }
+        val vm = ReaderViewModel("3", "The hippocampus as a spatial map", withPdf, pdf, dispatcher).also { advanceUntilIdle() }
+        assertEquals(0, asked, "not before the drawer opens")
+        vm.onEvent(ReaderEvent.OnToggleFigureDrawer)
+        advanceUntilIdle()
+        assertEquals(listOf(figure), vm.state.value.pdf.figures)
+        val crop = assertNotNull(vm.pdfFigure(figure))
+        // The page at 1536 px for its 612 pt: 306 x 153 pt of figure.
+        assertEquals(768, crop.width)
+        assertEquals(384, crop.height)
+        vm.onEvent(ReaderEvent.OnToggleFigureDrawer)
+        vm.onEvent(ReaderEvent.OnToggleFigureDrawer)
+        advanceUntilIdle()
+        assertEquals(1, asked, "looked for once")
+    }
+
     /** While a page renders at a new width (zooming in), the nearest width already rendered shows. */
     @Test
     fun aRenderedWidthStandsInForAnother() = runTest(dispatcher) {
@@ -190,4 +222,34 @@ class ReaderViewModelTest {
         vm.page(0, 1000)
         assertNotNull(vm.renderedNear(0, 2000))
     }
+
+    /** Pane sizes were kept only while shown and lost with the window; they live in the preferences now. */
+    @Test
+    fun paneSizesComeFromThePreferencesAndAreSavedThere() = runTest(dispatcher) {
+        val saved = ReaderLayout(annotationsWidth = 300, notesWidth = 240, two = listOf(0.3f, 0.7f))
+        val preferences = SamplePreferencesRepository(GuiPreferences(readerLayout = saved))
+        val vm = ReaderViewModel("3", "A paper", reader, SamplePdfRepository(), preferences = preferences).also { advanceUntilIdle() }
+        assertEquals(saved, vm.state.value.layout)
+        val dragged = saved.copy(two = listOf(0.6f, 0.4f))
+        vm.onEvent(ReaderEvent.OnLayoutChange(saved.copy(two = listOf(0.4f, 0.6f))))
+        vm.onEvent(ReaderEvent.OnLayoutChange(dragged))
+        assertEquals(dragged, vm.state.value.layout, "the screen follows the drag at once")
+        runCurrent()
+        assertEquals(saved, preferences.preferences.value.readerLayout, "written once the drag stops, not on every move")
+        advanceUntilIdle()
+        assertEquals(dragged, preferences.preferences.value.readerLayout)
+    }
+
+    /** A figure or a table could only sit in the drawer; it can be read beside the text or the PDF. */
+    @Test
+    fun aFigureIsPinnedBesideTheTextAndUnpinned() = runTest(dispatcher) {
+        val vm = viewModel()
+        val figure = ExtractedFigure(id = "f1", title = "Figure 1", caption = "Place fields", imageUrl = "fig1.png")
+        vm.onEvent(ReaderEvent.OnPin(Pinned.Figure(figure)))
+        assertEquals(Pinned.Figure(figure), vm.state.value.pinned)
+        assertEquals(listOf(ReaderPane.Text, ReaderPane.Pinned), vm.state.value.panes)
+        vm.onEvent(ReaderEvent.OnPin(null))
+        assertEquals(listOf(ReaderPane.Text), vm.state.value.panes)
+    }
 }
+

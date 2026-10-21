@@ -56,14 +56,14 @@ fun SettingRow(
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
-            modifier = Modifier.padding(top = 4.dp),
+            modifier = Modifier.padding(top = Dimens.SpaceMin),
         ) {
             when (field.kind) {
                 SettingKind.Bool -> Checkbox(
                     checked = field.draft == "true",
                     onCheckedChange = { onDraftChange(it.toString()) },
                 )
-                SettingKind.Choice -> Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                SettingKind.Choice -> Row(horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceMin)) {
                     field.choices.forEach { choice -> Choice(choice, selected = field.draft == choice) { onDraftChange(choice) } }
                 }
                 else -> {
@@ -102,7 +102,7 @@ private fun Choice(text: String, selected: Boolean, onClick: () -> Unit) {
             .clip(RoundedCornerShape(Dimens.RadiusLarge))
             .background(if (selected) colors.accent else colors.fillQuinary)
             .clickable(onClick = onClick)
-            .padding(horizontal = Dimens.SpaceXs, vertical = 4.dp),
+            .padding(horizontal = Dimens.SpaceXs, vertical = Dimens.SpaceMin),
     )
 }
 

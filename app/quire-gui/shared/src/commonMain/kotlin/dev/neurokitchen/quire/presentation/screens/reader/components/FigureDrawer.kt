@@ -1,5 +1,25 @@
 package dev.neurokitchen.quire.presentation.screens.reader.components
 
+import dev.neurokitchen.quire.resources.figures_this_document_does_not
+import dev.neurokitchen.quire.resources.figures_no_structured_tables_were
+import dev.neurokitchen.quire.resources.figures_no_extracted_tables
+import dev.neurokitchen.quire.resources.figures_no_extracted_figures
+import dev.neurokitchen.quire.resources.figures_loading_figure
+import dev.neurokitchen.quire.resources.figures_figures_tables
+import dev.neurokitchen.quire.resources.figures_figure_preview
+import dev.neurokitchen.quire.resources.figures_figure
+import dev.neurokitchen.quire.resources.figures_enlarged_figure
+import dev.neurokitchen.quire.resources.figures_close_lightbox
+import dev.neurokitchen.quire.resources.figures_close_drawer
+import dev.neurokitchen.quire.resources.reader_rows
+import dev.neurokitchen.quire.resources.reader_open_beside
+import androidx.compose.material3.TextButton
+import dev.neurokitchen.quire.presentation.screens.reader.Pinned
+import org.jetbrains.compose.resources.stringResource
+import dev.neurokitchen.quire.resources.figures_finding
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import dev.neurokitchen.quire.domain.model.PdfFigure
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -64,6 +84,8 @@ data class ExtractedFigure(
     val title: String,
     val caption: String,
     val imageUrl: String,
+    /** Found on the PDF's page from its caption (no image in the text): cropped from the page. */
+    val pdf: PdfFigure? = null,
 )
 
 data class ExtractedTable(
@@ -83,15 +105,22 @@ fun FigureDrawer(
     dockSide: FigureDockSide = FigureDockSide.Right,
     onToggleDockSide: () -> Unit = {},
     modifier: Modifier = Modifier,
+    /** Figures found on the PDF's pages; `null` while they are looked for (no PDF: empty). */
+    pdfFigures: List<PdfFigure>? = emptyList(),
+    loadPdfFigure: suspend (PdfFigure) -> ImageBitmap? = { null },
+    /** Opens a figure or table in its own pane beside the text or the PDF. */
+    onPin: (Pinned) -> Unit = {},
 ) {
     if (!isOpen) return
 
     val colors = QuireTheme.colors
     var selectedTab by remember { mutableStateOf(0) } // 0: Figures, 1: Tables
-    var enlargedImageUrl by remember { mutableStateOf<String?>(null) }
+    var enlarged by remember { mutableStateOf<ExtractedFigure?>(null) }
+    val loadImage: suspend (ExtractedFigure) -> ImageBitmap? = { figure -> figureImage(figure, loadFigure, loadPdfFigure) }
 
     // Extract figures and tables from paper tabs
-    val figures = remember(tabs) {
+    val figureWord = stringResource(Res.string.figures_figure)
+    val textFigures = remember(tabs, figureWord) {
         val list = mutableListOf<ExtractedFigure>()
         var figIndex = 1
         tabs.forEach { tab ->
@@ -101,7 +130,7 @@ fun FigureDrawer(
                     list.add(
                         ExtractedFigure(
                             id = "fig-$figIndex",
-                            title = "Figure $figIndex",
+                            title = "$figureWord $figIndex",
                             caption = caption,
                             imageUrl = block.kind.url,
                         )
@@ -122,6 +151,12 @@ fun FigureDrawer(
             }
         }
         list
+    }
+
+    // A text read from the PDF has captions but no images: the figures found on the pages instead.
+    val shownFigures = remember(textFigures, pdfFigures) {
+        if (textFigures.any { it.imageUrl.isNotEmpty() } || pdfFigures.isNullOrEmpty()) textFigures
+        else pdfFigures.mapIndexed { i, f -> ExtractedFigure("pdf-$i", f.label, f.caption, imageUrl = "", pdf = f) }
     }
 
     val tables = remember(tabs) {
@@ -156,14 +191,8 @@ fun FigureDrawer(
                         }
                     }
                     is BlockKind.TableRow -> {
-                        val rawText = block.text.trim().removePrefix("|").removeSuffix("|")
-                        val cells = if ("\t" in rawText) {
-                            rawText.split("\t")
-                        } else if ("|" in rawText) {
-                            rawText.split("|").map { it.trim() }
-                        } else {
-                            listOf(rawText)
-                        }
+                        // One word per cell, as the engine keeps them (joined text loses the columns).
+                        val cells = block.words.map { it.text }
                         if (cells.any { it.isNotBlank() }) {
                             currentRows.add(cells)
                         }
@@ -205,7 +234,7 @@ fun FigureDrawer(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "FIGURES & TABLES",
+                    text = stringResource(Res.string.figures_figures_tables),
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp,
@@ -243,7 +272,7 @@ fun FigureDrawer(
                 ) {
                     Icon(
                         painterResource(Res.drawable.ic_close),
-                        contentDescription = "Close Drawer",
+                        contentDescription = stringResource(Res.string.figures_close_drawer),
                         tint = colors.fillSecondary,
                         modifier = Modifier.size(14.dp),
                     )
@@ -255,21 +284,23 @@ fun FigureDrawer(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(horizontal = 14.dp, vertical = Dimens.SpaceMin),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
         ) {
-            DrawerTabChip("Figures (${figures.size})", selected = selectedTab == 0) { selectedTab = 0 }
+            DrawerTabChip("Figures (${shownFigures.size})", selected = selectedTab == 0) { selectedTab = 0 }
             DrawerTabChip("Tables (${tables.size})", selected = selectedTab == 1) { selectedTab = 1 }
         }
 
-        HorizontalDivider(color = colors.border.copy(alpha = 0.4f), modifier = Modifier.padding(top = 8.dp))
+        HorizontalDivider(color = colors.border.copy(alpha = 0.4f), modifier = Modifier.padding(top = Dimens.SpaceXs))
 
         // Content List
         if (selectedTab == 0) {
-            if (figures.isEmpty()) {
+            if (shownFigures.isEmpty() && pdfFigures == null) {
+                DrawerEmptyState(title = "", message = stringResource(Res.string.figures_finding))
+            } else if (shownFigures.isEmpty()) {
                 DrawerEmptyState(
-                    title = "No Extracted Figures",
-                    message = "This document does not contain standalone raster figures in its text layer.\n\nTip: Use the Snapshot tool in the toolbar to capture figures directly from the PDF into notes.",
+                    title = stringResource(Res.string.figures_no_extracted_figures),
+                    message = stringResource(Res.string.figures_this_document_does_not),
                 )
             } else {
                 LazyColumn(
@@ -277,11 +308,12 @@ fun FigureDrawer(
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    itemsIndexed(figures) { _, fig ->
+                    itemsIndexed(shownFigures) { _, fig ->
                         FigureCard(
                             figure = fig,
-                            loadFigure = loadFigure,
-                            onEnlarge = { enlargedImageUrl = fig.imageUrl },
+                            loadImage = loadImage,
+                            onEnlarge = { enlarged = fig },
+                            onPin = { onPin(Pinned.Figure(fig)) },
                         )
                     }
                 }
@@ -289,8 +321,8 @@ fun FigureDrawer(
         } else {
             if (tables.isEmpty()) {
                 DrawerEmptyState(
-                    title = "No Extracted Tables",
-                    message = "No structured tables were extracted from this document's text layer.",
+                    title = stringResource(Res.string.figures_no_extracted_tables),
+                    message = stringResource(Res.string.figures_no_structured_tables_were),
                 )
             } else {
                 LazyColumn(
@@ -299,7 +331,7 @@ fun FigureDrawer(
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     itemsIndexed(tables) { _, tbl ->
-                        TableCard(table = tbl)
+                        TableCard(table = tbl, onPin = { onPin(Pinned.Table(tbl)) })
                     }
                 }
             }
@@ -307,17 +339,17 @@ fun FigureDrawer(
     }
 
     // High-Res Image Lightbox Dialog
-    enlargedImageUrl?.let { url ->
-        Dialog(onDismissRequest = { enlargedImageUrl = null }) {
+    enlarged?.let { figure ->
+        Dialog(onDismissRequest = { enlarged = null }) {
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(Dimens.RadiusBase),
                 color = colors.background,
                 shadowElevation = 24.dp,
                 modifier = Modifier
-                    .padding(16.dp)
-                    .clip(RoundedCornerShape(12.dp)),
+                    .padding(Dimens.SpaceMd)
+                    .clip(RoundedCornerShape(Dimens.RadiusBase)),
             ) {
-                Column(Modifier.padding(16.dp)) {
+                Column(Modifier.padding(Dimens.SpaceMd)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End,
@@ -328,23 +360,21 @@ fun FigureDrawer(
                                 .size(28.dp)
                                 .clip(CircleShape)
                                 .background(colors.fillQuarternary)
-                                .clickable { enlargedImageUrl = null },
+                                .clickable { enlarged = null },
                         ) {
                             Icon(
                                 painterResource(Res.drawable.ic_close),
-                                contentDescription = "Close Lightbox",
+                                contentDescription = stringResource(Res.string.figures_close_lightbox),
                                 tint = colors.fillPrimary,
                                 modifier = Modifier.size(16.dp),
                             )
                         }
                     }
-                    val img: ImageBitmap? by produceState<ImageBitmap?>(null, url) {
-                        value = loadFigure(url)?.let(::loadImageFile)
-                    }
+                    val img: ImageBitmap? by produceState<ImageBitmap?>(null, figure) { value = loadImage(figure) }
                     if (img != null) {
                         Image(
                             bitmap = img!!,
-                            contentDescription = "Enlarged Figure",
+                            contentDescription = stringResource(Res.string.figures_enlarged_figure),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(max = 600.dp),
@@ -356,7 +386,7 @@ fun FigureDrawer(
                                 .fillMaxWidth()
                                 .height(200.dp),
                         ) {
-                            Text("Loading figure...", color = colors.fillTertiary)
+                            Text(stringResource(Res.string.figures_loading_figure), color = colors.fillTertiary)
                         }
                     }
                 }
@@ -368,13 +398,12 @@ fun FigureDrawer(
 @Composable
 private fun FigureCard(
     figure: ExtractedFigure,
-    loadFigure: suspend (String) -> String?,
+    loadImage: suspend (ExtractedFigure) -> ImageBitmap?,
     onEnlarge: () -> Unit,
+    onPin: () -> Unit,
 ) {
     val colors = QuireTheme.colors
-    val image: ImageBitmap? by produceState<ImageBitmap?>(null, figure.imageUrl) {
-        value = loadFigure(figure.imageUrl)?.let(::loadImageFile)
-    }
+    val image: ImageBitmap? by produceState<ImageBitmap?>(null, figure) { value = loadImage(figure) }
 
     Column(
         modifier = Modifier
@@ -395,11 +424,7 @@ private fun FigureCard(
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
                 color = colors.accent,
             )
-            Text(
-                text = "Click to enlarge",
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                color = colors.fillTertiary,
-            )
+            OpenBeside(onPin)
         }
 
         Spacer(Modifier.height(6.dp))
@@ -422,7 +447,7 @@ private fun FigureCard(
                     .background(colors.fillQuarternary.copy(alpha = 0.4f)),
             ) {
                 Text(
-                    "Figure Preview",
+                    stringResource(Res.string.figures_figure_preview),
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.fillTertiary,
                 )
@@ -443,7 +468,7 @@ private fun FigureCard(
 }
 
 @Composable
-private fun TableCard(table: ExtractedTable) {
+private fun TableCard(table: ExtractedTable, onPin: () -> Unit) {
     val colors = QuireTheme.colors
     Column(
         modifier = Modifier
@@ -466,65 +491,24 @@ private fun TableCard(table: ExtractedTable) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Dimens.SpaceXs))
             Text(
-                text = "${table.rows.size} rows",
+                text = stringResource(Res.string.reader_rows, table.rows.size),
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                 color = colors.fillTertiary,
             )
+            Spacer(Modifier.weight(1f))
+            OpenBeside(onPin)
         }
-        Spacer(Modifier.height(8.dp))
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Dimens.RadiusSmall))
-                .border(1.dp, colors.border.copy(alpha = 0.35f), RoundedCornerShape(Dimens.RadiusSmall)),
-        ) {
-            val maxVisibleRows = 6
-            table.rows.take(maxVisibleRows).forEachIndexed { rowIndex, cells ->
-                val isHeader = rowIndex == 0
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(if (isHeader) colors.sidepane else if (rowIndex % 2 == 1) colors.background else colors.sidepane.copy(alpha = 0.4f))
-                        .padding(horizontal = 8.dp, vertical = 5.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    cells.forEach { cell ->
-                        Text(
-                            text = cell,
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontSize = 10.sp,
-                                fontWeight = if (isHeader) FontWeight.SemiBold else FontWeight.Normal,
-                                fontFamily = if (isHeader) null else androidx.compose.ui.text.font.FontFamily.Monospace,
-                            ),
-                            color = if (isHeader) colors.fillPrimary else colors.fillSecondary,
-                            modifier = Modifier.weight(1f, fill = false),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-                if (rowIndex < minOf(table.rows.size - 1, maxVisibleRows - 1)) {
-                    HorizontalDivider(color = colors.border.copy(alpha = 0.2f))
-                }
-            }
-            if (table.rows.size > maxVisibleRows) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(colors.sidepane.copy(alpha = 0.7f))
-                        .padding(vertical = 4.dp),
-                ) {
-                    Text(
-                        "+ ${table.rows.size - maxVisibleRows} more rows",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                        color = colors.fillTertiary,
-                    )
-                }
-            }
-        }
+        Spacer(Modifier.height(Dimens.SpaceXs))
+        PaperTable(
+            rows = table.rows,
+            textStyle = MaterialTheme.typography.bodySmall,
+            textColor = colors.fillPrimary,
+            lineColor = colors.border.copy(alpha = 0.5f),
+            stripeColor = colors.sidepane.copy(alpha = 0.6f),
+            maxColumnWidth = 220.dp,
+        )
     }
 }
 
@@ -560,11 +544,11 @@ private fun DrawerEmptyState(title: String, message: String) {
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(Dimens.SpaceLg),
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
         ) {
             Icon(
                 painterResource(Res.drawable.ic_inventory_2),
@@ -585,5 +569,27 @@ private fun DrawerEmptyState(title: String, message: String) {
                 textAlign = TextAlign.Center,
             )
         }
+    }
+}
+
+/**
+ * A figure's image: cut from its PDF page, or the text's image file decoded (off the UI thread;
+ * a large figure decoded in composition stalled the reader). `null` when it cannot be had.
+ */
+internal suspend fun figureImage(
+    figure: ExtractedFigure,
+    loadFigure: suspend (String) -> String?,
+    loadPdfFigure: suspend (PdfFigure) -> ImageBitmap?,
+): ImageBitmap? = when {
+    figure.pdf != null -> loadPdfFigure(figure.pdf)
+    figure.imageUrl.isNotEmpty() -> loadFigure(figure.imageUrl)?.let { path -> withContext(Dispatchers.Default) { loadImageFile(path) } }
+    else -> null
+}
+
+/** "Open Beside": the figure or table in its own pane beside the text or the PDF. */
+@Composable
+private fun OpenBeside(onClick: () -> Unit) {
+    TextButton(onClick = onClick, contentPadding = PaddingValues(horizontal = Dimens.SpaceXs), modifier = Modifier.height(24.dp)) {
+        Text(stringResource(Res.string.reader_open_beside), style = MaterialTheme.typography.labelSmall)
     }
 }

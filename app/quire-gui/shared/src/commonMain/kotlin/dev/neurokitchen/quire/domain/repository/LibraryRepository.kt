@@ -29,6 +29,9 @@ interface LibraryRepository {
     /** Opens the library again, e.g. after its settings changed; open flows switch to it. */
     suspend fun reopen()
 
+    /** Rebuilds reader texts an older converter made, in the background; how many. */
+    suspend fun rebuildStaleTexts(): Int = 0
+
     /** Adds a reference typed in by hand (its fields; `id` and `citeKey` are the engine's). */
     suspend fun addReference(reference: Reference): AddOutcome = unsupported()
     /** Replaces the fields of the reference with `reference.id`; changed fields become the user's. */

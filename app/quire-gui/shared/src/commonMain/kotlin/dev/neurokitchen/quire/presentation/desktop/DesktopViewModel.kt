@@ -8,6 +8,7 @@ import dev.neurokitchen.quire.domain.model.LibraryQuery
 import dev.neurokitchen.quire.domain.repository.LibraryRepository
 import dev.neurokitchen.quire.domain.repository.PreferencesRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
@@ -32,6 +33,12 @@ class DesktopViewModel(
             preferencesRepository.preferences.collect { prefs ->
                 _state.update { it.copy(appTheme = prefs.appTheme) }
             }
+        }
+        // After an update, papers' stored texts are rebuilt in the background, a moment after the
+        // window is up, instead of each one inside its first opening.
+        viewModelScope.launch {
+            delay(STALE_TEXTS_DELAY_MS)
+            runCatching { libraryRepository.rebuildStaleTexts() }
         }
         // Every reference, for the command palette and the citation graph: followed only while one
         // of them is open (the library screen keeps its own list).
@@ -66,3 +73,6 @@ class DesktopViewModel(
         }
     }
 }
+
+/** How long after startup stale paper texts start rebuilding (the first screen goes first). */
+private const val STALE_TEXTS_DELAY_MS = 3_000L

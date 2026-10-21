@@ -2,7 +2,6 @@ package dev.neurokitchen.quire.presentation.screens.tools
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.neurokitchen.quire.domain.model.ExportSelection
 import dev.neurokitchen.quire.domain.model.Reference
 import dev.neurokitchen.quire.domain.repository.AttachmentRepository
 import dev.neurokitchen.quire.domain.repository.CurationRepository
@@ -21,9 +20,7 @@ import dev.neurokitchen.quire.resources.tools_auto_ran
 import dev.neurokitchen.quire.resources.tools_auto_stopped
 import dev.neurokitchen.quire.resources.tools_backed_up
 import dev.neurokitchen.quire.resources.tools_dismissed
-import dev.neurokitchen.quire.resources.tools_exported
 import dev.neurokitchen.quire.resources.tools_key_imported
-import dev.neurokitchen.quire.resources.tools_kept_updated
 import dev.neurokitchen.quire.resources.tools_library_created
 import dev.neurokitchen.quire.resources.tools_library_default
 import dev.neurokitchen.quire.resources.tools_library_opened
@@ -120,20 +117,10 @@ class ToolsViewModel(
                 null
             }
 
-            is ToolsEvent.OnExportChange -> _state.update { it.copy(export = event.form, exportPreview = null) }
-            ToolsEvent.OnExportPreview -> act {
-                val (text, count) = exchange.export(selection())
-                _state.update { it.copy(exportPreview = text, exportCount = count) }
-                null
-            }
-            is ToolsEvent.OnExportSave -> act {
-                val count = exchange.exportTo(selection(), event.path)
-                Notice.Done(Res.string.tools_exported, listOf(count, event.path))
-            }
-            is ToolsEvent.OnKeepUpdated -> act {
-                val count = exchange.keepUpdated(selection(), event.path)
-                loadExport()
-                Notice.Done(Res.string.tools_kept_updated, listOf(count, event.path))
+            is ToolsEvent.OnShowExport -> _state.update { it.copy(isExportOpen = event.open) }
+            is ToolsEvent.OnExportDone -> {
+                _state.update { it.copy(isExportOpen = false, notice = event.notice) }
+                viewModelScope.launch { runCatching { loadExport() } }
             }
             is ToolsEvent.OnStopAutoExport -> act {
                 exchange.stopAutoExport(event.path)
@@ -254,12 +241,8 @@ class ToolsViewModel(
     }
 
     private suspend fun loadExport() {
-        val formats = runCatching { exchange.exportFormats() }.getOrDefault(emptyList())
         val autos = exchange.autoExports()
-        _state.update { s ->
-            val format = s.export.format.takeIf { it in formats } ?: formats.firstOrNull() ?: s.export.format
-            s.copy(formats = formats, autoExports = autos, export = s.export.copy(format = format))
-        }
+        _state.update { it.copy(autoExports = autos) }
     }
 
     private suspend fun loadLibraries() {
@@ -278,8 +261,6 @@ class ToolsViewModel(
         val members = sync.projectMembers(path)
         _state.update { it.copy(sync = it.sync.copy(members = members)) }
     }
-
-    private fun selection() = _state.value.export.let { ExportSelection(it.projectPath, it.recursive, format = it.format) }
 
     /** Runs an action with the working mark, then reports its notice (none if `null`) or failure. */
     private fun act(action: suspend () -> Notice?) {

@@ -1,17 +1,18 @@
 package dev.neurokitchen.quire.data.engine
 
 import dev.neurokitchen.quire.domain.model.AutoExport
-import java.io.File
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import dev.neurokitchen.quire.domain.model.AutoExportRun
 import dev.neurokitchen.quire.domain.model.CiteUse
+import dev.neurokitchen.quire.domain.model.ExportOptions
+import dev.neurokitchen.quire.domain.model.ExportProfile
 import dev.neurokitchen.quire.domain.model.ExportSelection
 import dev.neurokitchen.quire.domain.model.ManuscriptCheck
 import dev.neurokitchen.quire.domain.model.PaperAnnotations
 import dev.neurokitchen.quire.domain.model.UnknownCiteKey
 import dev.neurokitchen.quire.domain.model.ZoteroImport
 import dev.neurokitchen.quire.domain.repository.ExchangeRepository
+import dev.neurokitchen.quire.ffi.ExportOptionsRecord
+import dev.neurokitchen.quire.ffi.exportEncodings as ffiExportEncodings
 import dev.neurokitchen.quire.ffi.exportFormats as ffiExportFormats
 import dev.neurokitchen.quire.ffi.ExportSelection as FfiExportSelection
 
@@ -27,16 +28,17 @@ class EngineExchangeRepository(private val session: EngineSession) : ExchangeRep
 
     override fun exportFormats() = ffiExportFormats()
 
+    override fun exportEncodings() = ffiExportEncodings()
+
+    override suspend fun exportProfiles() = session.library().exportProfiles().map { ExportProfile(it.name, it.options.toDomain()) }
+
     override suspend fun export(selection: ExportSelection): Pair<String, Int> {
         val exported = session.library().export(selection.toFfi())
         return exported.text to exported.count.toInt()
     }
 
-    override suspend fun exportTo(selection: ExportSelection, path: String): Int {
-        val (text, count) = export(selection)
-        withContext(Dispatchers.IO) { File(path).writeText(text) }
-        return count
-    }
+    override suspend fun exportTo(selection: ExportSelection, path: String) =
+        session.library().exportTo(selection.toFfi(), path).count.toInt()
 
     override suspend fun keepUpdated(selection: ExportSelection, path: String) =
         session.library().keepUpdated(selection.toFfi(), path).count.toInt()
@@ -67,5 +69,17 @@ class EngineExchangeRepository(private val session: EngineSession) : ExchangeRep
         )
     }
 
-    private fun ExportSelection.toFfi() = FfiExportSelection(projectPath, recursive, profile, format)
+    private fun ExportSelection.toFfi() =
+        FfiExportSelection(projectPath, recursive, references, profile, options?.toFfi(), format)
+
+    private fun ExportOptions.toFfi() = ExportOptionsRecord(format, omit, ascii, monthMacros, preprintsAsArticles, encoding)
+
+    private fun ExportOptionsRecord.toDomain() = ExportOptions(
+        format = format ?: "biblatex",
+        omit = omit,
+        ascii = ascii,
+        monthMacros = monthMacros,
+        preprintsAsArticles = preprintsAsArticles,
+        encoding = encoding ?: "utf-8",
+    )
 }

@@ -281,6 +281,28 @@ impl Engine {
         Ok((reference, markdown, false))
     }
 
+    /// Converts again every stored reader text made by an older converter (after an update), one
+    /// paper at a time, so opening a paper does not wait for it; papers never opened (no stored
+    /// text) are left alone. A paper that fails is skipped. Returns how many were rebuilt.
+    pub async fn rebuild_stale_texts(&self) -> Result<usize> {
+        let header = format!("<!-- quire reader text: {} -->\n", pdf::READER_CONVERTER);
+        let mut rebuilt = 0;
+        for id in self.references_with_pdfs().await? {
+            let (_, pdfs) = self.pdfs_of(&id.to_string()).await?;
+            let Some((attachment, _)) = pdfs.first() else { continue };
+            let cache = self.files().path(&attachment.hash, "md");
+            let Ok(stored) = std::fs::read_to_string(&cache) else { continue };
+            if stored.starts_with(&header) {
+                continue;
+            }
+            match self.paper_text(&id.to_string()).await {
+                Ok(_) => rebuilt += 1,
+                Err(error) => tracing::debug!(%error, "rebuilding a stale reader text"),
+            }
+        }
+        Ok(rebuilt)
+    }
+
     /// Re-checks every PDF of `references` against its reference (identifier, else title); changes
     /// nothing. For finding wrong attachments.
     pub async fn verify_pdfs(&self, references: Vec<Reference>) -> Result<Vec<(Reference, Attachment, PdfMatch)>> {

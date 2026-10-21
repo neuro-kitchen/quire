@@ -24,6 +24,8 @@ import dev.neurokitchen.quire.presentation.screens.settings.SettingsViewModel
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.module.dsl.viewModelOf
+import dev.neurokitchen.quire.presentation.components.export_dialog.ExportDialogViewModel
+import dev.neurokitchen.quire.presentation.components.export_dialog.ExportTarget
 import org.koin.dsl.module
 
 /** Sample data: tests, previews, and platforms without the engine bridge yet (Android, iOS). */
@@ -58,7 +60,9 @@ val viewModelModule = module {
     viewModelOf(::DesktopViewModel)
     viewModelOf(::ToolsViewModel)
     // One per open paper: its reference ID and title come as parameters.
-    viewModel { (id: String, title: String) -> ReaderViewModel(id, title, get(), get()) }
+    viewModel { (id: String, title: String) -> ReaderViewModel(id, title, get(), get(), preferences = getOrNull()) }
+    // One per export dialog: what it exports comes as a parameter.
+    viewModel { (target: ExportTarget) -> ExportDialogViewModel(target, get()) }
 }
 
 /** Everything the app needs, with `data` supplying the repositories. */

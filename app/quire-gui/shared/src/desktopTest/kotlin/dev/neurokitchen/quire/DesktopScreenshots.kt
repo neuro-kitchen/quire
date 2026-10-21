@@ -1,5 +1,22 @@
 package dev.neurokitchen.quire
 
+import kotlinx.coroutines.withTimeout
+import dev.neurokitchen.quire.presentation.screens.reader.components.ExtractedTable
+import dev.neurokitchen.quire.presentation.screens.reader.Pinned
+import dev.neurokitchen.quire.presentation.components.export_dialog.ENCODING_ASCII
+import dev.neurokitchen.quire.presentation.components.export_dialog.ENCODING_WINDOWS_1252
+import dev.neurokitchen.quire.presentation.components.export_dialog.ENCODING_UTF8_BOM
+import dev.neurokitchen.quire.presentation.components.export_dialog.ENCODING_UTF8
+import dev.neurokitchen.quire.presentation.components.export_dialog.OmitField
+import dev.neurokitchen.quire.presentation.components.export_dialog.ExportTarget
+import dev.neurokitchen.quire.presentation.components.export_dialog.ExportDialogContent
+import dev.neurokitchen.quire.presentation.components.export_dialog.ExportDialogState
+import dev.neurokitchen.quire.domain.model.ExportOptions
+import dev.neurokitchen.quire.domain.model.PaperTabKind
+import dev.neurokitchen.quire.domain.model.PaperTab
+import dev.neurokitchen.quire.domain.model.BlockKind
+import dev.neurokitchen.quire.domain.model.Word
+import dev.neurokitchen.quire.domain.model.TextBlock
 import dev.neurokitchen.quire.presentation.mapping.toImageBitmap
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -160,6 +177,32 @@ class DesktopScreenshots {
         }
     }
 
+    /** A table as a grid: columns as wide as their cells, the header bold, numbers aligned right. */
+    @Test
+    fun readerShowsATable() {
+        fun row(vararg cells: String) = TextBlock(BlockKind.TableRow, cells.map { Word(it) })
+        val blocks = listOf(
+            TextBlock(BlockKind.Heading(2), "Temperature sensing".split(" ").map { Word(it) }),
+            TextBlock(BlockKind.Paragraph, "Table 1 compares the probes measured in living cells.".split(" ").map { Word(it) }),
+            row("Probe", "Sensitivity (mK Hz⁻½)", "Accuracy (mK)", "Cells (n)"),
+            row("Nitrogen-vacancy centre in nanodiamond", "9 ± 2", "44", "12"),
+            row("Gold nanoparticle", "—", "100", "8"),
+            row("Fluorescent polymer thermometer", "180", "250 ± 30", "21"),
+            TextBlock(BlockKind.Paragraph, "The nanodiamond probes were the most accurate.".split(" ").map { Word(it) }),
+        )
+        val state = ReaderState(
+            referenceId = "t",
+            title = "Nanometre-scale thermometry in a living cell",
+            isLoading = false,
+            mode = ReaderMode.Text,
+            tabs = listOf(PaperTab(PaperTabKind.Paper, blocks)),
+            pdf = PdfViewState(isLoading = false),
+        )
+        render("desktop-reader-table.png") {
+            QuireTheme(darkTheme = false, desktop = true) { Surface { ReaderScreen(state, {}, { _, _ -> null }, { null }) } }
+        }
+    }
+
     @Test
     fun readerThemedAndCustomFont() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -306,7 +349,9 @@ class DesktopScreenshots {
                                 title = "Microstructure of a spatial map in the entorhinal cortex",
                                 creator = "Hafting et al.", year = "2005", dateAdded = "", hasPdf = false,
                             ),
+                            project = "thesis",
                         ),
+                        projects = listOf("thesis" to "Thesis", "thesis/chapter-2" to "Chapter 2"),
                         onEvent = {},
                     )
                 }
@@ -457,6 +502,33 @@ class DesktopScreenshots {
         }
     }
 
+    /** Three columns: the text, the PDF, and a table pinned beside them (side panes closed). */
+    @Test
+    fun readerWithAPinnedTable() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        val reader = SampleReaderRepository(fakePdfs = true)
+        val pdf = SamplePdfRepository()
+        val vm = ReaderViewModel("3", "The hippocampus as a spatial map", reader, pdf)
+        vm.onEvent(ReaderEvent.OnModeChange(ReaderMode.Split))
+        vm.onEvent(ReaderEvent.OnToggleAnnotations)
+        vm.onEvent(ReaderEvent.OnToggleNotes)
+        val table = ExtractedTable(
+            id = "t1",
+            title = "Table 1. Units recorded",
+            rows = listOf(listOf("Rat", "Units", "Place cells", "%"), listOf("R1", "23", "8", "34.8"), listOf("R2", "19", "5", "26.3"), listOf("R3", "34", "12", "35.3")),
+        )
+        vm.onEvent(ReaderEvent.OnPin(Pinned.Table(table)))
+        val state = runBlocking { withTimeout(10_000) { vm.state.first { !it.isLoading && !it.pdf.isLoading && it.panes.size == 3 } } }
+        val path = state.pdf.path!!
+        render("desktop-reader-pinned.png") {
+            QuireTheme(darkTheme = false, desktop = true) {
+                Surface {
+                    ReaderScreen(state, {}, { index, width -> pdf.render(path, index, width).toImageBitmap() }, { null })
+                }
+            }
+        }
+    }
+
     @Test
     fun readerWithFigureDrawer() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -579,6 +651,45 @@ class DesktopScreenshots {
     @Composable
     private fun Library(state: LibraryState, dark: Boolean) {
         QuireTheme(appTheme = if (dark) AppTheme.Obsidian else AppTheme.PaperLight, desktop = true) { Surface { LibraryScreen(state, onEvent = {}) } }
+    }
+
+    @Test
+    fun exportDialog() {
+        val state = ExportDialogState(
+            target = ExportTarget(projectPath = "thesis"),
+            formats = listOf("biblatex", "bibtex", "csl-json", "hayagriva"),
+            encodings = listOf(ENCODING_UTF8, ENCODING_UTF8_BOM, ENCODING_WINDOWS_1252, ENCODING_ASCII),
+            options = ExportOptions(format = "bibtex", monthMacros = true),
+            encoding = ENCODING_WINDOWS_1252,
+            omitted = setOf(OmitField.Abstract, OmitField.File),
+            preview = """
+                @article{hafting2005,
+                  author = {Hafting, Torkel and Fyhn, Marianne and Molden, Sturla and Moser, May-Britt and Moser, Edvard I.},
+                  title = {Microstructure of a spatial map in the entorhinal cortex},
+                  journal = {Nature},
+                  year = {2005},
+                  month = aug,
+                  volume = {436},
+                  pages = {801--806},
+                  doi = {10.1038/nature03721},
+                }
+
+                @article{okeefe1971,
+                  author = {O'Keefe, J. and Dostrovsky, J.},
+                  title = {The hippocampus as a spatial map},
+                  journal = {Brain Research},
+                  year = {1971},
+                }
+            """.trimIndent(),
+            count = 2,
+        )
+        render("desktop-export.png", width = 1000, height = 700) {
+            QuireTheme(darkTheme = false, desktop = true) {
+                Surface {
+                    ExportDialogContent(state, projects = listOf("thesis" to "Thesis", "thesis/chapter-2" to "Chapter 2"), onEvent = {}, onDismiss = {})
+                }
+            }
+        }
     }
 
     private fun render(name: String, width: Int = 1400, height: Int = 860, content: @Composable () -> Unit) {

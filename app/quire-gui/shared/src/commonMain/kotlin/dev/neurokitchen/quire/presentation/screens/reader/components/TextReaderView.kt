@@ -19,7 +19,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -107,13 +107,18 @@ fun TextReaderView(
     val themeColors = readerColors(readerTheme)
     var localSelection by remember(selectedTab) { mutableStateOf<Pair<String, String>?>(null) }
 
-    val firstVisibleBlock by remember(tab, list) { derivedStateOf { list.firstVisibleItemIndex + 1 } }
+    // Consecutive table rows show as one table: list items are not blocks one to one.
+    val items = remember(tab) { readerItems(tab.blocks) }
+    val itemOfBlock = remember(items, tab) { itemOfBlock(items, tab.blocks.size) }
+    val firstVisibleBlock by remember(items, list) {
+        derivedStateOf { (items.getOrNull(list.firstVisibleItemIndex)?.first ?: 0) + 1 }
+    }
     LaunchedEffect(firstVisibleBlock, tab.blocks.size) {
         onProgressChange(firstVisibleBlock, tab.blocks.size)
     }
 
     val current = findMatches.getOrNull(currentFind)
-    LaunchedEffect(current) { if (current != null) list.animateScrollToItem(current.block) }
+    LaunchedEffect(current) { if (current != null) list.animateScrollToItem(itemOfBlock[current.block]) }
 
     LaunchedEffect(focusedQuote, selectedTab) {
         val index = focusedQuote?.let { q ->
@@ -123,7 +128,7 @@ fun TextReaderView(
                 clean in blockText || blockText in clean
             }
         } ?: -1
-        if (index >= 0) list.animateScrollToItem(index)
+        if (index >= 0) list.animateScrollToItem(itemOfBlock[index])
     }
 
     Column(modifier.fillMaxSize().background(themeColors.background)) {
@@ -133,7 +138,7 @@ fun TextReaderView(
                 .horizontalScroll(rememberScrollState())
                 .background(themeColors.surface)
                 .padding(Dimens.SpaceXs),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceMin),
         ) {
             tabs.forEachIndexed { index, t ->
                 val label = stringResource(t.kind.label) + (t.count?.let { " ($it)" } ?: "")
@@ -155,9 +160,18 @@ fun TextReaderView(
                 contentPadding = PaddingValues(vertical = Dimens.SpaceMd, horizontal = Dimens.SpaceLg),
                 modifier = Modifier.widthIn(max = ReadingWidth).fillMaxSize(),
             ) {
-                itemsIndexed(tab.blocks) { blockIndex, block ->
+                items(items) { item ->
+                    val blockIndex = item.first
+                    val block = tab.blocks[blockIndex]
                     when (val kind = block.kind) {
                         is BlockKind.Image -> Figure(kind.url, loadFigure)
+                        BlockKind.TableRow -> PaperTable(
+                            rows = tab.blocks.subList(item.first, item.last + 1).map { row -> row.words.map { it.text } },
+                            textStyle = style(BlockKind.Paragraph, readerFont, (fontSizeSp * 0.9f).toInt()),
+                            textColor = themeColors.text,
+                            lineColor = themeColors.text.copy(alpha = 0.18f),
+                            stripeColor = themeColors.text.copy(alpha = 0.04f),
+                        )
                         else -> SelectableBlock(
                             block = block,
                             highlights = highlights,
@@ -355,7 +369,7 @@ private fun TabChip(text: String, selected: Boolean, onClick: () -> Unit) {
             .clip(RoundedCornerShape(Dimens.RadiusLarge))
             .background(if (selected) colors.accent else colors.fillQuinary)
             .clickable(onClick = onClick)
-            .padding(horizontal = Dimens.SpaceXs, vertical = 4.dp),
+            .padding(horizontal = Dimens.SpaceXs, vertical = Dimens.SpaceMin),
     )
 }
 
@@ -370,3 +384,28 @@ private val PaperTabKind.label: StringResource
         PaperTabKind.References -> Res.string.tab_references
     }
 
+
+/** A list item of the reader: one block, or the table rows from [first] to [last] as one table. */
+internal data class ReaderItem(val first: Int, val last: Int = first)
+
+/** The blocks as list items: each run of table rows becomes one item. */
+internal fun readerItems(blocks: List<TextBlock>): List<ReaderItem> {
+    val items = mutableListOf<ReaderItem>()
+    var i = 0
+    while (i < blocks.size) {
+        var end = i
+        if (blocks[i].kind == BlockKind.TableRow) {
+            while (end + 1 < blocks.size && blocks[end + 1].kind == BlockKind.TableRow) end++
+        }
+        items += ReaderItem(i, end)
+        i = end + 1
+    }
+    return items
+}
+
+/** For each block, the list item showing it. */
+internal fun itemOfBlock(items: List<ReaderItem>, blocks: Int): IntArray {
+    val out = IntArray(blocks)
+    items.forEachIndexed { index, item -> for (b in item.first..item.last) out[b] = index }
+    return out
+}
