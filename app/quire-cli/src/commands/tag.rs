@@ -79,7 +79,7 @@ pub async fn run(engine: &Engine, args: &TagArgs) -> anyhow::Result<()> {
                 for (tag, count) in &tags {
                     let key = tag.position.map(|p| format!("[{p}] ")).unwrap_or_else(|| "    ".into());
                     let name = format!("{:<width$}", tag.name);
-                    anstream::println!(
+                    crate::out!(
                         "{}{}  {}",
                         style::paint(style::DIM, key),
                         paint_tag(tag, &name),

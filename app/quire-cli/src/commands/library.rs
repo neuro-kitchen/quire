@@ -93,7 +93,7 @@ pub async fn run(context: &Context, args: &LibraryArgs) -> anyhow::Result<()> {
                         (false, true) => "  (built-in default)",
                         (true, true) => "",
                     };
-                    anstream::println!(
+                    crate::out!(
                         "{mark} {name}  {}{}",
                         style::paint(style::DIM, library.path.display()),
                         style::paint(style::DIM, state)

@@ -128,7 +128,7 @@ pub async fn run(context: &Context, args: &ExportArgs) -> anyhow::Result<()> {
                 format!("{} to {}", output::count(count, "reference", "references"), path.display()),
             );
         }
-        None => print!("{}", engine.export(&request).await?.0),
+        None => crate::data!("{}", engine.export(&request).await?.0),
     }
     Ok(())
 }
@@ -154,7 +154,7 @@ async fn list_auto(context: &Context) -> anyhow::Result<()> {
             .flatten()
             .collect::<Vec<_>>()
             .join(", ");
-        anstream::println!("{}  {what}  {}", export.path, style::paint(style::DIM, how));
+        crate::out!("{}  {what}  {}", export.path, style::paint(style::DIM, how));
     }
     Ok(())
 }

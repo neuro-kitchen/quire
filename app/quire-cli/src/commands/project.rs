@@ -74,16 +74,11 @@ pub async fn run(engine: &Engine, args: &ProjectArgs) -> anyhow::Result<()> {
         Action::Members { path } => {
             let (project, members) = engine.project_members(path).await?;
             match &project.owner {
-                Some(owner) => anstream::println!("{}  owner", style::paint(style::KEY, owner.short())),
+                Some(owner) => crate::out!("{}  owner", style::paint(style::KEY, owner.short())),
                 None => output::hint(format!("{path} is not shared")),
             }
             for member in &members {
-                anstream::println!(
-                    "{}  {}  {}",
-                    style::paint(style::KEY, member.user.short()),
-                    member.role,
-                    member.name
-                );
+                crate::out!("{}  {}  {}", style::paint(style::KEY, member.user.short()), member.role, member.name);
             }
         }
         Action::Unshare { path, user } => {
@@ -108,11 +103,7 @@ pub async fn run(engine: &Engine, args: &ProjectArgs) -> anyhow::Result<()> {
                 let width = projects.iter().map(|p| p.path.to_string().chars().count()).max().unwrap_or(0);
                 for p in &projects {
                     let path = format!("{:<width$}", p.path.to_string());
-                    anstream::println!(
-                        "{}  {}",
-                        style::paint(style::KEY, path),
-                        style::paint(style::DIM, p.references)
-                    );
+                    crate::out!("{}  {}", style::paint(style::KEY, path), style::paint(style::DIM, p.references));
                 }
             }
         }
@@ -121,7 +112,7 @@ pub async fn run(engine: &Engine, args: &ProjectArgs) -> anyhow::Result<()> {
             if projects.is_empty() {
                 output::hint("No projects. Create one with `quire project new <name>`.");
             } else {
-                anstream::println!("{}", tree::projects(&projects));
+                crate::out!("{}", tree::projects(&projects));
             }
         }
         Action::Rename { path, name } => {

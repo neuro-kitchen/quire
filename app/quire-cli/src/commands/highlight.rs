@@ -56,11 +56,11 @@ pub async fn run(engine: &Engine, args: &HighlightArgs) -> anyhow::Result<()> {
                 ));
             }
             for highlight in &highlights {
-                println!("> {}", highlight.quote);
+                crate::out!("> {}", highlight.quote);
                 if let Some(comment) = &highlight.comment {
-                    println!("\n{comment}");
+                    crate::out!("\n{comment}");
                 }
-                anstream::println!("{}\n", style::paint(style::DIM, format!("<!-- {} -->", highlight.id)));
+                crate::out!("{}\n", style::paint(style::DIM, format!("<!-- {} -->", highlight.id)));
             }
         }
         Action::Comment { id, message } => {
@@ -71,7 +71,7 @@ pub async fn run(engine: &Engine, args: &HighlightArgs) -> anyhow::Result<()> {
             let files = engine.annotations_markdown(project.as_ref(), *recursive).await?;
             let Some(dir) = output else {
                 for (_, markdown) in &files {
-                    println!("{markdown}");
+                    crate::data!("{markdown}\n");
                 }
                 return Ok(());
             };

@@ -53,12 +53,12 @@ pub async fn run(engine: &Engine, args: &NoteArgs) -> anyhow::Result<()> {
                 output::hint(if reference.is_some() { "No notes on it." } else { "No standalone notes." });
             }
             for note in &notes {
-                anstream::println!("{}", line(note));
+                crate::out!("{}", line(note));
             }
         }
         Action::Show { id } => {
             let note = found(engine, *id).await?;
-            println!("{}", note.body);
+            crate::data!("{}\n", note.body);
         }
         Action::Edit { id } => {
             let note = found(engine, *id).await?;

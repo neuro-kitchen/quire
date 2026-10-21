@@ -44,15 +44,15 @@ pub fn line(tone: Tone, label: &str, message: impl Display) -> String {
 
 /// A result line on stdout.
 pub fn report(tone: Tone, label: &str, message: impl Display) {
-    anstream::println!("{}", line(tone, label, message));
+    crate::out!("{}", line(tone, label, message));
 }
 
 /// A message on stderr.
 pub fn note(tone: Tone, label: &str, message: impl Display) {
-    anstream::eprintln!("{}", line(tone, label, message));
+    crate::err!("{}", line(tone, label, message));
 }
 
 /// A plain hint on stderr, dimmed.
 pub fn hint(message: impl Display) {
-    anstream::eprintln!("{}", style::paint(style::DIM, message));
+    crate::err!("{}", style::paint(style::DIM, message));
 }
