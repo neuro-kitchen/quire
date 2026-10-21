@@ -1,5 +1,6 @@
 package dev.neurokitchen.quire.presentation.screens.reader
 
+import dev.neurokitchen.quire.domain.model.PdfFigure
 import dev.neurokitchen.quire.domain.model.PdfMatch
 import androidx.compose.runtime.Immutable
 import dev.neurokitchen.quire.domain.model.Highlight
@@ -75,4 +76,6 @@ data class PdfViewState(
     val error: String? = null,
     /** Still finding the PDF and its pages (the text loads on its own). */
     val isLoading: Boolean = true,
+    /** Figures found from their captions; `null` until the figure drawer first opens. */
+    val figures: List<PdfFigure>? = null,
 )

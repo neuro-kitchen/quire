@@ -5,7 +5,7 @@
 //! `PageSize`, `RenderedPage`, `PageRect`, `QuoteMatch` and `TextMatch` are `quire-document`'s own types, sent
 //! as they are (UniFFI remote records: the compiler checks the field lists below against them).
 
-pub use quire_document::pdf::{PageRect, PageSize, QuoteMatch, RenderedPage, TextMatch};
+pub use quire_document::pdf::{FigureRegion, PageRect, PageSize, QuoteMatch, RenderedPage, TextMatch};
 
 use crate::{QuireError, Result, on_runtime};
 
@@ -61,6 +61,22 @@ pub struct PdfWordRecord {
 pub struct TextRangeRecord {
     pub text: String,
     pub rects: Vec<PageRect>,
+}
+
+/// A figure found on a page from its caption (`quire_document::pdf::figures`).
+#[uniffi::remote(Record)]
+pub struct FigureRegion {
+    pub page: u32,
+    pub label: String,
+    pub caption: String,
+    pub rect: PageRect,
+}
+
+/// The figures of the PDF, from their captions (for papers read from their PDF, whose text has
+/// no images): each one's page and box, to crop from the rendered page.
+#[uniffi::export]
+pub async fn pdf_figures(path: String) -> Result<Vec<FigureRegion>> {
+    blocking(move || quire_document::pdf::figures(&path).map_err(pdf_error)).await
 }
 
 /// The size of every page in points.

@@ -20,6 +20,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import dev.neurokitchen.quire.domain.model.PageImage
+import dev.neurokitchen.quire.domain.model.PdfFigure
 import kotlin.test.assertNotNull
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -180,6 +181,32 @@ class ReaderViewModelTest {
         assertNotNull(vm.page(1, 1000))
         advanceUntilIdle()
         assertEquals(1, pdf.renders.count { it.first == 1 }, "page 2 came from the render ahead")
+    }
+
+    /**
+     * Papers read from their PDF have no figure images; the drawer shows figures cropped from the
+     * pages. They are looked for only once the drawer opens (it renders pages).
+     */
+    @Test
+    fun pdfFiguresLoadWhenTheDrawerOpensAndAreCroppedFromThePage() = runTest(dispatcher) {
+        var asked = 0
+        val figure = PdfFigure(1, "Figure 2", "Figure 2. Firing.", PageRect(72f, 100f, 378f, 253f))
+        val pdf = object : PdfRepository by CountingPdf() {
+            override suspend fun figures(path: String): List<PdfFigure> = listOf(figure).also { asked++ }
+        }
+        val vm = ReaderViewModel("3", "The hippocampus as a spatial map", withPdf, pdf, dispatcher).also { advanceUntilIdle() }
+        assertEquals(0, asked, "not before the drawer opens")
+        vm.onEvent(ReaderEvent.OnToggleFigureDrawer)
+        advanceUntilIdle()
+        assertEquals(listOf(figure), vm.state.value.pdf.figures)
+        val crop = assertNotNull(vm.pdfFigure(figure))
+        // The page at 1536 px for its 612 pt: 306 x 153 pt of figure.
+        assertEquals(768, crop.width)
+        assertEquals(384, crop.height)
+        vm.onEvent(ReaderEvent.OnToggleFigureDrawer)
+        vm.onEvent(ReaderEvent.OnToggleFigureDrawer)
+        advanceUntilIdle()
+        assertEquals(1, asked, "looked for once")
     }
 
     /** While a page renders at a new width (zooming in), the nearest width already rendered shows. */
