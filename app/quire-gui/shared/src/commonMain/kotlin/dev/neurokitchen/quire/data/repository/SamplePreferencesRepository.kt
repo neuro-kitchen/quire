@@ -1,5 +1,6 @@
 package dev.neurokitchen.quire.data.repository
 
+import dev.neurokitchen.quire.domain.repository.ReaderLayout
 import dev.neurokitchen.quire.domain.repository.GuiPreferences
 import dev.neurokitchen.quire.domain.repository.PreferencesRepository
 import dev.neurokitchen.quire.presentation.designsystem.AppTheme
@@ -28,5 +29,9 @@ class SamplePreferencesRepository(initial: GuiPreferences = GuiPreferences()) : 
 
     override suspend fun setReaderFontSize(size: Int) {
         _prefs.update { it.copy(readerFontSize = size) }
+    }
+
+    override suspend fun setReaderLayout(layout: ReaderLayout) {
+        _prefs.update { it.copy(readerLayout = layout) }
     }
 }

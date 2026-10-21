@@ -1,5 +1,6 @@
 package dev.neurokitchen.quire.data.engine
 
+import dev.neurokitchen.quire.domain.repository.ReaderLayout
 import dev.neurokitchen.quire.domain.repository.GuiPreferences
 import dev.neurokitchen.quire.domain.repository.PreferencesRepository
 import dev.neurokitchen.quire.presentation.designsystem.AppTheme
@@ -41,6 +42,7 @@ class FilePreferencesRepository(
                 readerTheme = readerTheme,
                 readerFont = readerFont,
                 readerFontSize = fontSize,
+                readerLayout = readerLayout(props),
             )
         } catch (_: Exception) {
             GuiPreferences()
@@ -55,6 +57,14 @@ class FilePreferencesRepository(
             props.setProperty("reader.theme", prefs.readerTheme.name)
             props.setProperty("reader.font", prefs.readerFont.name)
             props.setProperty("reader.fontSize", prefs.readerFontSize.toString())
+            prefs.readerLayout.let { layout ->
+                props.setProperty("reader.layout.annotations", layout.annotationsWidth.toString())
+                props.setProperty("reader.layout.notes", layout.notesWidth.toString())
+                props.setProperty("reader.layout.drawer", layout.drawerWidth.toString())
+                props.setProperty("reader.layout.drawerOnLeft", layout.drawerOnLeft.toString())
+                props.setProperty("reader.layout.two", layout.two.joinToString(";"))
+                props.setProperty("reader.layout.three", layout.three.joinToString(";"))
+            }
             preferencesFile.outputStream().use { props.store(it, "Quire GUI Preferences") }
         } catch (_: Exception) {}
     }
@@ -77,6 +87,27 @@ class FilePreferencesRepository(
     override suspend fun setReaderFontSize(size: Int) {
         _prefs.update { it.copy(readerFontSize = size) }
         save(_prefs.value)
+    }
+
+    override suspend fun setReaderLayout(layout: ReaderLayout) {
+        _prefs.update { it.copy(readerLayout = layout) }
+        save(_prefs.value)
+    }
+
+    /** The saved layout; any value missing or unreadable is the default's. */
+    private fun readerLayout(props: Properties): ReaderLayout {
+        val default = ReaderLayout()
+        fun int(key: String, fallback: Int) = props.getProperty(key)?.toIntOrNull() ?: fallback
+        fun fractions(key: String, fallback: List<Float>) =
+            props.getProperty(key)?.split(';')?.map { it.toFloatOrNull() ?: return fallback }?.takeIf { it.size == fallback.size } ?: fallback
+        return ReaderLayout(
+            annotationsWidth = int("reader.layout.annotations", default.annotationsWidth),
+            notesWidth = int("reader.layout.notes", default.notesWidth),
+            drawerWidth = int("reader.layout.drawer", default.drawerWidth),
+            drawerOnLeft = props.getProperty("reader.layout.drawerOnLeft")?.toBooleanStrictOrNull() ?: default.drawerOnLeft,
+            two = fractions("reader.layout.two", default.two),
+            three = fractions("reader.layout.three", default.three),
+        )
     }
 
     companion object {

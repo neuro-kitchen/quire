@@ -370,4 +370,7 @@
     <string name="export_copy">Copy</string>
     <string name="export_save">Save…</string>
     <string name="export_menu">Export…</string>
+    <string name="reader_open_beside">Open Beside</string>
+    <string name="reader_close_pane">Close</string>
+    <string name="reader_rows">%1$s rows</string>
 </resources>

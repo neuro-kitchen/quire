@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerIcon
@@ -22,14 +24,20 @@ import dev.neurokitchen.quire.presentation.designsystem.QuireTheme
 
 /**
  * An interactive draggable vertical splitter for resizing adjacent panels.
- * Responds to drag gestures and highlights on hover.
+ * Responds to drag gestures and highlights on hover. [onDelta] gets the movement in dp (the drag
+ * reports pixels: widths in dp moved faster or slower than the mouse on a scaled screen);
+ * [onDragEnd] when the drag stops.
  */
 @Composable
 fun DraggableSplitter(
     onDelta: (Float) -> Unit,
     modifier: Modifier = Modifier,
     width: Dp = 6.dp,
+    onDragEnd: () -> Unit = {},
 ) {
+    val density = LocalDensity.current.density
+    val delta by rememberUpdatedState(onDelta)
+    val end by rememberUpdatedState(onDragEnd)
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
     val colors = QuireTheme.colors
@@ -41,9 +49,9 @@ fun DraggableSplitter(
             .hoverable(interactionSource)
             .pointerHoverIcon(PointerIcon.Hand)
             .pointerInput(Unit) {
-                detectDragGestures { change, dragAmount ->
+                detectDragGestures(onDragEnd = { end() }) { change, dragAmount ->
                     change.consume()
-                    onDelta(dragAmount.x)
+                    delta(dragAmount.x / density)
                 }
             },
         contentAlignment = Alignment.Center,

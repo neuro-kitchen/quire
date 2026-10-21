@@ -1,5 +1,9 @@
 package dev.neurokitchen.quire.presentation.screens.reader.components
 
+import dev.neurokitchen.quire.resources.reader_rows
+import dev.neurokitchen.quire.resources.reader_open_beside
+import androidx.compose.material3.TextButton
+import dev.neurokitchen.quire.presentation.screens.reader.Pinned
 import org.jetbrains.compose.resources.stringResource
 import dev.neurokitchen.quire.resources.figures_finding
 import kotlinx.coroutines.withContext
@@ -93,6 +97,8 @@ fun FigureDrawer(
     /** Figures found on the PDF's pages; `null` while they are looked for (no PDF: empty). */
     pdfFigures: List<PdfFigure>? = emptyList(),
     loadPdfFigure: suspend (PdfFigure) -> ImageBitmap? = { null },
+    /** Opens a figure or table in its own pane beside the text or the PDF. */
+    onPin: (Pinned) -> Unit = {},
 ) {
     if (!isOpen) return
 
@@ -295,6 +301,7 @@ fun FigureDrawer(
                             figure = fig,
                             loadImage = loadImage,
                             onEnlarge = { enlarged = fig },
+                            onPin = { onPin(Pinned.Figure(fig)) },
                         )
                     }
                 }
@@ -312,7 +319,7 @@ fun FigureDrawer(
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     itemsIndexed(tables) { _, tbl ->
-                        TableCard(table = tbl)
+                        TableCard(table = tbl, onPin = { onPin(Pinned.Table(tbl)) })
                     }
                 }
             }
@@ -381,6 +388,7 @@ private fun FigureCard(
     figure: ExtractedFigure,
     loadImage: suspend (ExtractedFigure) -> ImageBitmap?,
     onEnlarge: () -> Unit,
+    onPin: () -> Unit,
 ) {
     val colors = QuireTheme.colors
     val image: ImageBitmap? by produceState<ImageBitmap?>(null, figure) { value = loadImage(figure) }
@@ -404,11 +412,7 @@ private fun FigureCard(
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
                 color = colors.accent,
             )
-            Text(
-                text = "Click to enlarge",
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                color = colors.fillTertiary,
-            )
+            OpenBeside(onPin)
         }
 
         Spacer(Modifier.height(6.dp))
@@ -452,7 +456,7 @@ private fun FigureCard(
 }
 
 @Composable
-private fun TableCard(table: ExtractedTable) {
+private fun TableCard(table: ExtractedTable, onPin: () -> Unit) {
     val colors = QuireTheme.colors
     Column(
         modifier = Modifier
@@ -477,10 +481,12 @@ private fun TableCard(table: ExtractedTable) {
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                text = "${table.rows.size} rows",
+                text = stringResource(Res.string.reader_rows, table.rows.size),
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                 color = colors.fillTertiary,
             )
+            Spacer(Modifier.weight(1f))
+            OpenBeside(onPin)
         }
         Spacer(Modifier.height(8.dp))
         PaperTable(
@@ -558,7 +564,7 @@ private fun DrawerEmptyState(title: String, message: String) {
  * A figure's image: cut from its PDF page, or the text's image file decoded (off the UI thread;
  * a large figure decoded in composition stalled the reader). `null` when it cannot be had.
  */
-private suspend fun figureImage(
+internal suspend fun figureImage(
     figure: ExtractedFigure,
     loadFigure: suspend (String) -> String?,
     loadPdfFigure: suspend (PdfFigure) -> ImageBitmap?,
@@ -566,4 +572,12 @@ private suspend fun figureImage(
     figure.pdf != null -> loadPdfFigure(figure.pdf)
     figure.imageUrl.isNotEmpty() -> loadFigure(figure.imageUrl)?.let { path -> withContext(Dispatchers.Default) { loadImageFile(path) } }
     else -> null
+}
+
+/** "Open Beside": the figure or table in its own pane beside the text or the PDF. */
+@Composable
+private fun OpenBeside(onClick: () -> Unit) {
+    TextButton(onClick = onClick, contentPadding = PaddingValues(horizontal = Dimens.SpaceXs), modifier = Modifier.height(24.dp)) {
+        Text(stringResource(Res.string.reader_open_beside), style = MaterialTheme.typography.labelSmall)
+    }
 }

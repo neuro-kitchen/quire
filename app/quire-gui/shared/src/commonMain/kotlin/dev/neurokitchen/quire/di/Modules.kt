@@ -60,7 +60,7 @@ val viewModelModule = module {
     viewModelOf(::DesktopViewModel)
     viewModelOf(::ToolsViewModel)
     // One per open paper: its reference ID and title come as parameters.
-    viewModel { (id: String, title: String) -> ReaderViewModel(id, title, get(), get()) }
+    viewModel { (id: String, title: String) -> ReaderViewModel(id, title, get(), get(), preferences = getOrNull()) }
     // One per export dialog: what it exports comes as a parameter.
     viewModel { (target: ExportTarget) -> ExportDialogViewModel(target, get()) }
 }
