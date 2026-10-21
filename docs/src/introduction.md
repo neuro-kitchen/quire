@@ -22,8 +22,9 @@ quire is a reference manager for people who write in the terminal: Typst, LaTeX,
 - **Discover**: what a paper cites and who cites it (OpenAlex), alerts on arXiv, PubMed and Crossref,
   retraction checks; saved searches and a reading list.
 - **Search** metadata, notes, highlights and the papers' full text.
-- **Sync** a library between your devices, directly and end-to-end encrypted, with no server
-  holding your data.
+- **Sync** a library between your devices, directly and end-to-end encrypted, or through a
+  [sync hub](guide/sync-hub.md) (your own, or a hosted one) that stores only data it cannot read;
+  share projects with other people.
 
 Everything is local: one SQLite database and a folder of PDFs per library.
 
