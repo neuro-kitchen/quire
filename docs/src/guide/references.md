@@ -18,7 +18,9 @@ as a PubMed ID. DOIs are compared ignoring case, and all versions of an arXiv pa
 reference.
 
 Each identifier goes through a chain of sources until one answers: DOI content negotiation →
-Crossref → the source's own API (arXiv, NCBI) → the page's JSON-LD → its `citation_*` tags.
+Crossref → the source's own API (arXiv, NCBI) → the publisher's page (its `citation_*` tags,
+then its schema.org JSON-LD for what the tags lack). A link to a page that names a DOI, arXiv ID
+or PMID is looked up by that identifier, with the page's own tags as the last resort.
 Every failed attempt is recorded with the reference, so `ref check` can show what went wrong.
 
 Cite keys are made from the first author, the title and the year (`vaswaniAttentionAllYou2017`)
