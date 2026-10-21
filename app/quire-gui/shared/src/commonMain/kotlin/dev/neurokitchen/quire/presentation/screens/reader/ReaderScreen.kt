@@ -1,5 +1,6 @@
 package dev.neurokitchen.quire.presentation.screens.reader
 
+import dev.neurokitchen.quire.domain.model.PdfFigure
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -74,7 +75,7 @@ fun ReaderRoute(
     viewModel: ReaderViewModel = koinViewModel(key = "reader-$id") { parametersOf(id, title) },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    ReaderScreen(state, viewModel::onEvent, loadPage = viewModel::page, renderedNear = viewModel::renderedNear, loadFigure = viewModel::figure, textLayer = viewModel)
+    ReaderScreen(state, viewModel::onEvent, loadPage = viewModel::page, renderedNear = viewModel::renderedNear, loadPdfFigure = viewModel::pdfFigure, loadFigure = viewModel::figure, textLayer = viewModel)
 }
 
 /**
@@ -91,6 +92,8 @@ fun ReaderScreen(
     textLayer: PdfTextLayer = PdfTextLayer.None,
     /** A page already rendered at another width, shown while the sharp one renders. */
     renderedNear: (Int, Int) -> ImageBitmap? = { _, _ -> null },
+    /** A figure found on the PDF's pages, cut from its page. */
+    loadPdfFigure: suspend (PdfFigure) -> ImageBitmap? = { null },
 ) {
     val colors = QuireTheme.colors
     var selection by remember(state.referenceId) { mutableStateOf<Pair<String, String>?>(null) }
@@ -174,6 +177,8 @@ fun ReaderScreen(
                     isOpen = true,
                     tabs = state.tabs,
                     loadFigure = loadFigure,
+                    pdfFigures = if (state.pdf.path == null) emptyList() else state.pdf.figures,
+                    loadPdfFigure = loadPdfFigure,
                     onClose = { onEvent(ReaderEvent.OnToggleFigureDrawer) },
                     dockSide = figureDockSide,
                     onToggleDockSide = { figureDockSide = FigureDockSide.Right },
@@ -449,6 +454,8 @@ fun ReaderScreen(
                     isOpen = true,
                     tabs = state.tabs,
                     loadFigure = loadFigure,
+                    pdfFigures = if (state.pdf.path == null) emptyList() else state.pdf.figures,
+                    loadPdfFigure = loadPdfFigure,
                     onClose = { onEvent(ReaderEvent.OnToggleFigureDrawer) },
                     dockSide = figureDockSide,
                     onToggleDockSide = { figureDockSide = FigureDockSide.Left },

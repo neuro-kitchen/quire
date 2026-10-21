@@ -1,5 +1,10 @@
 package dev.neurokitchen.quire.presentation.screens.reader.components
 
+import org.jetbrains.compose.resources.stringResource
+import dev.neurokitchen.quire.resources.figures_finding
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import dev.neurokitchen.quire.domain.model.PdfFigure
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -64,6 +69,8 @@ data class ExtractedFigure(
     val title: String,
     val caption: String,
     val imageUrl: String,
+    /** Found on the PDF's page from its caption (no image in the text): cropped from the page. */
+    val pdf: PdfFigure? = null,
 )
 
 data class ExtractedTable(
@@ -83,15 +90,19 @@ fun FigureDrawer(
     dockSide: FigureDockSide = FigureDockSide.Right,
     onToggleDockSide: () -> Unit = {},
     modifier: Modifier = Modifier,
+    /** Figures found on the PDF's pages; `null` while they are looked for (no PDF: empty). */
+    pdfFigures: List<PdfFigure>? = emptyList(),
+    loadPdfFigure: suspend (PdfFigure) -> ImageBitmap? = { null },
 ) {
     if (!isOpen) return
 
     val colors = QuireTheme.colors
     var selectedTab by remember { mutableStateOf(0) } // 0: Figures, 1: Tables
-    var enlargedImageUrl by remember { mutableStateOf<String?>(null) }
+    var enlarged by remember { mutableStateOf<ExtractedFigure?>(null) }
+    val loadImage: suspend (ExtractedFigure) -> ImageBitmap? = { figure -> figureImage(figure, loadFigure, loadPdfFigure) }
 
     // Extract figures and tables from paper tabs
-    val figures = remember(tabs) {
+    val textFigures = remember(tabs) {
         val list = mutableListOf<ExtractedFigure>()
         var figIndex = 1
         tabs.forEach { tab ->
@@ -122,6 +133,12 @@ fun FigureDrawer(
             }
         }
         list
+    }
+
+    // A text read from the PDF has captions but no images: the figures found on the pages instead.
+    val shownFigures = remember(textFigures, pdfFigures) {
+        if (textFigures.any { it.imageUrl.isNotEmpty() } || pdfFigures.isNullOrEmpty()) textFigures
+        else pdfFigures.mapIndexed { i, f -> ExtractedFigure("pdf-$i", f.label, f.caption, imageUrl = "", pdf = f) }
     }
 
     val tables = remember(tabs) {
@@ -252,7 +269,7 @@ fun FigureDrawer(
                 .padding(horizontal = 14.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            DrawerTabChip("Figures (${figures.size})", selected = selectedTab == 0) { selectedTab = 0 }
+            DrawerTabChip("Figures (${shownFigures.size})", selected = selectedTab == 0) { selectedTab = 0 }
             DrawerTabChip("Tables (${tables.size})", selected = selectedTab == 1) { selectedTab = 1 }
         }
 
@@ -260,7 +277,9 @@ fun FigureDrawer(
 
         // Content List
         if (selectedTab == 0) {
-            if (figures.isEmpty()) {
+            if (shownFigures.isEmpty() && pdfFigures == null) {
+                DrawerEmptyState(title = "", message = stringResource(Res.string.figures_finding))
+            } else if (shownFigures.isEmpty()) {
                 DrawerEmptyState(
                     title = "No Extracted Figures",
                     message = "This document does not contain standalone raster figures in its text layer.\n\nTip: Use the Snapshot tool in the toolbar to capture figures directly from the PDF into notes.",
@@ -271,11 +290,11 @@ fun FigureDrawer(
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    itemsIndexed(figures) { _, fig ->
+                    itemsIndexed(shownFigures) { _, fig ->
                         FigureCard(
                             figure = fig,
-                            loadFigure = loadFigure,
-                            onEnlarge = { enlargedImageUrl = fig.imageUrl },
+                            loadImage = loadImage,
+                            onEnlarge = { enlarged = fig },
                         )
                     }
                 }
@@ -301,8 +320,8 @@ fun FigureDrawer(
     }
 
     // High-Res Image Lightbox Dialog
-    enlargedImageUrl?.let { url ->
-        Dialog(onDismissRequest = { enlargedImageUrl = null }) {
+    enlarged?.let { figure ->
+        Dialog(onDismissRequest = { enlarged = null }) {
             Surface(
                 shape = RoundedCornerShape(12.dp),
                 color = colors.background,
@@ -322,7 +341,7 @@ fun FigureDrawer(
                                 .size(28.dp)
                                 .clip(CircleShape)
                                 .background(colors.fillQuarternary)
-                                .clickable { enlargedImageUrl = null },
+                                .clickable { enlarged = null },
                         ) {
                             Icon(
                                 painterResource(Res.drawable.ic_close),
@@ -332,9 +351,7 @@ fun FigureDrawer(
                             )
                         }
                     }
-                    val img: ImageBitmap? by produceState<ImageBitmap?>(null, url) {
-                        value = loadFigure(url)?.let(::loadImageFile)
-                    }
+                    val img: ImageBitmap? by produceState<ImageBitmap?>(null, figure) { value = loadImage(figure) }
                     if (img != null) {
                         Image(
                             bitmap = img!!,
@@ -362,13 +379,11 @@ fun FigureDrawer(
 @Composable
 private fun FigureCard(
     figure: ExtractedFigure,
-    loadFigure: suspend (String) -> String?,
+    loadImage: suspend (ExtractedFigure) -> ImageBitmap?,
     onEnlarge: () -> Unit,
 ) {
     val colors = QuireTheme.colors
-    val image: ImageBitmap? by produceState<ImageBitmap?>(null, figure.imageUrl) {
-        value = loadFigure(figure.imageUrl)?.let(::loadImageFile)
-    }
+    val image: ImageBitmap? by produceState<ImageBitmap?>(null, figure) { value = loadImage(figure) }
 
     Column(
         modifier = Modifier
@@ -537,4 +552,18 @@ private fun DrawerEmptyState(title: String, message: String) {
             )
         }
     }
+}
+
+/**
+ * A figure's image: cut from its PDF page, or the text's image file decoded (off the UI thread;
+ * a large figure decoded in composition stalled the reader). `null` when it cannot be had.
+ */
+private suspend fun figureImage(
+    figure: ExtractedFigure,
+    loadFigure: suspend (String) -> String?,
+    loadPdfFigure: suspend (PdfFigure) -> ImageBitmap?,
+): ImageBitmap? = when {
+    figure.pdf != null -> loadPdfFigure(figure.pdf)
+    figure.imageUrl.isNotEmpty() -> loadFigure(figure.imageUrl)?.let { path -> withContext(Dispatchers.Default) { loadImageFile(path) } }
+    else -> null
 }

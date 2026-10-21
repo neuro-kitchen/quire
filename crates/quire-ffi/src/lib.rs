@@ -64,8 +64,9 @@ pub use libraries::{
     unregister_library,
 };
 pub use pdf::{
-    PageRect, PageSize, PdfWordRecord, QuoteMatch, RenderedPage, TextMatch, TextRangeRecord, pdf_find,
-    pdf_nearest_glyph, pdf_page_sizes, pdf_page_text, pdf_render_page, pdf_search, pdf_text_range, pdf_word_at,
+    FigureRegion, PageRect, PageSize, PdfWordRecord, QuoteMatch, RenderedPage, TextMatch, TextRangeRecord, pdf_figures,
+    pdf_find, pdf_nearest_glyph, pdf_page_sizes, pdf_page_text, pdf_render_page, pdf_search, pdf_text_range,
+    pdf_word_at,
 };
 pub use reader::{BlockKind, BlockRecord, HighlightRecord, NoteRecord, PaperRecord, ReaderTab, WordRecord};
 pub use records::{Creator, LibraryInfo, ProjectRecord, Query, ReferenceRecord, SortColumn, Source, TagRecord};
