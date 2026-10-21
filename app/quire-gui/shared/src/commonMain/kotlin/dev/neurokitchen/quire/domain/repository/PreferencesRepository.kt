@@ -6,7 +6,8 @@ import dev.neurokitchen.quire.presentation.designsystem.ReaderTheme
 import kotlinx.coroutines.flow.StateFlow
 
 data class GuiPreferences(
-    val appTheme: AppTheme = AppTheme.Obsidian,
+    /** "System" (the default) follows the device's light or dark setting. */
+    val appTheme: AppTheme = AppTheme.System,
     val readerTheme: ReaderTheme = ReaderTheme.Dark,
     val readerFont: ReaderFont = ReaderFont.Serif,
     val readerFontSize: Int = 16,

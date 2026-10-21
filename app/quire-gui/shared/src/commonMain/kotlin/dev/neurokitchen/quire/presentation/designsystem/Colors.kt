@@ -109,6 +109,8 @@ val DarkQuireColors = QuireColors(
 )
 
 enum class AppTheme(val title: String, val isDark: Boolean) {
+    /** Follows the device: Obsidian when it is dark, Paper Light when it is light (see `QuireTheme`). */
+    System("System", isDark = true),
     Obsidian("Obsidian Dark", isDark = true),
     Nord("Nord Arctic", isDark = true),
     Solarized("Solarized Dark", isDark = true),
@@ -213,7 +215,7 @@ val OledQuireColors = QuireColors(
 )
 
 fun quireColors(theme: AppTheme): QuireColors = when (theme) {
-    AppTheme.Obsidian -> DarkQuireColors
+    AppTheme.System, AppTheme.Obsidian -> DarkQuireColors
     AppTheme.Nord -> NordQuireColors
     AppTheme.Solarized -> SolarizedQuireColors
     AppTheme.Oled -> OledQuireColors

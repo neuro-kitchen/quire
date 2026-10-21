@@ -47,7 +47,8 @@ import dev.neurokitchen.quire.presentation.mobile.screens.SearchTab
 import dev.neurokitchen.quire.presentation.mobile.screens.ShelfScreen
 import dev.neurokitchen.quire.presentation.platform.SystemBarsAppearance
 import dev.neurokitchen.quire.presentation.screens.reader.ReaderRoute
-import dev.neurokitchen.quire.presentation.screens.settings.SettingsRoute
+import dev.neurokitchen.quire.presentation.mobile.screens.SettingsPageScreen
+import dev.neurokitchen.quire.presentation.mobile.screens.SettingsTab
 import dev.neurokitchen.quire.resources.Res
 import dev.neurokitchen.quire.resources.add_title
 import dev.neurokitchen.quire.resources.ic_add
@@ -122,7 +123,10 @@ private fun entryProvider(navigation: MobileNavigation) = entryProvider<NavKey> 
     entry<Route.Search>(metadata = TabRootTransitions) {
         SearchTab(onOpenDetails = openDetails, onOpenReader = openReader)
     }
-    entry<Route.Settings>(metadata = TabRootTransitions) { SettingsRoute() }
+    entry<Route.Settings>(metadata = TabRootTransitions) {
+        SettingsTab(onOpen = { page -> navigation.open { Route.SettingsPage(it, page) } })
+    }
+    entry<Route.SettingsPage> { key -> SettingsPageScreen(key.page, onBack = navigation::back) }
     entry<Route.Shelf> { key ->
         ShelfScreen(key.shelf, onBack = navigation::back, onOpenDetails = openDetails, onOpenReader = openReader)
     }
