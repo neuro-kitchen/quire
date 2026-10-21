@@ -201,6 +201,10 @@ where
             if !rows.is_empty() {
                 report.pulled += self.replica.merge(rows, &self.peer).await?;
             }
+            // "More" from the same position again would be asked for forever (a broken hub).
+            if more && up_to <= after {
+                return Err(SyncError::Protocol("the hub says more batches follow but gives no new ones".into()));
+            }
             if up_to > after {
                 self.replica.record_received(&self.peer.device, i64::try_from(up_to).unwrap_or(i64::MAX)).await?;
                 after = up_to;
@@ -480,4 +484,109 @@ fn unexpected(wanted: &str, got: &ReplyBody) -> SyncError {
         ReplyBody::Devices(_) => "Devices",
     };
     SyncError::Protocol(format!("the hub answered {name}, expected {wanted}"))
+}
+
+#[cfg(test)]
+mod stalling_hub {
+    use std::time::Duration;
+
+    use super::*;
+    use crate::Certificate;
+    use crate::hub::protocol::{Reply, ReplyBody, Welcome};
+
+    /// A library copy with nothing to send.
+    struct Empty {
+        certificate: Certificate,
+    }
+
+    impl Replica for Empty {
+        async fn library_id(&self) -> Result<String> {
+            Ok("lib_test".into())
+        }
+        fn device(&self) -> String {
+            self.certificate.device.clone()
+        }
+        fn certificate(&self) -> Certificate {
+            self.certificate.clone()
+        }
+        async fn is_new(&self) -> Result<bool> {
+            Ok(false)
+        }
+        async fn adopt(&self, _: &str) -> Result<()> {
+            Ok(())
+        }
+        async fn received_from(&self, _: &str) -> Result<i64> {
+            Ok(0)
+        }
+        async fn changes_for(&self, seq: i64, _: &Peer) -> Result<(Vec<Row>, i64)> {
+            Ok((Vec::new(), seq))
+        }
+        async fn merge(&self, _: Vec<Row>, _: &Peer) -> Result<MergeSummary> {
+            Ok(MergeSummary::default())
+        }
+        async fn record_received(&self, _: &str, _: i64) -> Result<()> {
+            Ok(())
+        }
+        async fn missing_files(&self) -> Result<Vec<String>> {
+            Ok(Vec::new())
+        }
+        async fn read_file(&self, _: &str, _: &Peer) -> Result<Option<Vec<u8>>> {
+            Ok(None)
+        }
+        async fn write_file(&self, _: &str, _: Vec<u8>) -> Result<()> {
+            Ok(())
+        }
+    }
+
+    impl HubReplica for Empty {
+        async fn library_key(&self) -> Result<LibraryKey> {
+            Ok(LibraryKey::derive(&[7; 32], "lib_test"))
+        }
+        async fn local_files(&self) -> Result<Vec<String>> {
+            Ok(Vec::new())
+        }
+        async fn snapshot(&self) -> Result<Vec<Row>> {
+            Ok(Vec::new())
+        }
+        async fn wanted_files(&self) -> Result<Vec<String>> {
+            Ok(Vec::new())
+        }
+    }
+
+    /// A hub that answers every pull with "more" at the same position kept the device pulling
+    /// forever; a pull that does not move on is now an error.
+    #[tokio::test]
+    async fn a_hub_that_never_moves_on_is_left() {
+        let device = crate::transport::device_id(&[1; 32]);
+        let replica = Empty { certificate: Certificate::issue(&[2; 32], &device) };
+        let (mut ours, mut theirs) = tokio::io::duplex(1 << 16);
+        tokio::spawn(async move {
+            let (mut reader, mut writer) = tokio::io::split(&mut theirs);
+            while let Ok(Some(request)) = protocol::receive::<_, Request>(&mut reader).await {
+                let body = match request.body {
+                    Some(RequestBody::Hello(_)) => ReplyBody::Welcome(Welcome {
+                        registered: true,
+                        libraries: vec!["lib_test".into()],
+                        ..Welcome::default()
+                    }),
+                    Some(RequestBody::Pull(_)) => {
+                        ReplyBody::Batches(Batches { batches: Vec::new(), up_to: 0, more: true, since_snapshot: 0 })
+                    }
+                    _ => return,
+                };
+                if protocol::send(&mut writer, &Reply::of(body)).await.is_err() {
+                    return;
+                }
+                let _ = writer.flush().await;
+            }
+        });
+        let (mut reader, mut writer) = tokio::io::split(&mut ours);
+        let outcome = tokio::time::timeout(
+            Duration::from_secs(5),
+            sync(&replica, "hub", &SyncOptions::default(), &mut reader, &mut writer),
+        )
+        .await
+        .expect("the session ends instead of pulling forever");
+        assert!(matches!(outcome, Err(SyncError::Protocol(_))), "{outcome:?}");
+    }
 }

@@ -235,12 +235,17 @@ async fn fetch_files<R: Replica, Rd: AsyncRead + Unpin, Wr: AsyncWrite + Unpin>(
     writer: &mut Wr,
 ) -> Result<usize> {
     let hashes = replica.missing_files().await?;
+    let mut asked: std::collections::HashSet<String> = hashes.iter().cloned().collect();
     protocol::send(writer, &Message::Want { hashes }).await?;
     writer.flush().await?;
     let mut got = 0;
     loop {
         match protocol::receive(reader).await? {
             Message::File { hash, size } => {
+                // Only what was asked for, once: a peer cannot fill the disk with files of its choosing.
+                if !asked.remove(&hash) {
+                    return Err(SyncError::Protocol(format!("sent a file not asked for ({hash:.12})")));
+                }
                 let bytes = protocol::receive_bytes(reader, size).await?;
                 replica.write_file(&hash, bytes).await?;
                 got += 1;
@@ -270,4 +275,93 @@ async fn serve_files<R: Replica, Rd: AsyncRead + Unpin, Wr: AsyncWrite + Unpin>(
     protocol::send(writer, &Message::End).await?;
     writer.flush().await?;
     Ok(sent)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Mutex;
+
+    use tokio::io::AsyncWriteExt;
+
+    use super::*;
+
+    /// Only what fetching files uses: the files it lacks, and those it was given.
+    struct Lacking {
+        missing: Vec<String>,
+        written: Mutex<Vec<String>>,
+    }
+
+    impl Replica for Lacking {
+        async fn library_id(&self) -> Result<String> {
+            unimplemented!()
+        }
+        fn device(&self) -> String {
+            unimplemented!()
+        }
+        fn certificate(&self) -> Certificate {
+            unimplemented!()
+        }
+        async fn is_new(&self) -> Result<bool> {
+            unimplemented!()
+        }
+        async fn adopt(&self, _: &str) -> Result<()> {
+            unimplemented!()
+        }
+        async fn received_from(&self, _: &str) -> Result<i64> {
+            unimplemented!()
+        }
+        async fn changes_for(&self, _: i64, _: &Peer) -> Result<(Vec<Row>, i64)> {
+            unimplemented!()
+        }
+        async fn merge(&self, _: Vec<Row>, _: &Peer) -> Result<MergeSummary> {
+            unimplemented!()
+        }
+        async fn record_received(&self, _: &str, _: i64) -> Result<()> {
+            unimplemented!()
+        }
+        async fn missing_files(&self) -> Result<Vec<String>> {
+            Ok(self.missing.clone())
+        }
+        async fn read_file(&self, _: &str, _: &Peer) -> Result<Option<Vec<u8>>> {
+            unimplemented!()
+        }
+        async fn write_file(&self, hash: &str, _: Vec<u8>) -> Result<()> {
+            self.written.lock().unwrap().push(hash.to_string());
+            Ok(())
+        }
+    }
+
+    /// The other side may send only the files asked for, each once: anything else (a peer
+    /// filling the disk with files of its choosing) ends the session, nothing written.
+    #[tokio::test]
+    async fn only_files_asked_for_are_taken() {
+        let wanted = "a".repeat(64);
+        let replica = Lacking { missing: vec![wanted.clone()], written: Mutex::default() };
+        let (mut ours, mut theirs) = tokio::io::duplex(1 << 16);
+        let other = tokio::spawn(async move {
+            let Message::Want { hashes } = protocol::receive(&mut theirs).await.unwrap() else { panic!() };
+            assert_eq!(hashes, ["a".repeat(64)]);
+            protocol::send_file(&mut theirs, &"b".repeat(64), b"junk").await.unwrap();
+            protocol::send(&mut theirs, &Message::End).await.unwrap();
+            theirs.flush().await.unwrap();
+            theirs
+        });
+        let (mut reader, mut writer) = tokio::io::split(&mut ours);
+        let result = fetch_files(&replica, &mut reader, &mut writer).await;
+        drop(other.await);
+        assert!(matches!(result, Err(SyncError::Protocol(_))), "{result:?}");
+        assert!(replica.written.lock().unwrap().is_empty());
+    }
+
+    /// A file header claiming more than follows is an error (and the size is not allocated up
+    /// front: bytes are read as they come).
+    #[tokio::test]
+    async fn a_file_shorter_than_announced_is_an_error() {
+        let (mut ours, mut theirs) = tokio::io::duplex(1 << 16);
+        protocol::send(&mut theirs, &Message::File { hash: "a".repeat(64), size: protocol::MAX_FILE }).await.unwrap();
+        theirs.write_all(b"%PDF-short").await.unwrap();
+        drop(theirs);
+        let Message::File { size, .. } = protocol::receive(&mut ours).await.unwrap() else { panic!() };
+        assert!(protocol::receive_bytes(&mut ours, size).await.is_err());
+    }
 }
