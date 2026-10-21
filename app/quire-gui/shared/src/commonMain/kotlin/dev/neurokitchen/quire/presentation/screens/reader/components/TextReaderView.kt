@@ -156,7 +156,7 @@ fun TextReaderView(
             ) {
                 tabs.forEachIndexed { index, t ->
                     val label = stringResource(t.kind.label) + (t.count?.let { " ($it)" } ?: "")
-                    TabChip(label, selected = index == selectedTab) { onTabClick(index) }
+                    TabChip(label, selected = index == selectedTab, textColor = themeColors.text) { onTabClick(index) }
                 }
             }
         }
@@ -392,15 +392,16 @@ private fun Figure(url: String, loadFigure: suspend (String) -> String?) {
 }
 
 @Composable
-private fun TabChip(text: String, selected: Boolean, onClick: () -> Unit) {
+/** A text tab's chip, in the page's colours ([textColor]: the reader theme's, not the app's). */
+private fun TabChip(text: String, selected: Boolean, textColor: Color, onClick: () -> Unit) {
     val colors = QuireTheme.colors
     Text(
         text,
         style = MaterialTheme.typography.bodyMedium,
-        color = if (selected) colors.onAccent else colors.fillPrimary,
+        color = if (selected) colors.onAccent else textColor,
         modifier = Modifier
             .clip(RoundedCornerShape(Dimens.RadiusLarge))
-            .background(if (selected) colors.accent else colors.fillQuinary)
+            .background(if (selected) colors.accent else textColor.copy(alpha = 0.08f))
             .clickable(onClick = onClick)
             .padding(horizontal = Dimens.SpaceXs, vertical = Dimens.SpaceMin),
     )
