@@ -1,5 +1,8 @@
 package dev.neurokitchen.quire.presentation.mobile.screens
 
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -96,14 +99,25 @@ fun HomeTab(
     val reading = references.filter { it.reading == ReadingStatus.Reading }
     val recent = references.sortedByDescending { it.dateAdded }
     val unread = references.filter { it.reading == ReadingStatus.Unread }
-    val all = ShelfKey(ShelfKey.Kind.All)
+    // "See all" opens the list of what Home shows: the library, or the chip's project.
+    val all = when (val source = state.source) {
+        is LibrarySource.InProject -> ShelfKey(ShelfKey.Kind.Project, source.path, state.projectChoices.firstOrNull { it.first == source.path }?.second.orEmpty())
+        LibrarySource.Unfiled -> ShelfKey(ShelfKey.Kind.Unfiled)
+        else -> ShelfKey(ShelfKey.Kind.All)
+    }
+    val shown = when (val source = state.source) {
+        is LibrarySource.InProject -> state.projectChoices.firstOrNull { it.first == source.path }?.second ?: source.path
+        LibrarySource.Unfiled -> stringResource(Res.string.library_unfiled)
+        else -> stringResource(Res.string.library_my_library)
+    }
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
             Modifier.fillMaxSize().hazeSource(LocalMobileChrome.current.haze),
             contentPadding = mobileContentPadding(topBar = false),
             verticalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
         ) {
-            item { LargeTitle("Quire", stringResource(Res.string.library_my_library) + " · " + pluralStringResource(Res.plurals.mobile_items, references.size, references.size)) }
+            item { LargeTitle("Quire", shown + " · " + pluralStringResource(Res.plurals.mobile_items, references.size, references.size)) }
+            item { SourceChips(state.source, state.projectChoices) { viewModel.onEvent(LibraryEvent.OnSourceClick(it)) } }
             val error = state.error
             if (error != null) {
                 // The engine could not read the library: say so (it is not an empty library).
@@ -366,4 +380,35 @@ private fun ShelfKey.title(): String = when (kind) {
     ShelfKey.Kind.Project -> name.ifEmpty { path.orEmpty() }
     ShelfKey.Kind.Tag -> "#$name"
     ShelfKey.Kind.SavedSearch -> name
+}
+
+/**
+ * What Home shows, one tap away: the library, unfiled papers, each project (a carousel of
+ * chips; the full tree is in the Library tab).
+ */
+@Composable
+private fun SourceChips(source: LibrarySource, projects: List<Pair<String, String>>, onSelect: (LibrarySource) -> Unit) {
+    val colors = QuireTheme.colors
+    val chips = listOf(
+        Triple<LibrarySource, String, DrawableResource>(LibrarySource.All, stringResource(Res.string.library_my_library), Res.drawable.ic_library_books),
+        Triple(LibrarySource.Unfiled, stringResource(Res.string.library_unfiled), Res.drawable.ic_draft),
+    ) + projects.map { (path, name) -> Triple<LibrarySource, String, DrawableResource>(LibrarySource.InProject(path), name, Res.drawable.ic_folder) }
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = Dimens.SpaceMd),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
+    ) {
+        items(chips, key = { it.first.toString() }) { (chip, label, icon) ->
+            FilterChip(
+                selected = chip == source,
+                onClick = { onSelect(chip) },
+                label = { Text(label, maxLines = 1) },
+                leadingIcon = { Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(18.dp)) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = colors.accent.copy(alpha = 0.16f),
+                    selectedLabelColor = colors.accent,
+                    selectedLeadingIconColor = colors.accent,
+                ),
+            )
+        }
+    }
 }

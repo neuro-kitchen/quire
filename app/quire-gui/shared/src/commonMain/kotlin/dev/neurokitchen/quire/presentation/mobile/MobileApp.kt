@@ -1,5 +1,7 @@
 package dev.neurokitchen.quire.presentation.mobile
 
+import dev.neurokitchen.quire.presentation.screens.library.AddTab
+import dev.neurokitchen.quire.presentation.mobile.components.AddFabMenu
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import dev.neurokitchen.quire.presentation.mobile.components.RailWidth
@@ -106,19 +108,7 @@ fun MobileApp() {
                         predictivePopTransitionSpec = { pop() },
                     )
                     if (showBar && (navigation.tab == Tab.Home || navigation.tab == Tab.Library)) {
-                        val addLabel = stringResource(Res.string.add_title)
-                        ExtendedFloatingActionButton(
-                            onClick = { navigation.open { Route.Add(it) } },
-                            icon = { Icon(painterResource(Res.drawable.ic_add), contentDescription = null) },
-                            text = { Text(addLabel) },
-                            containerColor = QuireTheme.colors.accent,
-                            contentColor = QuireTheme.colors.onAccent,
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(end = Dimens.SpaceMd, bottom = chrome.bottomBar + Dimens.SpaceMd)
-                                // Named for TalkBack (its text alone was not in the accessibility tree).
-                                .semantics { contentDescription = addLabel },
-                        )
+                        AddFabMenu(onAdd = { way -> navigation.open { Route.Add(it, way = way.name) } }, bottom = chrome.bottomBar)
                     }
                     if (showBar && !wide) {
                         MobileNavigationBar(
@@ -175,7 +165,13 @@ private fun entryProvider(navigation: MobileNavigation) = entryProvider<NavKey> 
         ReaderRoute(id = key.id, title = key.title, onBack = navigation::back)
     }
     entry<Route.Add> { key ->
-        AddScreen(projectPath = key.projectPath, onDone = navigation::back, identifiers = key.identifiers, pdfs = key.pdfs)
+        AddScreen(
+            projectPath = key.projectPath,
+            onDone = navigation::back,
+            identifiers = key.identifiers,
+            pdfs = key.pdfs,
+            way = key.way?.let { name -> AddTab.entries.firstOrNull { it.name == name } },
+        )
     }
 }
 
