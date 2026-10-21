@@ -1,5 +1,19 @@
 package dev.neurokitchen.quire.presentation.screens.reader.components
 
+import androidx.compose.ui.unit.Dp
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.Tab
+import androidx.compose.material3.PrimaryScrollableTabRow
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Animatable
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
@@ -140,6 +154,15 @@ fun TextReaderView(
         if (index >= 0) list.animateScrollToItem(itemOfBlock[index] + 1)
     }
 
+    // Another tab: from its top (the tabs row is item 0, so it shows again).
+    var lastTab by remember { mutableStateOf(selectedTab) }
+    LaunchedEffect(selectedTab) {
+        if (selectedTab != lastTab) {
+            lastTab = selectedTab
+            list.scrollToItem(0)
+        }
+    }
+
     LaunchedEffect(jumpToBlock) { if (jumpToBlock != null) list.scrollToItem(itemOfBlock.getOrElse(jumpToBlock) { 0 } + 1) }
     val layoutDirection = LocalLayoutDirection.current
     val focusManager = LocalFocusManager.current
@@ -160,15 +183,54 @@ fun TextReaderView(
                 }
             }
         }
-        // Under bars drawn over the text, the tabs scroll with it; otherwise they stay at the top.
+        // Under bars drawn over the text (the phone), the tabs scroll with it as a tab row; otherwise
+        // they stay at the top as chips.
         val tabsInList = contentPadding.calculateTopPadding() > 0.dp
         if (!tabsInList) tabRow()
+        val phoneTabs: @Composable () -> Unit = {
+            PaperTabRow(tabs, selectedTab, themeColors.text, onTabClick)
+        }
+        // Swiping sideways turns to the next or previous tab: the text follows the finger, and
+        // the new tab comes in from the side it was pulled from.
+        val scope = rememberCoroutineScope()
+        val pull = remember { Animatable(0f) }
+        var width by remember { mutableStateOf(1) }
 
         Box(
             Modifier
                 .fillMaxSize()
+                .onSizeChanged { width = it.width.coerceAtLeast(1) }
                 .pointerInput(Unit) {
                     detectTapGestures { onTapPage() }
+                }
+                .pointerInput(selectedTab, tabs.size, tabsInList) {
+                    if (!tabsInList) return@pointerInput
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            val next = when {
+                                pull.value < -width / 4f && selectedTab < tabs.lastIndex -> selectedTab + 1
+                                pull.value > width / 4f && selectedTab > 0 -> selectedTab - 1
+                                else -> null
+                            }
+                            scope.launch {
+                                if (next == null) {
+                                    pull.animateTo(0f)
+                                } else {
+                                    val from = if (next > selectedTab) width.toFloat() else -width.toFloat()
+                                    onTabClick(next)
+                                    pull.snapTo(from / 3)
+                                    pull.animateTo(0f, tween(220))
+                                }
+                            }
+                        },
+                        onDragCancel = { scope.launch { pull.animateTo(0f) } },
+                    ) { change, amount ->
+                        change.consume()
+                        // No tab past the first or the last: the pull resists.
+                        val atEnd = (pull.value + amount > 0 && selectedTab == 0) ||
+                            (pull.value + amount < 0 && selectedTab == tabs.lastIndex)
+                        scope.launch { pull.snapTo(pull.value + if (atEnd) amount / 4 else amount) }
+                    }
                 },
             contentAlignment = Alignment.TopCenter,
         ) {
@@ -181,10 +243,16 @@ fun TextReaderView(
                     top = Dimens.SpaceMd + contentPadding.calculateTopPadding(),
                     bottom = Dimens.SpaceMd + contentPadding.calculateBottomPadding(),
                 ),
-                modifier = Modifier.widthIn(max = ReadingWidth).fillMaxSize(),
+                modifier = Modifier
+                    .widthIn(max = ReadingWidth)
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        translationX = pull.value
+                        alpha = 1f - (abs(pull.value) / width).coerceAtMost(1f) * 0.6f
+                    },
             ) {
                 // Item 0: the tabs when they scroll with the text (jumps count it).
-                item { if (tabsInList) tabRow() }
+                item { if (tabsInList) phoneTabs() }
                 items(items) { item ->
                     val blockIndex = item.first
                     val block = tab.blocks[blockIndex]
@@ -405,6 +473,45 @@ private fun TabChip(text: String, selected: Boolean, textColor: Color, onClick: 
             .clickable(onClick = onClick)
             .padding(horizontal = Dimens.SpaceXs, vertical = Dimens.SpaceMin),
     )
+}
+
+/**
+ * The phone's tabs: text tabs on the page, the selected one in the accent and underlined, the row
+ * scrolling to keep it in view (Material's scrollable tab row, in the reader theme's colours).
+ */
+@Composable
+private fun PaperTabRow(tabs: List<PaperTab>, selected: Int, textColor: Color, onSelect: (Int) -> Unit) {
+    val colors = QuireTheme.colors
+    PrimaryScrollableTabRow(
+        selectedTabIndex = selected,
+        containerColor = Color.Transparent,
+        contentColor = textColor,
+        edgePadding = 0.dp,
+        minTabWidth = 0.dp,
+        indicator = {
+            TabRowDefaults.PrimaryIndicator(
+                Modifier.tabIndicatorOffset(selected, matchContentSize = true),
+                width = Dp.Unspecified,
+                color = colors.accent,
+            )
+        },
+        divider = { HorizontalDivider(color = textColor.copy(alpha = 0.12f)) },
+    ) {
+        tabs.forEachIndexed { index, t ->
+            Tab(
+                selected = index == selected,
+                onClick = { onSelect(index) },
+                selectedContentColor = colors.accent,
+                unselectedContentColor = textColor.copy(alpha = 0.65f),
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceMin)) {
+                        Text(stringResource(t.kind.label), style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                        t.count?.let { Text("$it", style = MaterialTheme.typography.labelSmall, color = textColor.copy(alpha = 0.5f)) }
+                    }
+                },
+            )
+        }
+    }
 }
 
 private val PaperTabKind.label: StringResource
