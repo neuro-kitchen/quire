@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -47,12 +48,15 @@ import dev.neurokitchen.quire.presentation.designsystem.QuireTheme
 import dev.neurokitchen.quire.presentation.designsystem.components.DraggableSplitter
 import dev.neurokitchen.quire.presentation.screens.reader.components.AnnotationsSidebar
 import dev.neurokitchen.quire.presentation.screens.reader.components.CitationHoverCard
+import dev.neurokitchen.quire.presentation.screens.reader.components.FigureDockSide
 import dev.neurokitchen.quire.presentation.screens.reader.components.FigureDrawer
 import dev.neurokitchen.quire.presentation.screens.reader.components.NotesPanel
 import dev.neurokitchen.quire.presentation.screens.reader.components.PdfPagesView
+import dev.neurokitchen.quire.presentation.screens.reader.components.ReaderBottomBar
 import dev.neurokitchen.quire.presentation.screens.reader.components.ReaderSearchBar
 import dev.neurokitchen.quire.presentation.screens.reader.components.ReaderToolbar
 import dev.neurokitchen.quire.presentation.screens.reader.components.TextReaderView
+import kotlin.math.roundToInt
 import dev.neurokitchen.quire.resources.Res
 import dev.neurokitchen.quire.resources.reader_loading
 import dev.neurokitchen.quire.resources.reader_no_pdf
@@ -91,6 +95,9 @@ fun ReaderScreen(
     var sidebarWidthDp by remember { mutableFloatStateOf(260f) }
     var notesWidthDp by remember { mutableFloatStateOf(280f) }
     var figureDrawerWidthDp by remember { mutableFloatStateOf(320f) }
+    var figureDockSide by remember { mutableStateOf(FigureDockSide.Right) }
+    var readingProgressCurrent by remember(state.referenceId) { mutableIntStateOf(1) }
+    var readingProgressTotal by remember(state.referenceId) { mutableIntStateOf(1) }
     val rootFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
@@ -160,12 +167,29 @@ fun ReaderScreen(
                     },
                 )
             }
+            if (state.isFigureDrawerOpen && figureDockSide == FigureDockSide.Left) {
+                FigureDrawer(
+                    isOpen = true,
+                    tabs = state.tabs,
+                    loadFigure = loadFigure,
+                    onClose = { onEvent(ReaderEvent.OnToggleFigureDrawer) },
+                    dockSide = figureDockSide,
+                    onToggleDockSide = { figureDockSide = FigureDockSide.Right },
+                    modifier = Modifier.width(figureDrawerWidthDp.dp),
+                )
+                DraggableSplitter(
+                    onDelta = { delta ->
+                        figureDrawerWidthDp = (figureDrawerWidthDp + delta).coerceIn(240f, 550f)
+                    },
+                )
+            }
             Column(Modifier.weight(1f).fillMaxHeight()) {
                 ReaderToolbar(
                     mode = state.mode,
                     hasPdf = state.pdf.path != null,
                     canHighlight = selection != null,
                     reading = state.reading,
+                    zoomPercent = (state.pdf.zoom * 100).roundToInt(),
                     isAnnotationsCollapsed = state.isAnnotationsCollapsed,
                     isNotesCollapsed = state.isNotesCollapsed,
                     isFigureDrawerOpen = state.isFigureDrawerOpen,
@@ -253,111 +277,147 @@ fun ReaderScreen(
                 }
 
                 StatusLine(state)
-                when {
-                    state.mode == ReaderMode.Split && state.pdf.pages.isNotEmpty() -> {
-                        var splitWeight by remember { mutableFloatStateOf(0.5f) }
-                        Row(Modifier.fillMaxSize()) {
-                            Box(Modifier.weight(splitWeight).fillMaxHeight()) {
-                                TextReaderView(
-                                    tabs = state.tabs,
-                                    selectedTab = state.selectedTab,
-                                    highlights = state.highlights,
-                                    focused = state.focusedHighlight,
-                                    readerTheme = state.readerTheme,
-                                    readerFont = state.readerFont,
-                                    fontSizeSp = state.fontSizeSp,
-                                    onTabClick = { onEvent(ReaderEvent.OnTabClick(it)) },
-                                    onSelection = { selection = it },
-                                    onHighlight = { quote, prefix, color ->
-                                        onEvent(ReaderEvent.OnHighlight(quote, prefix, color))
-                                    },
-                                    onAddNote = { body ->
-                                        onEvent(ReaderEvent.OnNoteDraftChange(body))
-                                        onEvent(ReaderEvent.OnNoteAdd)
-                                    },
-                                    loadFigure = loadFigure,
-                                    findMatches = if (state.find.isOpen) state.find.textMatches else emptyList(),
-                                    currentFind = state.find.current,
-                                )
-                            }
-                            DraggableSplitter(
-                                onDelta = { delta ->
-                                    splitWeight = (splitWeight + delta / 800f).coerceIn(0.25f, 0.75f)
-                                },
-                            )
-                            Box(Modifier.weight(1f - splitWeight).fillMaxHeight()) {
-                                PdfPagesView(
-                                    pages = state.pdf.pages,
-                                    zoom = state.pdf.zoom,
-                                    locations = state.pdf.locations,
-                                    focused = state.focusedHighlight,
-                                    loadPage = loadPage,
-                                    readerTheme = state.readerTheme,
-                                    textLayer = textLayer,
-                                    matches = if (state.find.isOpen) state.find.pdfMatches else emptyList(),
-                                    currentMatch = state.find.current,
-                                    isSnapshotMode = state.isSnapshotMode,
-                                    onHighlight = { quote, prefix, color ->
-                                        onEvent(ReaderEvent.OnHighlight(quote, prefix, color))
-                                    },
-                                    onAddNote = { body ->
-                                        onEvent(ReaderEvent.OnNoteDraftChange(body))
-                                        onEvent(ReaderEvent.OnNoteAdd)
-                                    },
-                                    onAddSnapshot = { rect, page ->
-                                        onEvent(ReaderEvent.OnNoteDraftChange("[Area Snapshot p. ${page + 1}: (${rect.left.toInt()}, ${rect.top.toInt()}) - (${rect.right.toInt()}, ${rect.bottom.toInt()})]"))
-                                        onEvent(ReaderEvent.OnNoteAdd)
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    when {
+                        state.mode == ReaderMode.Split && state.pdf.pages.isNotEmpty() -> {
+                            var splitWeight by remember { mutableFloatStateOf(0.5f) }
+                            Row(Modifier.fillMaxSize()) {
+                                Box(Modifier.weight(splitWeight).fillMaxHeight()) {
+                                    TextReaderView(
+                                        tabs = state.tabs,
+                                        selectedTab = state.selectedTab,
+                                        highlights = state.highlights,
+                                        focused = state.focusedHighlight,
+                                        readerTheme = state.readerTheme,
+                                        readerFont = state.readerFont,
+                                        fontSizeSp = state.fontSizeSp,
+                                        onTabClick = { onEvent(ReaderEvent.OnTabClick(it)) },
+                                        onSelection = { selection = it },
+                                        onHighlight = { quote, prefix, color ->
+                                            onEvent(ReaderEvent.OnHighlight(quote, prefix, color))
+                                        },
+                                        onAddNote = { body ->
+                                            onEvent(ReaderEvent.OnNoteDraftChange(body))
+                                            onEvent(ReaderEvent.OnNoteAdd)
+                                        },
+                                        loadFigure = loadFigure,
+                                        findMatches = if (state.find.isOpen) state.find.textMatches else emptyList(),
+                                        currentFind = state.find.current,
+                                        onProgressChange = { cur, tot ->
+                                            readingProgressCurrent = cur
+                                            readingProgressTotal = tot
+                                        },
+                                    )
+                                }
+                                DraggableSplitter(
+                                    onDelta = { delta ->
+                                        splitWeight = (splitWeight + delta / 800f).coerceIn(0.25f, 0.75f)
                                     },
                                 )
+                                Box(Modifier.weight(1f - splitWeight).fillMaxHeight()) {
+                                    PdfPagesView(
+                                        pages = state.pdf.pages,
+                                        zoom = state.pdf.zoom,
+                                        locations = state.pdf.locations,
+                                        focused = state.focusedHighlight,
+                                        loadPage = loadPage,
+                                        readerTheme = state.readerTheme,
+                                        textLayer = textLayer,
+                                        matches = if (state.find.isOpen) state.find.pdfMatches else emptyList(),
+                                        currentMatch = state.find.current,
+                                        isSnapshotMode = state.isSnapshotMode,
+                                        onHighlight = { quote, prefix, color ->
+                                            onEvent(ReaderEvent.OnHighlight(quote, prefix, color))
+                                        },
+                                        onAddNote = { body ->
+                                            onEvent(ReaderEvent.OnNoteDraftChange(body))
+                                            onEvent(ReaderEvent.OnNoteAdd)
+                                        },
+                                        onAddSnapshot = { rect, page ->
+                                            onEvent(ReaderEvent.OnNoteDraftChange("[Area Snapshot p. ${page + 1}: (${rect.left.toInt()}, ${rect.top.toInt()}) - (${rect.right.toInt()}, ${rect.bottom.toInt()})]"))
+                                            onEvent(ReaderEvent.OnNoteAdd)
+                                        },
+                                        onProgressChange = { cur, tot ->
+                                            readingProgressCurrent = cur
+                                            readingProgressTotal = tot
+                                        },
+                                    )
+                                }
                             }
                         }
+                        state.mode == ReaderMode.Pdf && state.pdf.pages.isNotEmpty() -> PdfPagesView(
+                            pages = state.pdf.pages,
+                            zoom = state.pdf.zoom,
+                            locations = state.pdf.locations,
+                            focused = state.focusedHighlight,
+                            loadPage = loadPage,
+                            readerTheme = state.readerTheme,
+                            textLayer = textLayer,
+                            matches = if (state.find.isOpen) state.find.pdfMatches else emptyList(),
+                            currentMatch = state.find.current,
+                            isSnapshotMode = state.isSnapshotMode,
+                            onHighlight = { quote, prefix, color ->
+                                onEvent(ReaderEvent.OnHighlight(quote, prefix, color))
+                            },
+                            onAddNote = { body ->
+                                onEvent(ReaderEvent.OnNoteDraftChange(body))
+                                onEvent(ReaderEvent.OnNoteAdd)
+                            },
+                            onAddSnapshot = { rect, page ->
+                                onEvent(ReaderEvent.OnNoteDraftChange("[Area Snapshot p. ${page + 1}: (${rect.left.toInt()}, ${rect.top.toInt()}) - (${rect.right.toInt()}, ${rect.bottom.toInt()})]"))
+                                onEvent(ReaderEvent.OnNoteAdd)
+                            },
+                            onProgressChange = { cur, tot ->
+                                readingProgressCurrent = cur
+                                readingProgressTotal = tot
+                            },
+                        )
+                        state.isLoading && state.tabs.isEmpty() -> Message(stringResource(Res.string.reader_loading))
+                        else -> TextReaderView(
+                            tabs = state.tabs,
+                            selectedTab = state.selectedTab,
+                            highlights = state.highlights,
+                            focused = state.focusedHighlight,
+                            readerTheme = state.readerTheme,
+                            readerFont = state.readerFont,
+                            fontSizeSp = state.fontSizeSp,
+                            onTabClick = { onEvent(ReaderEvent.OnTabClick(it)) },
+                            onSelection = { selection = it },
+                            onHighlight = { quote, prefix, color ->
+                                onEvent(ReaderEvent.OnHighlight(quote, prefix, color))
+                            },
+                            onAddNote = { body ->
+                                onEvent(ReaderEvent.OnNoteDraftChange(body))
+                                onEvent(ReaderEvent.OnNoteAdd)
+                            },
+                            loadFigure = loadFigure,
+                            findMatches = if (state.find.isOpen) state.find.textMatches else emptyList(),
+                            currentFind = state.find.current,
+                            onProgressChange = { cur, tot ->
+                                readingProgressCurrent = cur
+                                readingProgressTotal = tot
+                            },
+                        )
                     }
-                    state.mode == ReaderMode.Pdf && state.pdf.pages.isNotEmpty() -> PdfPagesView(
-                        pages = state.pdf.pages,
-                        zoom = state.pdf.zoom,
-                        locations = state.pdf.locations,
-                        focused = state.focusedHighlight,
-                        loadPage = loadPage,
-                        readerTheme = state.readerTheme,
-                        textLayer = textLayer,
-                        matches = if (state.find.isOpen) state.find.pdfMatches else emptyList(),
-                        currentMatch = state.find.current,
-                        isSnapshotMode = state.isSnapshotMode,
-                        onHighlight = { quote, prefix, color ->
-                            onEvent(ReaderEvent.OnHighlight(quote, prefix, color))
-                        },
-                        onAddNote = { body ->
-                            onEvent(ReaderEvent.OnNoteDraftChange(body))
-                            onEvent(ReaderEvent.OnNoteAdd)
-                        },
-                        onAddSnapshot = { rect, page ->
-                            onEvent(ReaderEvent.OnNoteDraftChange("[Area Snapshot p. ${page + 1}: (${rect.left.toInt()}, ${rect.top.toInt()}) - (${rect.right.toInt()}, ${rect.bottom.toInt()})]"))
-                            onEvent(ReaderEvent.OnNoteAdd)
-                        },
-                    )
-                    state.isLoading && state.tabs.isEmpty() -> Message(stringResource(Res.string.reader_loading))
-                    else -> TextReaderView(
-                        tabs = state.tabs,
-                        selectedTab = state.selectedTab,
-                        highlights = state.highlights,
-                        focused = state.focusedHighlight,
-                        readerTheme = state.readerTheme,
-                        readerFont = state.readerFont,
-                        fontSizeSp = state.fontSizeSp,
-                        onTabClick = { onEvent(ReaderEvent.OnTabClick(it)) },
-                        onSelection = { selection = it },
-                        onHighlight = { quote, prefix, color ->
-                            onEvent(ReaderEvent.OnHighlight(quote, prefix, color))
-                        },
-                        onAddNote = { body ->
-                            onEvent(ReaderEvent.OnNoteDraftChange(body))
-                            onEvent(ReaderEvent.OnNoteAdd)
-                        },
-                        loadFigure = loadFigure,
-                        findMatches = if (state.find.isOpen) state.find.textMatches else emptyList(),
-                        currentFind = state.find.current,
-                    )
                 }
+
+                // Kindle-style expanding reader bottom bar (replaces fragmented top and floating bars)
+                ReaderBottomBar(
+                    title = state.title,
+                    current = readingProgressCurrent,
+                    total = if (state.mode == ReaderMode.Pdf) state.pdf.pages.size else readingProgressTotal,
+                    mode = state.mode,
+                    reading = state.reading,
+                    zoomPercent = (state.pdf.zoom * 100).roundToInt(),
+                    fontSizeSp = state.fontSizeSp,
+                    readerFont = state.readerFont,
+                    highlightsCount = state.highlights.size,
+                    notesCount = state.notes.size,
+                    source = state.source ?: state.pdf.path,
+                    onToggleNotes = { onEvent(ReaderEvent.OnToggleNotes) },
+                    onToggleFigures = { onEvent(ReaderEvent.OnToggleFigureDrawer) },
+                    onToggleAnnotations = { onEvent(ReaderEvent.OnToggleAnnotations) },
+                )
             }
             if (!state.isNotesCollapsed) {
                 DraggableSplitter(
@@ -375,7 +435,7 @@ fun ReaderScreen(
                     modifier = Modifier.width(notesWidthDp.dp),
                 )
             }
-            if (state.isFigureDrawerOpen) {
+            if (state.isFigureDrawerOpen && figureDockSide == FigureDockSide.Right) {
                 DraggableSplitter(
                     onDelta = { delta ->
                         figureDrawerWidthDp = (figureDrawerWidthDp - delta).coerceIn(240f, 550f)
@@ -386,6 +446,8 @@ fun ReaderScreen(
                     tabs = state.tabs,
                     loadFigure = loadFigure,
                     onClose = { onEvent(ReaderEvent.OnToggleFigureDrawer) },
+                    dockSide = figureDockSide,
+                    onToggleDockSide = { figureDockSide = FigureDockSide.Left },
                     modifier = Modifier.width(figureDrawerWidthDp.dp),
                 )
             }

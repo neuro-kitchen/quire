@@ -74,4 +74,5 @@ sealed interface LibraryEvent {
     data object OnToggleSidebar : LibraryEvent
     data object OnToggleInspector : LibraryEvent
     data class OnToggleQuickLook(val open: Boolean? = null) : LibraryEvent
+    data class OnExportProject(val projectId: String, val path: String) : LibraryEvent
 }

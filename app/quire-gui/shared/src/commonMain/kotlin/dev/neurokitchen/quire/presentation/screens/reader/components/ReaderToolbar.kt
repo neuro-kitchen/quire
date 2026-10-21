@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +48,7 @@ import dev.neurokitchen.quire.presentation.designsystem.readerColors
 import dev.neurokitchen.quire.presentation.screens.reader.ReaderMode
 import dev.neurokitchen.quire.resources.Res
 import dev.neurokitchen.quire.resources.ic_auto_fix_high
+import dev.neurokitchen.quire.resources.ic_expand_more
 import dev.neurokitchen.quire.resources.ic_inventory_2
 import dev.neurokitchen.quire.resources.ic_search
 import dev.neurokitchen.quire.resources.ic_sticky_note_2
@@ -77,6 +79,7 @@ fun ReaderToolbar(
     hasPdf: Boolean,
     canHighlight: Boolean,
     reading: ReadingStatus,
+    zoomPercent: Int = 100,
     isAnnotationsCollapsed: Boolean = false,
     isNotesCollapsed: Boolean = false,
     isFigureDrawerOpen: Boolean = false,
@@ -164,8 +167,8 @@ fun ReaderToolbar(
                     .clip(RoundedCornerShape(Dimens.RadiusSmall))
                     .background(if (isSnapshotMode) colors.accent else Color.Transparent)
                     .border(1.dp, if (isSnapshotMode) colors.accent else colors.border.copy(alpha = 0.5f), RoundedCornerShape(Dimens.RadiusSmall))
-                .clickable(onClick = onToggleSnapshotMode)
-                .padding(horizontal = 6.dp),
+                    .clickable(onClick = onToggleSnapshotMode)
+                    .padding(horizontal = 6.dp),
             ) {
                 Icon(
                     painterResource(Res.drawable.ic_auto_fix_high),
@@ -184,36 +187,73 @@ fun ReaderToolbar(
 
         Spacer(Modifier.width(2.dp))
 
-        // Mode switchers
+        // Mode switchers (Clean PDF / Text toggle, redundant Split button removed)
         Chip(stringResource(Res.string.reader_mode_pdf), selected = mode == ReaderMode.Pdf, enabled = hasPdf) {
             onModeChange(ReaderMode.Pdf)
         }
         Chip(stringResource(Res.string.reader_mode_text), selected = mode == ReaderMode.Text) {
             onModeChange(ReaderMode.Text)
         }
-        Chip("Split", selected = mode == ReaderMode.Split, enabled = hasPdf) {
-            onModeChange(ReaderMode.Split)
-        }
 
-        Spacer(Modifier.width(4.dp))
+        Spacer(Modifier.width(2.dp))
 
         // PDF Zoom or Text highlight
         when (mode) {
             ReaderMode.Pdf, ReaderMode.Split -> {
-                val zoomOut = stringResource(Res.string.reader_zoom_out)
-                val zoomIn = stringResource(Res.string.reader_zoom_in)
-                TextButton(onClick = onZoomOut, modifier = Modifier.semantics { contentDescription = "$zoomOut (Ctrl+-)" }) {
-                    Text("−", style = MaterialTheme.typography.titleLarge)
-                }
-                TextButton(onClick = onZoomReset) { Text(stringResource(Res.string.reader_zoom_reset) + " (Ctrl+0)") }
-                TextButton(onClick = onZoomIn, modifier = Modifier.semantics { contentDescription = "$zoomIn (Ctrl++)" }) {
-                    Text("+", style = MaterialTheme.typography.titleLarge)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .height(28.dp)
+                        .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                        .background(colors.fillQuinary)
+                        .padding(horizontal = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(1.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                            .clickable(onClick = onZoomOut)
+                            .semantics { contentDescription = "Zoom Out (Ctrl+-)" },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("−", style = MaterialTheme.typography.titleMedium, color = colors.fillPrimary)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .height(24.dp)
+                            .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                            .clickable(onClick = onZoomReset)
+                            .padding(horizontal = 6.dp)
+                            .semantics { contentDescription = "Reset Zoom to Fit (Ctrl+0)" },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("${zoomPercent}%", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium), color = colors.fillPrimary)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                            .clickable(onClick = onZoomIn)
+                            .semantics { contentDescription = "Zoom In (Ctrl++)" },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("+", style = MaterialTheme.typography.titleMedium, color = colors.fillPrimary)
+                    }
                 }
             }
             ReaderMode.Text -> {
                 if (canHighlight) {
-                    TextButton(onClick = onHighlight) {
-                        Text(stringResource(Res.string.reader_highlight))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .height(28.dp)
+                            .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                            .background(colors.accent)
+                            .clickable(onClick = onHighlight)
+                            .padding(horizontal = 8.dp),
+                    ) {
+                        Text(stringResource(Res.string.reader_highlight), style = MaterialTheme.typography.labelSmall, color = colors.onAccent)
                     }
                 }
             }
@@ -400,7 +440,94 @@ fun ReaderToolbar(
 
         Spacer(Modifier.weight(1f))
 
-        // Toggle Notes Panel (Placed on the RIGHT side by the notes panel)
+        // Reading Status Selector (Single compact dropdown pill, eliminates button squashing)
+        var readingMenuOpen by remember { mutableStateOf(false) }
+        Box {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .height(26.dp)
+                    .clip(RoundedCornerShape(Dimens.RadiusFull))
+                    .background(
+                        when (reading) {
+                            ReadingStatus.Read -> colors.statusRead.copy(alpha = 0.18f)
+                            ReadingStatus.Reading -> colors.statusReading.copy(alpha = 0.18f)
+                            ReadingStatus.Unread -> colors.fillQuinary
+                        }
+                    )
+                    .border(
+                        1.dp,
+                        when (reading) {
+                            ReadingStatus.Read -> colors.statusRead.copy(alpha = 0.6f)
+                            ReadingStatus.Reading -> colors.statusReading.copy(alpha = 0.6f)
+                            ReadingStatus.Unread -> colors.border.copy(alpha = 0.4f)
+                        },
+                        RoundedCornerShape(Dimens.RadiusFull),
+                    )
+                    .clickable { readingMenuOpen = true }
+                    .padding(horizontal = 8.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(
+                            when (reading) {
+                                ReadingStatus.Read -> colors.statusRead
+                                ReadingStatus.Reading -> colors.statusReading
+                                ReadingStatus.Unread -> colors.fillSecondary
+                            }
+                        )
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = when (reading) {
+                        ReadingStatus.Read -> stringResource(Res.string.reading_read)
+                        ReadingStatus.Reading -> stringResource(Res.string.reading_reading)
+                        ReadingStatus.Unread -> stringResource(Res.string.reading_unread)
+                    },
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium),
+                    color = colors.fillPrimary,
+                )
+                Spacer(Modifier.width(4.dp))
+                Icon(
+                    painterResource(Res.drawable.ic_expand_more),
+                    contentDescription = "Change Reading Status",
+                    tint = colors.fillSecondary,
+                    modifier = Modifier.size(12.dp),
+                )
+            }
+
+            DropdownMenu(
+                expanded = readingMenuOpen,
+                onDismissRequest = { readingMenuOpen = false },
+            ) {
+                listOf(
+                    ReadingStatus.Unread to (Res.string.reading_unread to colors.fillSecondary),
+                    ReadingStatus.Reading to (Res.string.reading_reading to colors.statusReading),
+                    ReadingStatus.Read to (Res.string.reading_read to colors.statusRead),
+                ).forEach { (status, meta) ->
+                    val (strRes, statusColor) = meta
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(statusColor))
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(strRes), style = MaterialTheme.typography.bodyMedium)
+                            }
+                        },
+                        onClick = {
+                            readingMenuOpen = false
+                            onReadingChange(status)
+                        },
+                    )
+                }
+            }
+        }
+
+        VerticalDivider(color = colors.fillQuarternary, modifier = Modifier.height(16.dp).padding(horizontal = 2.dp))
+
+        // Toggle Notes Panel (Placed at the EXTREME RIGHT, flush above the right-hand notes drawer)
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
@@ -415,17 +542,6 @@ fun ReaderToolbar(
                 tint = if (!isNotesCollapsed) colors.accent else colors.fillSecondary,
                 modifier = Modifier.size(16.dp),
             )
-        }
-
-        VerticalDivider(color = colors.fillQuarternary, modifier = Modifier.height(16.dp).padding(horizontal = 2.dp))
-
-        // Reading Status (far right)
-        listOf(
-            ReadingStatus.Unread to Res.string.reading_unread,
-            ReadingStatus.Reading to Res.string.reading_reading,
-            ReadingStatus.Read to Res.string.reading_read,
-        ).forEach { (status, label) ->
-            Chip(stringResource(label), selected = reading == status, status = status) { onReadingChange(status) }
         }
     }
 }
@@ -442,6 +558,7 @@ private fun Chip(text: String, selected: Boolean, enabled: Boolean = true, statu
     Text(
         text,
         style = MaterialTheme.typography.labelSmall,
+        maxLines = 1,
         color = if (selected) colors.onAccent else colors.fillPrimary,
         modifier = Modifier
             .alpha(if (enabled) 1f else 0.4f)

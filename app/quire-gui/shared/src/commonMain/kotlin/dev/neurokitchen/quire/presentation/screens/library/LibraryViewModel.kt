@@ -48,6 +48,7 @@ import dev.neurokitchen.quire.resources.notice_pdf_present
 import dev.neurokitchen.quire.resources.notice_pdf_attached
 import dev.neurokitchen.quire.resources.notice_pdf_other_paper
 import dev.neurokitchen.quire.resources.notice_pdfs_removed
+import dev.neurokitchen.quire.resources.tools_exported
 import dev.neurokitchen.quire.resources.notice_no_publisher_page
 import dev.neurokitchen.quire.resources.notice_nothing_changed
 import dev.neurokitchen.quire.resources.notice_refetched
@@ -424,6 +425,13 @@ class LibraryViewModel(
             }
             LibraryEvent.OnToggleSidebar -> view.update { it.copy(isSidebarCollapsed = !it.isSidebarCollapsed) }
             is LibraryEvent.OnToggleQuickLook -> view.update { it.copy(isQuickLookOpen = event.open ?: !it.isQuickLookOpen) }
+            is LibraryEvent.OnExportProject -> act {
+                val count = exchange.exportTo(
+                    dev.neurokitchen.quire.domain.model.ExportSelection(projectPath = event.projectId, recursive = true, format = "biblatex"),
+                    event.path,
+                )
+                Notice.Done(Res.string.tools_exported, listOf(count, event.path))
+            }
         }
     }
 

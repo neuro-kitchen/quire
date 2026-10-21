@@ -13,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import dev.neurokitchen.quire.presentation.designsystem.components.onSecondaryClick
+import dev.neurokitchen.quire.presentation.platform.pickSaveFile
 import dev.neurokitchen.quire.presentation.screens.library.Confirm
 import dev.neurokitchen.quire.presentation.screens.library.NameDialog
 import dev.neurokitchen.quire.resources.menu_delete
@@ -155,13 +156,17 @@ fun ProjectsPane(
                     )
                     ProjectMenu(menuOpen, onDismiss = { menuOpen = false }) { action ->
                         menuOpen = false
-                        onEvent(
-                            when (action) {
-                                ProjectAction.NewSubproject -> LibraryEvent.OnNameDialog(NameDialog.NewProject(parentPath = project.id))
-                                ProjectAction.Rename -> LibraryEvent.OnNameDialog(NameDialog.RenameProject(project.id, project.name))
-                                ProjectAction.Delete -> LibraryEvent.OnConfirm(Confirm.DeleteProject(project.id, project.name))
-                            },
-                        )
+                        when (action) {
+                            ProjectAction.NewSubproject -> onEvent(LibraryEvent.OnNameDialog(NameDialog.NewProject(parentPath = project.id)))
+                            ProjectAction.Rename -> onEvent(LibraryEvent.OnNameDialog(NameDialog.RenameProject(project.id, project.name)))
+                            ProjectAction.Delete -> onEvent(LibraryEvent.OnConfirm(Confirm.DeleteProject(project.id, project.name)))
+                            ProjectAction.ExportBib -> {
+                                val cleanName = project.name.lowercase().replace(" ", "_").filter { it.isLetterOrDigit() || it == '_' }
+                                pickSaveFile("Export ${project.name} as BibTeX", "$cleanName.bib")?.let { path ->
+                                    onEvent(LibraryEvent.OnExportProject(project.id, path))
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -295,13 +300,17 @@ private fun Twisty(expanded: Boolean, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
-private enum class ProjectAction { NewSubproject, Rename, Delete }
+private enum class ProjectAction { NewSubproject, Rename, ExportBib, Delete }
 
 @Composable
 private fun ProjectMenu(expanded: Boolean, onDismiss: () -> Unit, onAction: (ProjectAction) -> Unit) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         DropdownMenuItem(text = { Text(stringResource(Res.string.menu_new_subproject)) }, onClick = { onAction(ProjectAction.NewSubproject) })
         DropdownMenuItem(text = { Text(stringResource(Res.string.menu_rename)) }, onClick = { onAction(ProjectAction.Rename) })
+        DropdownMenuItem(
+            text = { Text("Export as BibTeX (.bib)...") },
+            onClick = { onAction(ProjectAction.ExportBib) },
+        )
         DropdownMenuItem(
             text = { Text(stringResource(Res.string.menu_delete), color = MaterialTheme.colorScheme.error) },
             onClick = { onAction(ProjectAction.Delete) },

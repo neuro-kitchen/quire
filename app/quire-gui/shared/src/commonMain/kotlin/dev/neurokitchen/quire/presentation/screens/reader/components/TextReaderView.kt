@@ -96,12 +96,18 @@ fun TextReaderView(
     /** Find matches in this tab, and the one to bring into view. */
     findMatches: List<TextMatch> = emptyList(),
     currentFind: Int = 0,
+    onProgressChange: (currentBlock: Int, totalBlocks: Int) -> Unit = { _, _ -> },
 ) {
     val tab = tabs.getOrNull(selectedTab) ?: return
     val list = rememberLazyListState()
     val focusedQuote = highlights.firstOrNull { it.id == focused }?.quote
     val themeColors = readerColors(readerTheme)
     var localSelection by remember(selectedTab) { mutableStateOf<Pair<String, String>?>(null) }
+
+    val firstVisibleBlock by remember(tab, list) { derivedStateOf { list.firstVisibleItemIndex + 1 } }
+    LaunchedEffect(firstVisibleBlock, tab.blocks.size) {
+        onProgressChange(firstVisibleBlock, tab.blocks.size)
+    }
 
     val current = findMatches.getOrNull(currentFind)
     LaunchedEffect(current) { if (current != null) list.animateScrollToItem(current.block) }
@@ -132,27 +138,6 @@ fun TextReaderView(
             }
         }
 
-        // Reading Progress Bar at the top of the Text viewport
-        val textProgress by remember(tab, list) {
-            derivedStateOf {
-                if (tab.blocks.isNotEmpty()) {
-                    ((list.firstVisibleItemIndex + 1).toFloat() / tab.blocks.size.toFloat()).coerceIn(0f, 1f)
-                } else 0f
-            }
-        }
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(3.dp)
-                .background(QuireTheme.colors.border.copy(alpha = 0.25f)),
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(textProgress)
-                    .fillMaxHeight()
-                    .background(QuireTheme.colors.accent),
-            )
-        }
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             LazyColumn(
                 state = list,
