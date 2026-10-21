@@ -118,6 +118,8 @@ kotlin {
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
             implementation(libs.compose.ui)
+            // Back closing in-screen surfaces (the Add menu).
+            implementation(libs.compose.ui.backhandler)
             implementation(libs.compose.material3)
             implementation(libs.compose.material3.navigationSuite)
             implementation(libs.compose.components.resources)
