@@ -7,6 +7,7 @@ import dev.neurokitchen.quire.data.repository.SamplePreferencesRepository
 import dev.neurokitchen.quire.domain.model.LibraryQuery
 import dev.neurokitchen.quire.domain.repository.LibraryRepository
 import dev.neurokitchen.quire.domain.repository.PreferencesRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,7 +28,7 @@ class DesktopViewModel(
                 _state.update { it.copy(appTheme = prefs.appTheme) }
             }
         }
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             libraryRepository.references(LibraryQuery())
                 .catch { /* sample or empty fallback */ }
                 .collect { refs ->
