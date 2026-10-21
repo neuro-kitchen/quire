@@ -455,4 +455,19 @@
     <string name="selection_copy_with_citation">Copy with Citation</string>
     <string name="name_save_search_title">New Smart Collection</string>
     <string name="name_save_search_query">Filter query: “%1$s”</string>
+    <string name="common_back">Back</string>
+    <string name="home_continue">Continue reading</string>
+    <string name="home_recent">Recently added</string>
+    <string name="home_unread">Unread</string>
+    <string name="home_see_all">See all</string>
+    <string name="home_empty">No papers yet. Add one with the + button: a DOI, an arXiv ID, a PDF or a .bib file.</string>
+    <string name="mobile_library_projects">Projects</string>
+    <string name="mobile_library_tags">Tags</string>
+    <string name="mobile_library_saved">Saved searches</string>
+    <string name="mobile_nothing_here">Nothing here yet.</string>
+    <string name="mobile_toggle_children">Show or hide subprojects</string>
+    <plurals name="mobile_items">
+        <item quantity="one">%1$d paper</item>
+        <item quantity="other">%1$d papers</item>
+    </plurals>
 </resources>
