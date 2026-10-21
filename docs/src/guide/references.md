@@ -22,7 +22,8 @@ Crossref → the source's own API (arXiv, NCBI) → the page's JSON-LD → its `
 Every failed attempt is recorded with the reference, so `ref check` can show what went wrong.
 
 Cite keys are made from the first author, the title and the year (`vaswaniAttentionAllYou2017`)
-and stay fixed once made.
+and stay fixed once made. A `.bib` import keeps the file's own keys. A key already used by another
+paper gets a letter (`smith2020a`, then `b`, …).
 
 ## Checking
 

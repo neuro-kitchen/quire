@@ -10,6 +10,10 @@ quire tag rename to-read queue
 quire tag delete queue                 # removes it from every reference
 ```
 
+Tag names ignore case (`Methods` and `methods` are one tag). Renaming a tag to the name of another
+merges the two (`merged to-read → queue`), as in Zotero. Up to nine tags have a color, each on a
+key 1–9; giving a tag a key another tag holds takes the key (and color) from that one.
+
 ## Notes
 
 Notes are Markdown, attached to a reference or standalone.

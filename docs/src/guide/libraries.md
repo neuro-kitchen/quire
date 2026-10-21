@@ -29,7 +29,8 @@ quire ref unlink smith2020 -p thesis/chapter-2  # stays in the library
 quire list -p thesis -r                          # -r: with subprojects
 ```
 
-Removing a project moves it to the trash; its references stay in the library.
+Removing a project moves it to the trash; its references stay in the library. A project with
+subprojects is removed only with `-r` (`quire project rm thesis -r`), which removes them too.
 
 ## Trash
 

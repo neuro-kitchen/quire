@@ -105,6 +105,7 @@ pub fn copy_in(library: &mut impl Library, reference: Reference, project: Option
     }
     let cite_key = free_key(reference.cite_key.as_str(), |key| library.cite_key_taken(key))?;
     let mut copy = Reference { cite_key, ..reference };
+    copy.data.dedup_identifiers();
     copy.meta.restore(library.device());
     library.insert_reference(&copy, None)?;
     if let Some(project) = project {
