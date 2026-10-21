@@ -1,9 +1,9 @@
 //! Project operations of [`Engine`].
 
-use quire_core::ReferenceFilter;
 use quire_core::library::projects;
-use quire_core::prelude::*;
-use quire_model::{Project, Reference, SlugPath};
+use std::collections::HashMap;
+
+use quire_model::{Project, ProjectId, Reference, ReferenceId, SlugPath};
 
 use super::Engine;
 use crate::error::Result;
@@ -34,14 +34,34 @@ impl Engine {
     /// Every project as a depth-first tree, with how many references it holds directly.
     pub async fn project_summaries(&self) -> Result<Vec<ProjectSummary>> {
         self.run(|lib| {
+            let mut counts: HashMap<ProjectId, usize> = HashMap::new();
+            for (_, project) in lib.memberships()? {
+                *counts.entry(project).or_default() += 1;
+            }
             let tree = projects::tree(lib)?;
-            tree.into_iter()
+            Ok(tree
+                .into_iter()
                 .map(|(path, project)| {
-                    let filter = ReferenceFilter { projects: Some(vec![project.id]), ..ReferenceFilter::default() };
-                    let references = lib.references(&filter)?.len();
-                    Ok(ProjectSummary { path, project, references })
+                    let references = counts.get(&project.id).copied().unwrap_or(0);
+                    ProjectSummary { path, project, references }
                 })
-                .collect()
+                .collect())
+        })
+        .await
+    }
+
+    /// The projects each live reference is in, by path (references in none are left out).
+    pub async fn memberships(&self) -> Result<HashMap<ReferenceId, Vec<SlugPath>>> {
+        self.run(|lib| {
+            let paths: HashMap<ProjectId, SlugPath> =
+                projects::tree(lib)?.into_iter().map(|(path, project)| (project.id, path)).collect();
+            let mut out: HashMap<ReferenceId, Vec<SlugPath>> = HashMap::new();
+            for (reference, project) in lib.memberships()? {
+                if let Some(path) = paths.get(&project) {
+                    out.entry(reference).or_default().push(path.clone());
+                }
+            }
+            Ok(out)
         })
         .await
     }

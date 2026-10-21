@@ -309,3 +309,47 @@ async fn subscribers_hear_about_changes() {
     engine.color_tag("typesetting", Some("#5FB236"), None).await.unwrap();
     assert!(changes.try_recv().is_ok(), "a tag's colour is a change");
 }
+
+/// What each reference is in, and how many each project holds, from one query each (they were one
+/// query per project, the counts reading every reference of the project). Trashed references,
+/// unlinked ones and trashed projects do not count.
+#[tokio::test]
+async fn memberships_and_project_counts() {
+    let dir = tempfile::tempdir().unwrap();
+    let engine = engine(dir.path(), None).await;
+    let bib = dir.path().join("refs.bib");
+    std::fs::write(
+        &bib,
+        "@article{a, title = {A}, year = {2020}}\n@article{b, title = {B}, year = {2021}}\n@article{c, title = {C}, year = {2022}}\n@article{d, title = {D}, year = {2023}}",
+    )
+    .unwrap();
+    engine.import_bib(&bib, None).await.unwrap();
+    engine.create_project("Thesis", None).await.unwrap();
+    engine.create_project("Chapter", Some(&slug_path("thesis"))).await.unwrap();
+    engine.create_project("Old", None).await.unwrap();
+    for (key, project) in
+        [("a", "thesis"), ("a", "thesis/chapter"), ("b", "thesis/chapter"), ("c", "thesis"), ("d", "old")]
+    {
+        engine.link(key, &slug_path(project)).await.unwrap();
+    }
+    engine.trash("c").await.unwrap();
+    engine.unlink("b", &slug_path("thesis/chapter")).await.unwrap();
+    engine.remove_project(&slug_path("old"), false).await.unwrap();
+
+    let mut ids = std::collections::HashMap::new();
+    for key in ["a", "b", "c", "d"] {
+        ids.insert(key, engine.show(key).await.unwrap().0.id);
+    }
+    let memberships = engine.memberships().await.unwrap();
+    let paths = |key: &str| {
+        let mut paths: Vec<String> =
+            memberships.get(&ids[key]).into_iter().flatten().map(ToString::to_string).collect();
+        paths.sort();
+        paths
+    };
+    assert_eq!(paths("a"), ["thesis", "thesis/chapter"]);
+    assert!(paths("b").is_empty() && paths("c").is_empty() && paths("d").is_empty());
+    let counts: Vec<(String, usize)> =
+        engine.project_summaries().await.unwrap().into_iter().map(|s| (s.path.to_string(), s.references)).collect();
+    assert_eq!(counts, [("thesis".to_string(), 1), ("thesis/chapter".to_string(), 1)]);
+}
