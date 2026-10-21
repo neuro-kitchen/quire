@@ -35,11 +35,7 @@ pub async fn run(engine: &Engine, args: &SavedArgs) -> anyhow::Result<()> {
         Action::List => {
             let searches = engine.saved_searches().await?;
             for search in &searches {
-                anstream::println!(
-                    "{}  {}",
-                    style::paint(style::KEY, &search.name),
-                    style::paint(style::DIM, &search.query)
-                );
+                crate::out!("{}  {}", style::paint(style::KEY, &search.name), style::paint(style::DIM, &search.query));
             }
             if searches.is_empty() {
                 output::hint("no saved searches: save one with `quire search <query> --save <name>`");

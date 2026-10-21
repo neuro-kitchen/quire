@@ -109,13 +109,13 @@ pub async fn run(context: &Context, args: &FolderArgs) -> anyhow::Result<()> {
         Action::Check(args) => return check::run(context, args).await,
         Action::Show => match &context.folder {
             Some(folder) => {
-                anstream::println!(
+                crate::out!(
                     "{}",
                     style::paint(style::DIM, folder.folder.join(quire_engine::folder::FILE_NAME).display())
                 );
                 let show = |label: &str, value: Option<String>| {
                     if let Some(value) = value {
-                        anstream::println!("{}{value}", style::paint(style::LABEL, format!("{label:<12}")));
+                        crate::out!("{}{value}", style::paint(style::LABEL, format!("{label:<12}")));
                     }
                 };
                 show("library", folder.library.clone());

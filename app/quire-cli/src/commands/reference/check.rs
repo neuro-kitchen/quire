@@ -66,29 +66,29 @@ pub async fn run(context: &Context, args: &CheckArgs) -> anyhow::Result<()> {
             .iter()
             .map(|(f, project)| serde_json::json!({ "input": f.input, "project": project.as_ref().map(ToString::to_string), "error": f.error, "attempts": f.attempts }))
             .collect();
-        println!(
+        crate::out!(
             "{}",
             serde_json::to_string_pretty(&serde_json::json!({ "references": references, "failed_inputs": failed }))?
         );
         return Ok(());
     }
     for item in &checked {
-        anstream::println!("{}", output::summary(&item.reference));
+        crate::out!("{}", output::summary(&item.reference));
         for issue in &item.issues {
-            anstream::println!("    {}", issue_line(issue));
+            crate::out!("    {}", issue_line(issue));
         }
     }
     if !failures.is_empty() {
         if !checked.is_empty() {
-            println!();
+            crate::out!();
         }
-        anstream::println!("{}", style::paint(style::LABEL, "Failed lookups"));
+        crate::out!("{}", style::paint(style::LABEL, "Failed lookups"));
         for (failure, project) in &failures {
             let project = project.as_ref().map(|p| format!("  → {}", style::paint(style::KEY, p))).unwrap_or_default();
             let attempts =
                 if failure.attempts > 1 { format!("  ({} attempts)", failure.attempts) } else { String::new() };
-            anstream::println!("  {}{project}{}", failure.input, style::paint(style::DIM, attempts));
-            anstream::println!("    {}", style::paint(style::DIM, &failure.error));
+            crate::out!("  {}{project}{}", failure.input, style::paint(style::DIM, attempts));
+            crate::out!("    {}", style::paint(style::DIM, &failure.error));
         }
         output::hint("Retry them with `quire add --retry`, or forget them with `quire add --forget-failed`.");
     }

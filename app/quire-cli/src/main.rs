@@ -129,7 +129,7 @@ async fn main() -> ExitCode {
     match result {
         Ok(code) => code,
         Err(error) => {
-            anstream::eprintln!("{} {error:#}", style::paint(style::ERROR, "error:"));
+            crate::err!("{} {error:#}", style::paint(style::ERROR, "error:"));
             ExitCode::FAILURE
         }
     }

@@ -11,6 +11,7 @@
 
 pub mod changes;
 pub mod reference;
+pub mod safe;
 pub mod status;
 pub mod style;
 pub mod table;
