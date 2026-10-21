@@ -216,8 +216,14 @@ pub(crate) fn looks_like_pdf(bytes: &[u8]) -> bool {
     bytes.trim_ascii_start().starts_with(b"%PDF-")
 }
 
-/// Inspects `bytes`; an error if they are not a readable PDF.
+/// Inspects `bytes`; an error if they are not a readable PDF. Downloaded and imported files are
+/// untrusted: a panic in the parser is an error here (as in [`to_markdown`]), not a crash.
 pub fn inspect(bytes: &[u8]) -> Result<PdfInfo> {
+    std::panic::catch_unwind(|| inspect_unguarded(bytes))
+        .unwrap_or_else(|_| Err(DocumentError::NotPdf("the PDF could not be read (malformed)".into())))
+}
+
+fn inspect_unguarded(bytes: &[u8]) -> Result<PdfInfo> {
     if !looks_like_pdf(bytes) {
         return Err(DocumentError::NotPdf("the file does not start with %PDF-".into()));
     }
