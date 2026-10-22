@@ -45,6 +45,17 @@ class MobileNavigation internal constructor(
         }
     }
 
+    /**
+     * A horizontal swipe on a tab's root: to the next tab ([forward], a swipe to the left) or the
+     * previous one, in bottom-bar order. Ignored on pushed screens (the reader, details) and past
+     * the first and last tab.
+     */
+    fun swipe(forward: Boolean) {
+        if (!isAtTabRoot) return
+        val next = Tab.entries.getOrNull(tab.ordinal + if (forward) 1 else -1) ?: return
+        tab = next
+    }
+
     /** Opens [route] on top of the current tab. */
     fun open(route: (Tab) -> Route) {
         stack(tab).add(route(tab))

@@ -49,4 +49,23 @@ class MobileNavigationTest {
         assertEquals(Route.Search, nav.current)
         assertTrue(nav.isAtTabRoot)
     }
+
+    @Test
+    fun swipeMovesBetweenTabsOnlyAtTheirRoot() {
+        val nav = navigation()
+        nav.swipe(forward = false)
+        assertEquals(Tab.Home, nav.tab, "nothing before Home")
+        nav.swipe(forward = true)
+        assertEquals(Tab.Library, nav.tab)
+        nav.open { Route.Details(it, "2") }
+        nav.swipe(forward = true)
+        assertEquals(Tab.Library, nav.tab, "no swipe on a pushed screen")
+        nav.back()
+        nav.swipe(forward = true)
+        nav.swipe(forward = true)
+        nav.swipe(forward = true)
+        assertEquals(Tab.Settings, nav.tab, "nothing after Settings")
+        nav.swipe(forward = false)
+        assertEquals(Tab.Search, nav.tab)
+    }
 }
