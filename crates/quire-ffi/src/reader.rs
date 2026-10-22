@@ -77,12 +77,12 @@ pub struct NoteRecord {
 
 pub(crate) async fn paper(engine: &Engine, id: &str) -> Result<PaperRecord> {
     let (reference, _) = engine.show(id).await?;
-    let mut tabs = vec![tab(Tab::Abstract, None, paper::front_matter(&reference))];
+    let mut tabs = vec![tab(Tab::Abstract, None, paper::front_matter(&reference), Vec::new())];
     let (source, text_error) = match engine.reader_text(id).await {
         Ok((_, text)) => {
             let source = text.source;
             for content in paper::tabs(&text.markdown, source.has_math()) {
-                tabs.push(tab(content.tab, content.count, content.blocks));
+                tabs.push(tab(content.tab, content.count, content.blocks, content.images));
             }
             (Some(source.label().to_string()), None)
         }
@@ -91,7 +91,9 @@ pub(crate) async fn paper(engine: &Engine, id: &str) -> Result<PaperRecord> {
     Ok(PaperRecord { tabs, source, text_error })
 }
 
-fn tab(tab: Tab, count: Option<usize>, blocks: Vec<Block>) -> ReaderTab {
+/// `images`: each figure's image, shown before the block at its index (its label): an
+/// `Image` block there. Dropping them lost every full text's figure images (2026-10-22).
+fn tab(tab: Tab, count: Option<usize>, blocks: Vec<Block>, images: Vec<(usize, String)>) -> ReaderTab {
     let name = match tab {
         Tab::Abstract => "abstract",
         Tab::Paper => "paper",
@@ -102,7 +104,16 @@ fn tab(tab: Tab, count: Option<usize>, blocks: Vec<Block>) -> ReaderTab {
         Tab::References => "references",
         Tab::Notes => "notes",
     };
-    ReaderTab { name: name.into(), count: count.map(|c| c as u32), blocks: blocks.into_iter().map(block).collect() }
+    let mut records = Vec::with_capacity(blocks.len() + images.len());
+    let mut images = images.into_iter().peekable();
+    for (i, b) in blocks.into_iter().enumerate() {
+        while let Some((_, url)) = images.next_if(|(at, _)| *at <= i) {
+            records.push(BlockRecord { kind: BlockKind::Image { url }, words: Vec::new() });
+        }
+        records.push(block(b));
+    }
+    records.extend(images.map(|(_, url)| BlockRecord { kind: BlockKind::Image { url }, words: Vec::new() }));
+    ReaderTab { name: name.into(), count: count.map(|c| c as u32), blocks: records }
 }
 
 fn block(block: Block) -> BlockRecord {
@@ -144,4 +155,25 @@ pub(crate) fn reading_status(text: &str) -> Result<ReadingStatus> {
 
 pub(crate) fn reference_id(text: &str) -> Result<ReferenceId> {
     text.parse().map_err(|_| QuireError::Invalid(format!("`{text}` is not a reference ID")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A full text's figure image reaches the app: an `Image` block right before its label.
+    #[test]
+    fn figure_images_cross_the_bridge() {
+        let markdown = "## Results\n\nText.\n\n![Figure](https://pmc.ncbi.nlm.nih.gov/articles/instance/1/bin/f1.jpg)\n\n\
+                        Figure 1: Schematic.\n\nFigure 2: No image.\n";
+        let figures = paper::tabs(markdown, false)
+            .into_iter()
+            .find(|t| t.tab == Tab::Figures)
+            .map(|t| tab(t.tab, t.count, t.blocks, t.images))
+            .expect("a Figures tab");
+        let kinds: Vec<_> = figures.blocks.iter().map(|b| &b.kind).collect();
+        assert_eq!(kinds[0], &BlockKind::Image { url: "https://pmc.ncbi.nlm.nih.gov/articles/instance/1/bin/f1.jpg".into() });
+        assert_eq!(kinds[1], &BlockKind::Heading { level: 4 });
+        assert_eq!(kinds.iter().filter(|k| matches!(k, BlockKind::Image { .. })).count(), 1, "{kinds:?}");
+    }
 }

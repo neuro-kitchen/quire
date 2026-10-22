@@ -136,7 +136,9 @@ fun FigureDrawer(
         var figIndex = 1
         tabs.forEach { tab ->
             tab.blocks.forEachIndexed { i, block ->
-                if (block.kind is BlockKind.Image) {
+                // On the Figures tab an image comes right before its figure's label: the label's entry.
+                val labelled = tab.kind == PaperTabKind.Figures && tab.blocks.getOrNull(i + 1)?.kind is BlockKind.Heading
+                if (block.kind is BlockKind.Image && !labelled) {
                     val caption = tab.blocks.getOrNull(i + 1)?.text ?: ""
                     list.add(
                         ExtractedFigure(
@@ -149,12 +151,13 @@ fun FigureDrawer(
                     figIndex++
                 } else if (tab.kind == PaperTabKind.Figures && block.kind is BlockKind.Heading) {
                     val caption = tab.blocks.getOrNull(i + 1)?.text ?: ""
+                    val image = tab.blocks.getOrNull(i - 1)?.kind as? BlockKind.Image
                     list.add(
                         ExtractedFigure(
                             id = "fig-$figIndex",
                             title = block.text.ifEmpty { "Figure $figIndex" },
                             caption = caption,
-                            imageUrl = "",
+                            imageUrl = image?.url ?: "",
                         )
                     )
                     figIndex++

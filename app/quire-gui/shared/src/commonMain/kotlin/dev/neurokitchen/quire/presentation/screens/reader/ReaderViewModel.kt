@@ -1,6 +1,7 @@
 package dev.neurokitchen.quire.presentation.screens.reader
 
 import dev.neurokitchen.quire.presentation.platform.pageCacheBytes
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -250,7 +251,12 @@ class ReaderViewModel(
     }
 
     /** The local file of a figure image, `null` if it cannot be had. */
-    suspend fun figure(url: String): String? = runCatching { reader.figure(url) }.getOrNull()
+    suspend fun figure(url: String): String? =
+        // A failure is logged (logcat on Android): the drawer only shows a placeholder. A figure
+        // scrolled away cancels its load: that is passed on, not swallowed.
+        runCatching { reader.figure(url) }
+            .onFailure { if (it is CancellationException) throw it else println("quire: figure $url: $it") }
+            .getOrNull()
 
     /** The PDF, the text and the reading status load at once: none waits for another. */
     private fun load() {
