@@ -1,0 +1,167 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+  <defs>
+    <!-- Background: Modern Dark Obsidian Tile -->
+    <linearGradient id="flat-tile-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#161824" />
+      <stop offset="100%" stop-color="#0D0E15" />
+    </linearGradient>
+
+    <!-- Border highlight -->
+    <linearGradient id="flat-tile-stroke" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.12" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.02" />
+    </linearGradient>
+
+    <!-- Left Arc Gradient (Deep Indigo to Electric Violet) -->
+    <linearGradient id="left-arc-grad" x1="20%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#6366F1" />
+      <stop offset="50%" stop-color="#4F46E5" />
+      <stop offset="100%" stop-color="#3730A3" />
+    </linearGradient>
+
+    <!-- Feather Spine Gradient -->
+    <linearGradient id="spine-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="50%" stop-color="#818CF8" />
+      <stop offset="100%" stop-color="#C084FC" />
+    </linearGradient>
+
+    <!-- Feather Vane Gradients -->
+    <linearGradient id="vane-1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#60A5FA" />
+    </linearGradient>
+
+    <linearGradient id="vane-2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60A5FA" />
+      <stop offset="100%" stop-color="#818CF8" />
+    </linearGradient>
+
+    <linearGradient id="vane-3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818CF8" />
+      <stop offset="100%" stop-color="#A78BFA" />
+    </linearGradient>
+
+    <linearGradient id="vane-4" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#A78BFA" />
+      <stop offset="100%" stop-color="#C084FC" />
+    </linearGradient>
+
+    <linearGradient id="vane-tail" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#C084FC" />
+      <stop offset="100%" stop-color="#E879F9" />
+    </linearGradient>
+
+    <filter id="flat-tile-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="20" stdDeviation="24" flood-color="#000000" flood-opacity="0.5" />
+    </filter>
+
+    <filter id="soft-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#4F46E5" flood-opacity="0.35" />
+    </filter>
+
+    <clipPath id="squircle-shape">
+      <rect x="24" y="24" width="464" height="464" rx="108" ry="108" />
+    </clipPath>
+  </defs>
+
+  <!-- Squircle App Container -->
+  <g filter="url(#flat-tile-shadow)">
+    <rect x="24" y="24" width="464" height="464" rx="108" ry="108" fill="url(#flat-tile-bg)" />
+    <rect x="24.5" y="24.5" width="463" height="463" rx="107.5" ry="107.5" stroke="url(#flat-tile-stroke)" stroke-width="1.5" />
+  </g>
+
+  <!-- Logo Mark Inside Squircle -->
+  <g clip-path="url(#squircle-shape)">
+    <!-- Ambient Backdrop Light -->
+    <circle cx="240" cy="240" r="150" fill="#4F46E5" opacity="0.12" />
+
+    <g filter="url(#soft-glow)" transform="translate(10, 0)">
+      <!-- ========================================== -->
+      <!-- LEFT HALF OF Q: Smooth, bold circular arc  -->
+      <!-- ========================================== -->
+      <!-- Sweeps from top-center (x=240, y=90) through left (x=100, y=240) to bottom-center (x=240, y=390) -->
+      <path d="M 240 90
+               A 150 150 0 0 0 240 390
+               L 240 340
+               A 100 100 0 0 1 240 140
+               Z"
+            fill="url(#left-arc-grad)" />
+
+      <!-- Smooth tapered cap at top meeting the feather -->
+      <path d="M 240 90 C 255 90, 268 94, 276 100 L 260 144 C 252 142, 246 140, 240 140 Z"
+            fill="url(#left-arc-grad)" />
+
+      <!-- ============================================================ -->
+      <!-- RIGHT HALF OF Q: Feather segments forming the circular arc   -->
+      <!-- ============================================================ -->
+
+      <!-- Feather Vane 1 (Top-right quadrant) -->
+      <path d="M 284 105
+               C 328 128, 362 165, 376 200
+               L 334 212
+               C 324 186, 298 158, 268 144
+               Z"
+            fill="url(#vane-1)" />
+
+      <!-- Feather Vane 2 (Middle-right quadrant) -->
+      <path d="M 382 210
+               C 392 242, 390 278, 374 310
+               L 332 294
+               C 342 272, 344 246, 336 222
+               Z"
+            fill="url(#vane-2)" />
+
+      <!-- Feather Vane 3 (Lower-right quadrant) -->
+      <path d="M 370 320
+               C 350 354, 318 380, 276 394
+               L 262 348
+               C 288 340, 312 322, 326 298
+               Z"
+            fill="url(#vane-3)" />
+
+      <!-- Bottom connection to left arc -->
+      <path d="M 276 394 C 265 397, 252 398, 240 398 L 240 348 C 248 348, 256 347, 264 345 Z"
+            fill="url(#vane-4)" />
+
+      <!-- ============================================================ -->
+      <!-- FEATHER TAIL: Sweeping down-right to form the 'Q' tail       -->
+      <!-- ============================================================ -->
+      <!-- Tail Flume / Quill Tip -->
+      <path d="M 326 330
+               L 404 408
+               C 414 418, 412 432, 400 436
+               C 388 440, 376 434, 368 424
+               L 300 356
+               C 310 348, 318 340, 326 330
+               Z"
+            fill="url(#vane-tail)" />
+
+      <!-- Second smaller quill feather vane on tail -->
+      <path d="M 368 360
+               L 436 428
+               C 446 438, 442 450, 432 454
+               C 424 456, 416 452, 410 444
+               L 350 384
+               Z"
+            fill="url(#vane-tail)"
+            opacity="0.85" />
+
+      <!-- Central Feather Shaft / Spine running down the inner curve -->
+      <path d="M 270 120
+               C 330 160, 360 230, 330 320
+               L 426 430"
+            stroke="url(#spine-grad)"
+            stroke-width="4.5"
+            stroke-linecap="round" />
+
+      <!-- Subtle spine tip highlight -->
+      <path d="M 340 334 L 434 438"
+            stroke="#FFFFFF"
+            stroke-width="2"
+            stroke-linecap="round"
+            opacity="0.85" />
+
+    </g>
+  </g>
+</svg>
