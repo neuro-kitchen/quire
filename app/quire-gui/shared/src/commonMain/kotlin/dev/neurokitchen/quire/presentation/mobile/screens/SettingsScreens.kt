@@ -50,6 +50,24 @@ import dev.neurokitchen.quire.presentation.designsystem.QuireTheme
 import dev.neurokitchen.quire.presentation.designsystem.ReaderFont
 import dev.neurokitchen.quire.presentation.designsystem.ReaderTheme
 import dev.neurokitchen.quire.presentation.designsystem.quireColors
+import dev.neurokitchen.quire.presentation.designsystem.components.settings.SettingsBadge
+import dev.neurokitchen.quire.presentation.designsystem.components.settings.SettingsGroup
+import dev.neurokitchen.quire.presentation.designsystem.components.settings.SettingsHeader
+import dev.neurokitchen.quire.presentation.designsystem.components.settings.SettingsItem
+import androidx.compose.ui.graphics.Shape
+import dev.neurokitchen.quire.resources.ic_auto_fix_high
+import dev.neurokitchen.quire.resources.ic_delete
+import dev.neurokitchen.quire.resources.ic_description
+import dev.neurokitchen.quire.resources.ic_info
+import dev.neurokitchen.quire.resources.ic_library_books
+import dev.neurokitchen.quire.resources.ic_notifications
+import dev.neurokitchen.quire.resources.ic_person
+import dev.neurokitchen.quire.resources.ic_sync
+import dev.neurokitchen.quire.resources.settings_group_look
+import dev.neurokitchen.quire.resources.settings_group_more
+import dev.neurokitchen.quire.resources.settings_group_sync
+import dev.neurokitchen.quire.resources.settings_group_you
+import dev.neurokitchen.quire.resources.settings_header_hint
 import dev.neurokitchen.quire.presentation.designsystem.readerColors
 import dev.neurokitchen.quire.presentation.mobile.components.LocalMobileChrome
 import dev.neurokitchen.quire.presentation.mobile.components.MobileTopBar
@@ -90,43 +108,73 @@ import dev.neurokitchen.quire.resources.mobile_settings_reader_size
 import dev.neurokitchen.quire.resources.mobile_settings_reader_theme
 import dev.neurokitchen.quire.resources.mobile_settings_system_hint
 import dev.neurokitchen.quire.resources.mobile_settings_version
+import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
-/** The Settings tab: a list of pages, as Android's own settings. */
+/** The Settings tab: pages in sections, each row with its icon (Material 3 Expressive style). */
 @Composable
 fun SettingsTab(onOpen: (MobileSettingsPage) -> Unit) {
+    val notifications by koinViewModel<NotificationsViewModel>().state.collectAsStateWithLifecycle()
+    val page = @Composable { title: StringResource, hint: StringResource, icon: DrawableResource, target: MobileSettingsPage ->
+        @Composable { shape: Shape ->
+            SettingsItem(
+                stringResource(title),
+                shape,
+                supporting = stringResource(hint),
+                icon = icon,
+                opensPage = true,
+                onClick = { onOpen(target) },
+                trailing = if (target == MobileSettingsPage.Notifications && notifications.unread > 0) {
+                    { SettingsBadge(notifications.unread.toString()) }
+                } else {
+                    null
+                },
+            )
+        }
+    }
     LazyColumn(
-        Modifier.fillMaxSize().hazeSource(LocalMobileChrome.current.haze),
+        Modifier.fillMaxSize().background(QuireTheme.colors.background).hazeSource(LocalMobileChrome.current.haze),
         contentPadding = mobileContentPadding(topBar = false),
     ) {
-        item { LargeTitle(stringResource(Res.string.destination_settings), null) }
+        item { SettingsHeader(stringResource(Res.string.destination_settings), stringResource(Res.string.settings_header_hint)) }
         item {
-            Group {
-                PageRow(Res.string.mobile_settings_appearance, Res.string.mobile_settings_appearance_hint) { onOpen(MobileSettingsPage.Appearance) }
-                PageRow(Res.string.mobile_settings_reading, Res.string.mobile_settings_reading_hint) { onOpen(MobileSettingsPage.Reading) }
-            }
+            SettingsGroup(
+                label = stringResource(Res.string.settings_group_look),
+                rows = listOf(
+                    page(Res.string.mobile_settings_appearance, Res.string.mobile_settings_appearance_hint, Res.drawable.ic_auto_fix_high, MobileSettingsPage.Appearance),
+                    page(Res.string.mobile_settings_reading, Res.string.mobile_settings_reading_hint, Res.drawable.ic_description, MobileSettingsPage.Reading),
+                ),
+            )
         }
-        item { Spacer(Modifier.size(Dimens.SpaceMd)) }
         item {
-            Group {
-                PageRow(Res.string.mobile_settings_account, Res.string.mobile_settings_account_hint) { onOpen(MobileSettingsPage.Account) }
-                PageRow(Res.string.mobile_settings_libraries, Res.string.mobile_settings_libraries_hint) { onOpen(MobileSettingsPage.Libraries) }
-                PageRow(Res.string.mobile_settings_sync, Res.string.mobile_settings_sync_hint) { onOpen(MobileSettingsPage.Sync) }
-                val notifications by koinViewModel<NotificationsViewModel>().state.collectAsStateWithLifecycle()
-                PageRow(
-                    Res.string.notifications,
-                    Res.string.mobile_settings_notifications_hint,
-                    badge = if (notifications.unread > 0) stringResource(Res.string.mobile_settings_notifications_unread, notifications.unread) else null,
-                ) { onOpen(MobileSettingsPage.Notifications) }
-                PageRow(Res.string.library_trash, Res.string.mobile_settings_trash_hint) { onOpen(MobileSettingsPage.Trash) }
-            }
+            SettingsGroup(
+                label = stringResource(Res.string.settings_group_you),
+                rows = listOf(
+                    page(Res.string.mobile_settings_account, Res.string.mobile_settings_account_hint, Res.drawable.ic_person, MobileSettingsPage.Account),
+                    page(Res.string.mobile_settings_libraries, Res.string.mobile_settings_libraries_hint, Res.drawable.ic_library_books, MobileSettingsPage.Libraries),
+                ),
+            )
         }
-        item { Spacer(Modifier.size(Dimens.SpaceMd)) }
         item {
-            Group { PageRow(Res.string.mobile_settings_about, Res.string.mobile_settings_about_hint) { onOpen(MobileSettingsPage.About) } }
+            SettingsGroup(
+                label = stringResource(Res.string.settings_group_sync),
+                rows = listOf(
+                    page(Res.string.mobile_settings_sync, Res.string.mobile_settings_sync_hint, Res.drawable.ic_sync, MobileSettingsPage.Sync),
+                    page(Res.string.notifications, Res.string.mobile_settings_notifications_hint, Res.drawable.ic_notifications, MobileSettingsPage.Notifications),
+                ),
+            )
+        }
+        item {
+            SettingsGroup(
+                label = stringResource(Res.string.settings_group_more),
+                rows = listOf(
+                    page(Res.string.library_trash, Res.string.mobile_settings_trash_hint, Res.drawable.ic_delete, MobileSettingsPage.Trash),
+                    page(Res.string.mobile_settings_about, Res.string.mobile_settings_about_hint, Res.drawable.ic_info, MobileSettingsPage.About),
+                ),
+            )
         }
     }
 }
@@ -200,37 +248,32 @@ fun SettingsPageScreen(
 /** The app's theme: System (follows the device) and the five palettes, each previewed. */
 @Composable
 private fun AppearancePage(state: SettingsState, onEvent: (SettingsEvent) -> Unit) {
-    GroupLabel(stringResource(Res.string.mobile_settings_app_theme))
-    Group {
-        AppTheme.entries.forEach { theme ->
-            val palette = quireColors(theme)
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 64.dp)
-                    .clickable { onEvent(SettingsEvent.OnSetAppTheme(theme)) }
-                    .padding(horizontal = Dimens.SpaceMd),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceSm),
-            ) {
-                RadioButton(selected = theme == state.appTheme, onClick = { onEvent(SettingsEvent.OnSetAppTheme(theme)) })
-                Column(Modifier.weight(1f)) {
-                    Text(theme.title, style = MaterialTheme.typography.bodyLarge, color = QuireTheme.colors.fillPrimary)
-                    if (theme == AppTheme.System) {
-                        Text(stringResource(Res.string.mobile_settings_system_hint), style = MaterialTheme.typography.bodySmall, color = QuireTheme.colors.fillSecondary)
-                    }
-                }
-                // The palette: its background with its accent and text colours.
-                Row(
-                    Modifier.clip(CircleShape).background(palette.background).border(1.dp, QuireTheme.colors.paneDivider, CircleShape).padding(horizontal = 10.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Box(Modifier.size(12.dp).clip(CircleShape).background(palette.accent))
-                    Box(Modifier.size(12.dp).clip(CircleShape).background(palette.fillPrimary))
-                }
+    val systemHint = stringResource(Res.string.mobile_settings_system_hint)
+    SettingsGroup(
+        label = stringResource(Res.string.mobile_settings_app_theme),
+        rows = AppTheme.entries.map { theme ->
+            @Composable { shape: Shape ->
+                val palette = quireColors(theme)
+                SettingsItem(
+                    theme.title,
+                    shape,
+                    supporting = if (theme == AppTheme.System) systemHint else null,
+                    // The palette: its background with its accent and text colours.
+                    leading = {
+                        Row(
+                            Modifier.clip(CircleShape).background(palette.background).border(1.dp, QuireTheme.colors.paneDivider, CircleShape).padding(horizontal = 10.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Box(Modifier.size(12.dp).clip(CircleShape).background(palette.accent))
+                            Box(Modifier.size(12.dp).clip(CircleShape).background(palette.fillPrimary))
+                        }
+                    },
+                    onClick = { onEvent(SettingsEvent.OnSetAppTheme(theme)) },
+                    trailing = { RadioButton(selected = theme == state.appTheme, onClick = { onEvent(SettingsEvent.OnSetAppTheme(theme)) }) },
+                )
             }
-        }
-    }
+        },
+    )
 }
 
 /** How papers open: page colours, typeface, text size (the reader's Aa changes them per paper). */
@@ -291,9 +334,13 @@ private fun FieldsPage(state: SettingsState, onEvent: (SettingsEvent) -> Unit, e
         EmptyNote(emptyNote)
         return
     }
-    Group {
-        fields.forEach { field -> FieldRow(field, onEvent) }
-    }
+    SettingsGroup(
+        rows = fields.map { field ->
+            @Composable { shape: Shape ->
+                Box(Modifier.fillMaxWidth().clip(shape).background(QuireTheme.colors.cardBackground)) { FieldRow(field, onEvent) }
+            }
+        },
+    )
 }
 
 @Composable
@@ -303,11 +350,11 @@ private fun FieldRow(field: SettingField, onEvent: (SettingsEvent) -> Unit) {
     Column(Modifier.fillMaxWidth().padding(horizontal = Dimens.SpaceMd, vertical = Dimens.SpaceSm)) {
         when (field.kind) {
             SettingKind.Bool -> Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(label, style = MaterialTheme.typography.bodyLarge, color = colors.fillPrimary, modifier = Modifier.weight(1f))
+                Text(label, style = MaterialTheme.typography.titleMedium, color = colors.fillPrimary, modifier = Modifier.weight(1f))
                 Switch(checked = field.draft == "true", onCheckedChange = { onEvent(SettingsEvent.OnDraftChange(field.key, it.toString())) })
             }
             SettingKind.Choice -> {
-                Text(label, style = MaterialTheme.typography.bodyLarge, color = colors.fillPrimary)
+                Text(label, style = MaterialTheme.typography.titleMedium, color = colors.fillPrimary)
                 Spacer(Modifier.size(Dimens.SpaceXs))
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                     field.choices.forEachIndexed { i, choice ->
@@ -340,24 +387,6 @@ private fun FieldRow(field: SettingField, onEvent: (SettingsEvent) -> Unit) {
                     .onFocusChanged { if (!it.isFocused && field.isDirty) onEvent(SettingsEvent.OnApply(field.key)) },
             )
         }
-    }
-}
-
-/** A row opening a settings page: its name and what is in it. */
-@Composable
-private fun PageRow(title: StringResource, hint: StringResource, badge: String? = null, onClick: () -> Unit) {
-    val colors = QuireTheme.colors
-    Row(
-        Modifier.fillMaxWidth().heightIn(min = 64.dp).clickable(onClick = onClick).padding(horizontal = Dimens.SpaceMd, vertical = Dimens.SpaceXs),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(stringResource(title), style = MaterialTheme.typography.bodyLarge, color = colors.fillPrimary)
-            Text(stringResource(hint), style = MaterialTheme.typography.bodySmall, color = colors.fillSecondary)
-        }
-        badge?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = colors.accentRed) }
-        Spacer(Modifier.width(Dimens.SpaceXs))
-        Icon(painterResource(Res.drawable.ic_chevron_right), contentDescription = null, tint = colors.fillSecondary)
     }
 }
 
