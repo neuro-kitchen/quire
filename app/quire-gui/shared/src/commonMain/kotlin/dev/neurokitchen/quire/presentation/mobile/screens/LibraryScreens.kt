@@ -7,6 +7,7 @@ import dev.neurokitchen.quire.presentation.components.cite.CiteButton
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -83,6 +84,7 @@ import dev.neurokitchen.quire.resources.ic_description
 import dev.neurokitchen.quire.resources.ic_draft
 import dev.neurokitchen.quire.resources.ic_folder
 import dev.neurokitchen.quire.resources.ic_library_books
+import dev.neurokitchen.quire.resources.ic_quire_logo
 import dev.neurokitchen.quire.resources.ic_auto_fix_high
 import dev.neurokitchen.quire.resources.ic_sell
 import dev.neurokitchen.quire.resources.ic_tune
@@ -156,7 +158,19 @@ fun HomeTab(
             contentPadding = mobileContentPadding(topBar = false),
             verticalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
         ) {
-            item { LargeTitle("Quire", pluralStringResource(Res.plurals.mobile_items, state.totalCount, state.totalCount)) }
+            item {
+                LargeTitle(
+                    title = "Quire",
+                    subtitle = pluralStringResource(Res.plurals.mobile_items, state.totalCount, state.totalCount),
+                    icon = {
+                        Image(
+                            painter = painterResource(Res.drawable.ic_quire_logo),
+                            contentDescription = "Quire Logo",
+                            modifier = Modifier.size(36.dp),
+                        )
+                    },
+                )
+            }
             item {
                 DaysReadCard(
                     daysCount = state.daysCount,
@@ -535,11 +549,26 @@ internal fun ReferenceList(
 
 /** A tab's large title (Material's large top app bar, scrolling with the content). */
 @Composable
-internal fun LargeTitle(title: String, subtitle: String?) {
-    Column(Modifier.fillMaxWidth().padding(start = Dimens.SpaceLg, end = Dimens.SpaceLg, top = Dimens.SpaceLg, bottom = Dimens.SpaceXs)) {
-        Text(title, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, color = QuireTheme.colors.fillPrimary)
-        if (subtitle != null) {
-            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = QuireTheme.colors.fillSecondary)
+internal fun LargeTitle(
+    title: String,
+    subtitle: String?,
+    icon: (@Composable () -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = Dimens.SpaceLg, end = Dimens.SpaceLg, top = Dimens.SpaceLg, bottom = Dimens.SpaceXs),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(modifier = Modifier.weight(1f, fill = false)) {
+            Text(title, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, color = QuireTheme.colors.fillPrimary)
+            if (subtitle != null) {
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = QuireTheme.colors.fillSecondary)
+            }
+        }
+        if (icon != null) {
+            Box(modifier = Modifier.padding(start = Dimens.SpaceSm)) {
+                icon()
+            }
         }
     }
 }

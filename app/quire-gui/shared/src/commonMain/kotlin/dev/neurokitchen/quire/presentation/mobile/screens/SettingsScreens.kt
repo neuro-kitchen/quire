@@ -1,5 +1,6 @@
 package dev.neurokitchen.quire.presentation.mobile.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -61,6 +63,7 @@ import dev.neurokitchen.quire.presentation.screens.settings.SettingsViewModel
 import dev.neurokitchen.quire.resources.Res
 import dev.neurokitchen.quire.resources.destination_settings
 import dev.neurokitchen.quire.resources.ic_chevron_right
+import dev.neurokitchen.quire.resources.ic_quire_logo
 import dev.neurokitchen.quire.resources.mobile_settings_about
 import dev.neurokitchen.quire.resources.mobile_settings_about_hint
 import dev.neurokitchen.quire.resources.mobile_settings_account
@@ -147,8 +150,18 @@ fun SettingsPageScreen(
                 MobileSettingsPage.Sync -> Unit
                 MobileSettingsPage.About -> item {
                     Group {
-                        Column(Modifier.fillMaxWidth().padding(Dimens.SpaceMd)) {
-                            Text("Quire", style = MaterialTheme.typography.titleMedium, color = QuireTheme.colors.fillPrimary)
+                        Column(
+                            Modifier.fillMaxWidth().padding(Dimens.SpaceLg),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Image(
+                                painter = painterResource(Res.drawable.ic_quire_logo),
+                                contentDescription = "Quire Logo",
+                                modifier = Modifier.size(64.dp),
+                            )
+                            Spacer(Modifier.height(Dimens.SpaceMd))
+                            Text("Quire", style = MaterialTheme.typography.titleLarge, color = QuireTheme.colors.fillPrimary)
+                            Spacer(Modifier.height(Dimens.SpaceXs))
                             Text(stringResource(Res.string.mobile_settings_version, state.version), style = MaterialTheme.typography.bodyMedium, color = QuireTheme.colors.fillSecondary)
                         }
                     }
