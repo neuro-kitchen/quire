@@ -117,6 +117,8 @@ kotlin {
         commonMain.dependencies {
             // QR codes to link a device (`.tasks/T14-security.md`).
             implementation(libs.qrose)
+            // Dates in common code: java.time does not exist on iOS.
+            implementation(libs.kotlinx.datetime)
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
             implementation(libs.compose.ui)
