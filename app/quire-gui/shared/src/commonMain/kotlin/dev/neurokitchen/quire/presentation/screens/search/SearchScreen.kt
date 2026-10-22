@@ -47,7 +47,9 @@ import dev.neurokitchen.quire.presentation.screens.library.LibraryViewModel
 import dev.neurokitchen.quire.presentation.screens.library.components.LibrarySearchField
 import dev.neurokitchen.quire.presentation.screens.library.components.ReferenceDetailPane
 import dev.neurokitchen.quire.resources.Res
+import dev.neurokitchen.quire.resources.destination_search
 import dev.neurokitchen.quire.resources.ic_search
+import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -119,43 +121,22 @@ fun SearchScreen(
             .padding(horizontal = 20.dp)
             .padding(top = 12.dp),
     ) {
-        // Editorial Header
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        // Standardized Header matching Home, Library, and Settings
+        Column(
             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
         ) {
-            Column {
-                Text(
-                    text = buildAnnotatedString {
-                        withStyle(
-                            SpanStyle(
-                                fontWeight = FontWeight.Normal,
-                                color = colors.fillPrimary,
-                            ),
-                        ) {
-                            append("Quire ")
-                        }
-                        withStyle(
-                            SpanStyle(
-                                fontWeight = FontWeight.ExtraBold,
-                                color = colors.accent,
-                            ),
-                        ) {
-                            append("Search")
-                        }
-                    },
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontSize = 26.sp,
-                        letterSpacing = (-0.5).sp,
-                    ),
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = "Find papers by title, author, year, or identifier",
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
-                    color = colors.fillSecondary,
-                )
-            }
+            Text(
+                text = stringResource(Res.string.destination_search),
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
+                color = colors.fillPrimary,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = "Find papers by title, author, year, or identifier",
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.fillSecondary,
+            )
         }
 
         // Ergonomic Search Bar

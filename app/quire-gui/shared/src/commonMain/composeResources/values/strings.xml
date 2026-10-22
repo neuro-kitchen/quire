@@ -351,7 +351,7 @@
     <string name="tools_hub_last_seen">Last seen %1$s</string>
     <string name="tools_hub_no_devices">No device yet: sync with the hub first.</string>
     <string name="notifications">Notifications</string>
-    <string name="settings_header_hint">How quire looks, reads and syncs</string>
+    <string name="settings_header_hint">Preferences and library data</string>
     <string name="settings_hint_appearance">The app's colours, in every window</string>
     <string name="settings_hint_reader">How papers open: view, typeface, page colours</string>
     <string name="settings_hint_general">Your name and the email sent with lookups</string>

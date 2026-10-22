@@ -135,11 +135,12 @@ fun ReferenceCard(
 
                 if (showCiteKey) Spacer(Modifier.height(6.dp))
 
-                // Title
+                // Title: Editorial Serif Typography
                 Text(
                     text = state.title,
                     style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Serif,
+                        fontWeight = FontWeight.SemiBold,
                         fontSize = 15.sp,
                         lineHeight = 21.sp,
                     ),
