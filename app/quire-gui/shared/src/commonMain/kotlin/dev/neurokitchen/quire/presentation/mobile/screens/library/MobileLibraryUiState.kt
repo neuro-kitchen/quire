@@ -13,6 +13,7 @@ data class MobileLibraryUiState(
     val projectChoices: List<Pair<String, String>> = emptyList(),
     val isFolderSheetVisible: Boolean = false,
     val isCreateProjectDialogOpen: Boolean = false,
+    val isRefreshing: Boolean = false,
     val isLoading: Boolean = true,
     val error: String? = null,
     val actionSheetReference: ReferenceCardState? = null,
@@ -32,4 +33,5 @@ sealed interface MobileLibraryEvent {
     data object OnDismissDeleteDialog : MobileLibraryEvent
     data object OnConfirmDelete : MobileLibraryEvent
     data class OnDownloadPdf(val id: String) : MobileLibraryEvent
+    data object OnRefresh : MobileLibraryEvent
 }

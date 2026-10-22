@@ -172,7 +172,12 @@ private fun Header(
 ) {
     val colors = QuireTheme.colors
     Column(Modifier.fillMaxWidth().padding(horizontal = Dimens.SpaceLg), verticalArrangement = Arrangement.spacedBy(Dimens.SpaceXs)) {
-        Text(reference.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, color = colors.fillPrimary)
+        Text(
+            reference.title,
+            style = MaterialTheme.typography.headlineSmall.copy(fontFamily = FontFamily.Serif),
+            fontWeight = FontWeight.SemiBold,
+            color = colors.fillPrimary,
+        )
         val authors = reference.authors.joinToString("; ").ifBlank { reference.creator }
         if (authors.isNotBlank()) Text(authors, style = MaterialTheme.typography.bodyMedium, color = colors.fillSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis)
         Text(reference.year, style = MaterialTheme.typography.bodyMedium, color = colors.fillSecondary)

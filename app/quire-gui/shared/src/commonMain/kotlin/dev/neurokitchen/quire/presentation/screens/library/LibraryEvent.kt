@@ -55,6 +55,7 @@ sealed interface LibraryEvent {
     data object OnPageOpened : LibraryEvent
     data object OnRefetch : LibraryEvent
     data object OnRestore : LibraryEvent
+    data class OnRestoreId(val id: String) : LibraryEvent
     data class OnDeleteReference(val id: String) : LibraryEvent
     data object OnDeleteSelected : LibraryEvent
     data class OnBatchSetReadingStatus(val ids: Set<String>, val status: dev.neurokitchen.quire.domain.model.ReadingStatus) : LibraryEvent

@@ -1,5 +1,9 @@
 package dev.neurokitchen.quire.presentation.mobile.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.NavigationRailItemDefaults
@@ -66,6 +70,9 @@ val LocalMobileChrome = compositionLocalOf<MobileChrome> { error("no MobileChrom
 /** Height of Material 3 Expressive's short navigation bar, without the system navigation bar. */
 val ShortBarHeight = 64.dp
 
+/** Height of minimized landscape navigation bar, matching YouTube-style compact navigation. */
+val MinimizedBarHeight = 44.dp
+
 /** Height of [MobileTopBar], without the status bar. */
 val TopBarHeight = 56.dp
 
@@ -82,10 +89,13 @@ fun mobileContentPadding(topBar: Boolean = true, extraBottom: Dp = Dimens.SpaceM
 
 /** The bottom bar's space: the bar and the system navigation bar under it. */
 @Composable
-fun bottomBarSpace(): Dp = ShortBarHeight + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+fun bottomBarSpace(isLandscape: Boolean = false): Dp =
+    (if (isLandscape) MinimizedBarHeight else ShortBarHeight) +
+        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
 /**
- * The tabs, as Material 3 Expressive's short navigation bar, frosted: the content scrolls under
+ * The tabs, as Material 3 Expressive's short navigation bar (in portrait) or
+ * YouTube-style minimized bar (in landscape), frosted: the content scrolls under
  * it and shows blurred through it (Haze).
  */
 @Composable
@@ -94,27 +104,68 @@ fun MobileNavigationBar(
     onSelect: (Tab) -> Unit,
     haze: HazeState,
     modifier: Modifier = Modifier,
+    isLandscape: Boolean = false,
 ) {
     val colors = QuireTheme.colors
-    ShortNavigationBar(
-        modifier = modifier.hazeBlur(HazeInput.Sources(haze), HazeMaterials.thin(colors.background)),
-        containerColor = Color.Transparent,
-    ) {
-        Tab.entries.forEach { tab ->
-            val label = stringResource(tab.label())
-            ShortNavigationBarItem(
-                selected = tab == current,
-                onClick = { onSelect(tab) },
-                icon = { Icon(painterResource(tab.icon()), contentDescription = null) },
-                label = { Text(label) },
-                colors = ShortNavigationBarItemDefaults.colors(
-                    selectedIconColor = colors.accent,
-                    selectedTextColor = colors.fillPrimary,
-                    selectedIndicatorColor = colors.accent.copy(alpha = 0.16f),
-                    unselectedIconColor = colors.fillSecondary,
-                    unselectedTextColor = colors.fillSecondary,
-                ),
-            )
+    val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+
+    if (isLandscape) {
+        // Minimized YouTube-style landscape bar: ultra-compact 44dp height, icon-centric
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .height(MinimizedBarHeight + navBarBottom)
+                .hazeBlur(HazeInput.Sources(haze), HazeMaterials.thin(colors.background))
+                .padding(bottom = navBarBottom),
+            contentAlignment = Alignment.Center,
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(MinimizedBarHeight),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Tab.entries.forEach { tab ->
+                    val isSelected = tab == current
+                    Box(
+                        modifier = Modifier
+                            .height(34.dp)
+                            .clip(RoundedCornerShape(Dimens.RadiusFull))
+                            .background(if (isSelected) colors.accent.copy(alpha = 0.16f) else Color.Transparent)
+                            .clickable { onSelect(tab) }
+                            .padding(horizontal = 24.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            painter = painterResource(tab.icon()),
+                            contentDescription = stringResource(tab.label()),
+                            tint = if (isSelected) colors.accent else colors.fillSecondary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
+        }
+    } else {
+        ShortNavigationBar(
+            modifier = modifier.hazeBlur(HazeInput.Sources(haze), HazeMaterials.thin(colors.background)),
+            containerColor = Color.Transparent,
+        ) {
+            Tab.entries.forEach { tab ->
+                val label = stringResource(tab.label())
+                ShortNavigationBarItem(
+                    selected = tab == current,
+                    onClick = { onSelect(tab) },
+                    icon = { Icon(painterResource(tab.icon()), contentDescription = null) },
+                    label = { Text(label) },
+                    colors = ShortNavigationBarItemDefaults.colors(
+                        selectedIconColor = colors.accent,
+                        selectedTextColor = colors.fillPrimary,
+                        selectedIndicatorColor = colors.accent.copy(alpha = 0.16f),
+                        unselectedIconColor = colors.fillSecondary,
+                        unselectedTextColor = colors.fillSecondary,
+                    ),
+                )
+            }
         }
     }
 }
