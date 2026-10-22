@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+  <!--
+    Quire Brand Mark - Standalone Vector (Transparent Background)
+    Option 1: Left Crescent + Integrated Right Feather Q
+  -->
+  <defs>
+    <!-- Left Crescent Gradient (Deep Indigo to Electric Violet) -->
+    <linearGradient id="mark-crescent-grad" x1="20%" y1="0%" x2="60%" y2="100%">
+      <stop offset="0%" stop-color="#7C3AED" />
+      <stop offset="40%" stop-color="#6366F1" />
+      <stop offset="80%" stop-color="#4F46E5" />
+      <stop offset="100%" stop-color="#3730A3" />
+    </linearGradient>
+
+    <!-- Feather Spine Gradient -->
+    <linearGradient id="mark-spine-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818CF8" />
+      <stop offset="45%" stop-color="#6366F1" />
+      <stop offset="85%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#0284C7" />
+    </linearGradient>
+
+    <!-- Feather Outer Vanes Gradient (Cyan to Violet) -->
+    <linearGradient id="mark-vane-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#A78BFA" />
+      <stop offset="35%" stop-color="#818CF8" />
+      <stop offset="70%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#06B6D4" />
+    </linearGradient>
+
+    <!-- Feather Inner Barbs Gradient -->
+    <linearGradient id="mark-inner-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6" />
+      <stop offset="60%" stop-color="#6366F1" />
+      <stop offset="100%" stop-color="#3B82F6" />
+    </linearGradient>
+
+    <!-- Q Tail Gradient -->
+    <linearGradient id="mark-tail-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366F1" />
+      <stop offset="50%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#22D3EE" />
+    </linearGradient>
+  </defs>
+
+  <g id="quire-brand-mark" transform="translate(6, 2)">
+    <!-- LAYER 1: Left Circular Crescent -->
+    <path id="left-crescent"
+          d="M 238 90 
+             C 152 90, 84 158, 84 244 
+             C 84 330, 152 398, 238 398 
+             C 252 398, 268 395, 282 388 
+             L 266 342 
+             C 257 346, 248 348, 238 348 
+             C 180 348, 134 302, 134 244 
+             C 134 186, 180 140, 238 140 
+             C 250 140, 264 143, 276 149 
+             L 290 102 
+             C 273 94, 256 90, 238 90 Z"
+          fill="url(#mark-crescent-grad)" />
+
+    <!-- LAYER 2: Right Half - Feather Vanes -->
+    <g id="feather-outer-vanes" fill="url(#mark-vane-grad)">
+      <!-- Vane 1: Upper right barb -->
+      <path d="M 298 106 
+               C 342 128, 376 166, 390 204 
+               L 348 214 
+               C 338 188, 314 160, 284 146 
+               Z" />
+
+      <!-- Vane 2: Middle right barb -->
+      <path d="M 396 214 
+               C 404 242, 404 274, 392 304 
+               L 352 292 
+               C 360 270, 362 246, 354 224 
+               Z" />
+
+      <!-- Vane 3: Lower right barb -->
+      <path d="M 390 314 
+               C 376 346, 352 372, 318 390 
+               L 288 350 
+               C 312 336, 332 316, 344 294 
+               Z" />
+    </g>
+
+    <!-- LAYER 3: Inner Feather Barbs -->
+    <g id="feather-inner-barbs" fill="url(#mark-inner-grad)">
+      <path d="M 306 172 
+               C 328 196, 338 226, 336 256 
+               L 302 248 
+               C 304 228, 298 208, 284 192 
+               Z" />
+
+      <path d="M 334 266 
+               C 330 292, 316 316, 294 334 
+               L 272 304 
+               C 284 292, 294 278, 298 260 
+               Z" />
+    </g>
+
+    <!-- LAYER 4: The Feather Spine / Shaft -->
+    <path id="feather-spine"
+          d="M 278 100 
+             C 350 144, 376 226, 342 322 
+             L 418 408"
+          stroke="url(#mark-spine-grad)"
+          stroke-width="5"
+          stroke-linecap="round" />
+
+    <!-- LAYER 5: The "Q" Tail -->
+    <g id="q-tail">
+      <path d="M 334 326 
+               L 416 408 
+               C 426 418, 424 430, 412 436 
+               C 400 442, 388 436, 378 426 
+               L 300 348 
+               C 312 342, 324 334, 334 326 Z" 
+            fill="url(#mark-tail-grad)" />
+
+      <!-- Plume accent on tail tip -->
+      <path d="M 374 366 
+               L 444 436 
+               C 452 444, 450 454, 440 458 
+               C 432 460, 424 456, 418 448 
+               L 354 388 
+               Z" 
+            fill="#38BDF8" 
+            opacity="0.9" />
+
+      <!-- Spine tip highlight -->
+      <path d="M 348 338 L 428 420" 
+            stroke="#FFFFFF" 
+            stroke-width="2.5" 
+            stroke-linecap="round" 
+            opacity="0.9" />
+    </g>
+  </g>
+</svg>
