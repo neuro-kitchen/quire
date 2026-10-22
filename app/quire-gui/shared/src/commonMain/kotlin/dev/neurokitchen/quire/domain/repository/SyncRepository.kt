@@ -4,6 +4,7 @@ import dev.neurokitchen.quire.domain.model.HubDevice
 import dev.neurokitchen.quire.domain.model.HubLink
 import dev.neurokitchen.quire.domain.model.LinkJoin
 import dev.neurokitchen.quire.domain.model.LinkOffer
+import dev.neurokitchen.quire.domain.model.UnlinkResult
 import dev.neurokitchen.quire.domain.model.HubReport
 import dev.neurokitchen.quire.domain.model.ProjectMember
 import dev.neurokitchen.quire.domain.model.SyncReport
@@ -34,8 +35,8 @@ interface SyncRepository {
     suspend fun syncWithHub(code: String? = null): HubReport = unsupported()
     /** This person's devices the hub knows. */
     suspend fun hubDevices(): List<HubDevice> = unsupported()
-    /** Makes the hub refuse [device] of this person from now on (a lost phone). */
-    suspend fun revokeHubDevice(device: String): Unit = unsupported()
+    /** Unlinks [device]: the hub refuses it and the library key rotates (it cannot read new data). */
+    suspend fun unlinkHubDevice(device: String): UnlinkResult = unsupported()
     /** What to keep safe before syncing through a hub (it cannot recover the library). */
     suspend fun recoveryKit(): String = unsupported()
 }

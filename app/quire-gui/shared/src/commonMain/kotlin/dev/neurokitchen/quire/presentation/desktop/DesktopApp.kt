@@ -24,6 +24,7 @@ import androidx.compose.ui.input.key.type
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.neurokitchen.quire.presentation.designsystem.QuireTheme
 import dev.neurokitchen.quire.presentation.desktop.components.TabBar
+import dev.neurokitchen.quire.presentation.screens.notifications.components.NotificationsBell
 import dev.neurokitchen.quire.presentation.screens.library.LibraryRoute
 import dev.neurokitchen.quire.presentation.screens.reader.ReaderRoute
 import dev.neurokitchen.quire.presentation.screens.settings.SettingsRoute
@@ -72,6 +73,7 @@ fun DesktopApp(
                         onCommandPaletteClick = { viewModel.onEvent(DesktopEvent.OnToggleCommandPalette(true)) },
                         onCitationGraphClick = { viewModel.onEvent(DesktopEvent.OnToggleCitationGraph(true)) },
                         onSetTheme = { viewModel.onEvent(DesktopEvent.OnSetAppTheme(it)) },
+                        trailing = { NotificationsBell() },
                     )
                     HorizontalDivider(color = QuireTheme.colors.paneDivider)
                     val paper = state.papers.firstOrNull { it.id == state.selected }

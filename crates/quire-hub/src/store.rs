@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use quire_sync::hub::protocol::{Batch, BatchKind, Batches, DeviceInfo, ErrorCode};
+use quire_sync::hub::protocol::{Batch, BatchKind, Batches, DeviceInfo, ErrorCode, KeyEnvelope, Keys};
 use rusqlite::{Connection, OptionalExtension, params};
 
 /// A refusal to report to the device, or a failure of the hub itself.
@@ -78,6 +78,40 @@ CREATE TABLE IF NOT EXISTS device (
     last_seen INTEGER NOT NULL,
     revoked INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS device_activity (
+    device TEXT PRIMARY KEY REFERENCES device(device),
+    sealed_name BLOB,
+    last_session INTEGER NOT NULL,
+    batches_in INTEGER NOT NULL,
+    batches_out INTEGER NOT NULL,
+    files_in INTEGER NOT NULL,
+    files_out INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS device_box (
+    account INTEGER NOT NULL,
+    device TEXT PRIMARY KEY,
+    box_key BLOB NOT NULL,
+    box_signature BLOB NOT NULL
+);
+CREATE TABLE IF NOT EXISTS device_author (
+    account INTEGER NOT NULL,
+    device TEXT NOT NULL,
+    author TEXT NOT NULL,
+    PRIMARY KEY (device, author)
+);
+CREATE TABLE IF NOT EXISTS expected_device (
+    account INTEGER NOT NULL,
+    device TEXT PRIMARY KEY,
+    expires INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS key_envelope (
+    account INTEGER NOT NULL,
+    library TEXT NOT NULL,
+    epoch INTEGER NOT NULL,
+    device TEXT NOT NULL,
+    sealed BLOB NOT NULL,
+    PRIMARY KEY (account, library, epoch, device)
+);
 CREATE TABLE IF NOT EXISTS code (
     code TEXT PRIMARY KEY,
     purpose TEXT NOT NULL,
@@ -126,6 +160,29 @@ CREATE TABLE IF NOT EXISTS file (
 );
 ";
 
+/// Columns added after the first schema, to hubs that started before them.
+fn migrate(conn: &Connection) -> Result<()> {
+    for table in ["batch", "snapshot"] {
+        let has: bool = conn.query_row(
+            &format!("SELECT EXISTS (SELECT 1 FROM pragma_table_info('{table}') WHERE name = 'epoch')"),
+            [],
+            |r| r.get(0),
+        )?;
+        if !has {
+            conn.execute(&format!("ALTER TABLE {table} ADD COLUMN epoch INTEGER NOT NULL DEFAULT 0"), [])?;
+        }
+    }
+    Ok(())
+}
+
+/// How long an introduction lets a new device in (linking takes a minute or two).
+const INTRODUCTION: Duration = Duration::from_secs(10 * 60);
+
+/// Largest sealed device name kept (a name of 64 characters, sealed, is far below it).
+const MAX_SEALED_NAME: usize = 512;
+/// Largest key envelope (a chain of a thousand rotations is about 36 KB).
+const MAX_ENVELOPE: usize = 64 * 1024;
+
 /// Letters of codes: no 0/O, 1/I/L (read aloud or typed from a phone).
 const CODE_ALPHABET: &[u8] = b"23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 
@@ -139,6 +196,7 @@ impl Store {
         conn.pragma_update(None, "foreign_keys", "ON")?;
         conn.busy_timeout(Duration::from_secs(5))?;
         conn.execute_batch(SCHEMA)?;
+        migrate(&conn)?;
         Ok(Self { conn: Mutex::new(conn), files: dir.join("files") })
     }
 
@@ -251,45 +309,216 @@ impl Store {
 
     /// Notes that `device` (a network ID) of `account` is connecting; refused if it was revoked or
     /// belongs to another account.
-    pub fn see_device(&self, account: i64, device: &str) -> Result<()> {
+    /// Notes `device` of `account` as seen. A device the hub does not know yet is let in only if
+    /// it brought a code in this session (`admitted`) or one of the person's devices introduced it
+    /// ([`Store::introduce`]); an introduction also lets an unlinked device back in.
+    pub fn see_device(&self, account: i64, device: &str, admitted: bool) -> Result<()> {
         let now = now();
         self.with(|c| {
-            let found: Option<(i64, bool)> = c
+            let tx = c.transaction()?;
+            let found: Option<(i64, bool)> = tx
                 .query_row("SELECT account, revoked FROM device WHERE device = ?1", [device], |r| {
                     Ok((r.get(0)?, r.get(1)?))
                 })
                 .optional()?;
+            let introduced = tx.execute(
+                "DELETE FROM expected_device WHERE device = ?1 AND account = ?2 AND expires >= ?3",
+                params![device, account, now],
+            )? > 0;
             match found {
-                Some((_, true)) => {
-                    Err(HubError::refused(ErrorCode::Revoked, "this device was removed from your account"))
+                Some((owner, _)) if owner != account => {
+                    return Err(HubError::refused(ErrorCode::Revoked, "this device belongs to another account"));
                 }
-                Some((owner, false)) if owner != account => {
-                    Err(HubError::refused(ErrorCode::Revoked, "this device belongs to another account"))
+                Some((_, true)) if !introduced => {
+                    return Err(HubError::refused(ErrorCode::Revoked, "this device was removed from your account"));
                 }
                 Some(_) => {
-                    c.execute("UPDATE device SET last_seen = ?1 WHERE device = ?2", params![now, device])?;
-                    Ok(())
+                    tx.execute(
+                        "UPDATE device SET last_seen = ?1, revoked = 0 WHERE device = ?2",
+                        params![now, device],
+                    )?;
                 }
-                None => {
-                    c.execute(
+                None if admitted || introduced => {
+                    tx.execute(
                         "INSERT INTO device (device, account, first_seen, last_seen) VALUES (?1, ?2, ?3, ?3)",
                         params![device, account, now],
                     )?;
-                    Ok(())
+                }
+                None => {
+                    return Err(HubError::refused(
+                        ErrorCode::NotIntroduced,
+                        "this device is new to your hub: link it from one of your devices (Link a Device)",
+                    ));
                 }
             }
+            tx.commit()?;
+            Ok(())
+        })
+    }
+
+    /// Lets `device` in for a while as one of `account`'s (one of its devices is linking it).
+    pub fn introduce(&self, account: i64, device: &str) -> Result<()> {
+        let expires = now() + i64::try_from(INTRODUCTION.as_millis()).unwrap_or(i64::MAX);
+        self.with(|c| {
+            let owner: Option<i64> =
+                c.query_row("SELECT account FROM device WHERE device = ?1", [device], |r| r.get(0)).optional()?;
+            if owner.is_some_and(|o| o != account) {
+                return Err(HubError::refused(ErrorCode::Protocol, "that device belongs to another account"));
+            }
+            c.execute(
+                "INSERT INTO expected_device (account, device, expires) VALUES (?1, ?2, ?3)
+                 ON CONFLICT (device) DO UPDATE SET account = excluded.account, expires = excluded.expires",
+                params![account, device, expires],
+            )?;
+            Ok(())
+        })
+    }
+
+    /// Notes that `device` syncs the library copy `author` (the device list then says whose changes
+    /// are whose).
+    pub fn note_author(&self, account: i64, device: &str, author: &str) -> Result<()> {
+        self.with(|c| {
+            c.execute(
+                "INSERT OR IGNORE INTO device_author (account, device, author) VALUES (?1, ?2, ?3)",
+                params![account, device, author],
+            )?;
+            Ok(())
+        })
+    }
+
+    /// Keeps `device`'s box key (its signature by the device key was checked).
+    pub fn set_box_key(&self, account: i64, device: &str, key: &[u8], signature: &[u8]) -> Result<()> {
+        self.with(|c| {
+            c.execute(
+                "INSERT INTO device_box (account, device, box_key, box_signature) VALUES (?1, ?2, ?3, ?4)
+                 ON CONFLICT (device) DO UPDATE SET box_key = excluded.box_key, box_signature = excluded.box_signature",
+                params![account, device, key, signature],
+            )?;
+            Ok(())
+        })
+    }
+
+    /// The library's newest key epoch (0: never rotated).
+    pub fn key_epoch(&self, account: i64, library: &str) -> Result<u32> {
+        self.with(|c| {
+            let epoch: i64 = c.query_row(
+                "SELECT COALESCE(MAX(epoch), 0) FROM key_envelope WHERE account = ?1 AND library = ?2",
+                params![account, library],
+                |r| r.get(0),
+            )?;
+            Ok(u32::try_from(epoch).unwrap_or(0))
+        })
+    }
+
+    /// Stores the envelopes of the library's next epoch; refused unless `epoch` is the newest plus
+    /// one (another device rotated first: it takes those keys and tries again), or for a device that
+    /// is not one of `account`'s, or revoked.
+    pub fn put_keys(&self, account: i64, library: &str, epoch: u32, envelopes: &[KeyEnvelope]) -> Result<()> {
+        self.with(|c| {
+            let tx = c.transaction()?;
+            let newest: i64 = tx.query_row(
+                "SELECT COALESCE(MAX(epoch), 0) FROM key_envelope WHERE account = ?1 AND library = ?2",
+                params![account, library],
+                |r| r.get(0),
+            )?;
+            if i64::from(epoch) != newest + 1 {
+                return Err(HubError::refused(ErrorCode::StaleEpoch, "another device rotated the key first"));
+            }
+            for envelope in envelopes {
+                let ours: bool = tx.query_row(
+                    "SELECT EXISTS (SELECT 1 FROM device WHERE device = ?1 AND account = ?2 AND revoked = 0)",
+                    params![envelope.device, account],
+                    |r| r.get(0),
+                )?;
+                if !ours || envelope.sealed.len() > MAX_ENVELOPE {
+                    return Err(HubError::refused(ErrorCode::Protocol, "keys for a device that is not one of yours"));
+                }
+                tx.execute(
+                    "INSERT INTO key_envelope (account, library, epoch, device, sealed) VALUES (?1, ?2, ?3, ?4, ?5)",
+                    params![account, library, epoch, envelope.device, envelope.sealed],
+                )?;
+            }
+            tx.commit()?;
+            Ok(())
+        })
+    }
+
+    /// `device`'s envelope of the library's newest epoch (empty if there is none for it).
+    pub fn keys_for(&self, account: i64, library: &str, device: &str) -> Result<Keys> {
+        let epoch = self.key_epoch(account, library)?;
+        self.with(|c| {
+            let sealed: Option<Vec<u8>> = c
+                .query_row(
+                    "SELECT sealed FROM key_envelope WHERE account = ?1 AND library = ?2 AND epoch = ?3 AND device = ?4",
+                    params![account, library, epoch, device],
+                    |r| r.get(0),
+                )
+                .optional()?;
+            Ok(Keys { epoch, sealed: sealed.unwrap_or_default() })
+        })
+    }
+
+    /// Records a finished session of `account`'s `device`: what it moved and, if it sent one, its
+    /// sealed name (kept from earlier sessions otherwise). Counts and sizes only, never content.
+    pub fn record_session(&self, account: i64, device: &str, sealed_name: &[u8], moved: [usize; 4]) -> Result<()> {
+        let [batches_in, batches_out, files_in, files_out] = moved.map(|n| i64::try_from(n).unwrap_or(i64::MAX));
+        let name = (!sealed_name.is_empty() && sealed_name.len() <= MAX_SEALED_NAME).then_some(sealed_name);
+        self.with(|c| {
+            // Only a device of this account (one that a session just saw).
+            let known: bool = c.query_row(
+                "SELECT EXISTS (SELECT 1 FROM device WHERE device = ?1 AND account = ?2)",
+                params![device, account],
+                |r| r.get(0),
+            )?;
+            if known {
+                c.execute(
+                    "INSERT INTO device_activity (device, sealed_name, last_session, batches_in, batches_out, files_in, files_out)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                     ON CONFLICT (device) DO UPDATE SET sealed_name = COALESCE(excluded.sealed_name, sealed_name),
+                        last_session = excluded.last_session, batches_in = excluded.batches_in,
+                        batches_out = excluded.batches_out, files_in = excluded.files_in, files_out = excluded.files_out",
+                    params![device, name, now(), batches_in, batches_out, files_in, files_out],
+                )?;
+            }
+            Ok(())
         })
     }
 
     pub fn devices(&self, account: i64) -> Result<Vec<DeviceInfo>> {
         self.with(|c| {
             let mut statement = c.prepare(
-                "SELECT device, first_seen, last_seen, revoked FROM device WHERE account = ?1 ORDER BY first_seen",
+                "SELECT d.device, d.first_seen, d.last_seen, d.revoked, a.sealed_name, a.last_session,
+                        a.batches_in, a.batches_out, a.files_in, a.files_out, b.box_key, b.box_signature
+                 FROM device d LEFT JOIN device_activity a ON a.device = d.device
+                      LEFT JOIN device_box b ON b.device = d.device
+                 WHERE d.account = ?1 ORDER BY d.first_seen",
             )?;
+            let count = |r: &rusqlite::Row<'_>, i: usize| -> rusqlite::Result<u32> {
+                Ok(u32::try_from(r.get::<_, Option<i64>>(i)?.unwrap_or(0)).unwrap_or(u32::MAX))
+            };
             let rows = statement.query_map([account], |r| {
-                Ok(DeviceInfo { device: r.get(0)?, first_seen: r.get(1)?, last_seen: r.get(2)?, revoked: r.get(3)? })
+                Ok(DeviceInfo {
+                    device: r.get(0)?,
+                    first_seen: r.get(1)?,
+                    last_seen: r.get(2)?,
+                    revoked: r.get(3)?,
+                    sealed_name: r.get::<_, Option<Vec<u8>>>(4)?.unwrap_or_default(),
+                    last_session: r.get::<_, Option<i64>>(5)?.unwrap_or(0),
+                    batches_in: count(r, 6)?,
+                    batches_out: count(r, 7)?,
+                    files_in: count(r, 8)?,
+                    files_out: count(r, 9)?,
+                    box_key: r.get::<_, Option<Vec<u8>>>(10)?.unwrap_or_default(),
+                    box_signature: r.get::<_, Option<Vec<u8>>>(11)?.unwrap_or_default(),
+                    authors: Vec::new(),
+                })
             })?;
-            Ok(rows.collect::<rusqlite::Result<_>>()?)
+            let mut devices: Vec<DeviceInfo> = rows.collect::<rusqlite::Result<_>>()?;
+            let mut authors = c.prepare("SELECT author FROM device_author WHERE device = ?1 ORDER BY author")?;
+            for device in &mut devices {
+                device.authors = authors.query_map([&device.device], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?;
+            }
+            Ok(devices)
         })
     }
 
@@ -377,8 +606,8 @@ impl Store {
                     }
                     let next = seq + 1;
                     tx.execute(
-                        "INSERT INTO batch (account, library, seq, author, number, sealed) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                        params![account, library, next, author, number, batch.sealed],
+                        "INSERT INTO batch (account, library, seq, author, number, sealed, epoch) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                        params![account, library, next, author, number, batch.sealed, batch.epoch],
                     )?;
                     tx.execute(
                         "INSERT INTO author (account, library, author, last_number) VALUES (?1, ?2, ?3, ?4)
@@ -405,8 +634,8 @@ impl Store {
                         return Ok(seq as u64);
                     }
                     tx.execute(
-                        "INSERT OR REPLACE INTO snapshot (account, library, covers, author, number, sealed) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                        params![account, library, covers, author, batch.number as i64, batch.sealed],
+                        "INSERT OR REPLACE INTO snapshot (account, library, covers, author, number, sealed, epoch) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                        params![account, library, covers, author, batch.number as i64, batch.sealed, batch.epoch],
                     )?;
                     tx.execute("DELETE FROM batch WHERE account = ?1 AND library = ?2 AND seq <= ?3", params![account, library, covers])?;
                     tx.commit()?;
@@ -424,7 +653,7 @@ impl Store {
             let mut batches = Vec::new();
             let snapshot: Option<Batch> = c
                 .query_row(
-                    "SELECT covers, author, number, sealed FROM snapshot WHERE account = ?1 AND library = ?2",
+                    "SELECT covers, author, number, sealed, epoch FROM snapshot WHERE account = ?1 AND library = ?2",
                     params![account, library],
                     |r| {
                         let covers: i64 = r.get(0)?;
@@ -435,6 +664,7 @@ impl Store {
                             sealed: r.get(3)?,
                             covers: covers as u64,
                             seq: covers as u64,
+                            epoch: r.get(4)?,
                         })
                     },
                 )
@@ -445,7 +675,7 @@ impl Store {
             }
             let limit = i64::from(limit.clamp(1, 1000));
             let mut statement = c.prepare(
-                "SELECT seq, author, number, sealed FROM batch WHERE account = ?1 AND library = ?2 AND seq > ?3 ORDER BY seq LIMIT ?4",
+                "SELECT seq, author, number, sealed, epoch FROM batch WHERE account = ?1 AND library = ?2 AND seq > ?3 ORDER BY seq LIMIT ?4",
             )?;
             let rows: Vec<Batch> = statement
                 .query_map(params![account, library, after, limit], |r| {
@@ -456,6 +686,7 @@ impl Store {
                         kind: BatchKind::Changes as i32,
                         sealed: r.get(3)?,
                         covers: 0,
+                        epoch: r.get(4)?,
                     })
                 })?
                 .collect::<rusqlite::Result<_>>()?;
@@ -540,7 +771,23 @@ impl Store {
     pub fn delete_account(&self, account: i64) -> Result<()> {
         self.with(|c| {
             let tx = c.transaction()?;
-            for table in ["batch", "snapshot", "author", "library", "file", "device", "code"] {
+            tx.execute(
+                "DELETE FROM device_activity WHERE device IN (SELECT device FROM device WHERE account = ?1)",
+                [account],
+            )?;
+            for table in [
+                "batch",
+                "snapshot",
+                "author",
+                "library",
+                "file",
+                "device_box",
+                "device_author",
+                "expected_device",
+                "key_envelope",
+                "device",
+                "code",
+            ] {
                 tx.execute(&format!("DELETE FROM {table} WHERE account = ?1"), [account])?;
             }
             tx.execute("DELETE FROM account WHERE id = ?1", [account])?;

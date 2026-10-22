@@ -35,6 +35,11 @@ pub struct Summary {
     pub batches_out: usize,
     pub files_in: usize,
     pub files_out: usize,
+    /// The device, once it said `Hello` with an account here, and the name it sent, sealed.
+    pub device: Option<String>,
+    /// It synced (pulled) in this session: only then is the session its "last sync".
+    pub synced: bool,
+    pub sealed_name: Vec<u8>,
     /// The device ended the session (`Bye`, or it closed its side); `false`: the hub ended it (a
     /// refusal that stops the session, or silence), and the device may still be reading its reply.
     pub ended_by_device: bool,
@@ -47,11 +52,37 @@ struct Caller {
     library: String,
     author: String,
     account: Option<Account>,
+    /// Its box key and signature, checked against its device key (`None`: none sent, or forged).
+    box_key: Option<(Vec<u8>, Vec<u8>)>,
+    /// It used a code in this session (a new device is then let in without an introduction).
+    admitted: bool,
 }
 
 /// Serves one session; `authenticated` is the device's network ID from the connection (`None`
 /// over a pipe in tests: the certificate is then checked for its own device).
 pub async fn serve<Rd, Wr>(
+    store: &Arc<Store>,
+    settings: &Settings,
+    authenticated: Option<&str>,
+    reader: &mut Rd,
+    writer: &mut Wr,
+) -> Result<Summary, HubError>
+where
+    Rd: AsyncRead + Unpin,
+    Wr: AsyncWrite + Unpin,
+{
+    let summary = serve_session(store, settings, authenticated, reader, writer).await?;
+    // For the person's device list: when each device last synced and what it moved.
+    if let (Some(account), Some(device), true) = (summary.account, &summary.device, summary.synced) {
+        let moved = [summary.batches_in, summary.batches_out, summary.files_in, summary.files_out];
+        if let Err(error) = store.record_session(account, device, &summary.sealed_name, moved) {
+            tracing::warn!(%error, "could not record the session");
+        }
+    }
+    Ok(summary)
+}
+
+async fn serve_session<Rd, Wr>(
     store: &Arc<Store>,
     settings: &Settings,
     authenticated: Option<&str>,
@@ -120,8 +151,15 @@ where
     Wr: AsyncWrite + Unpin,
 {
     if let RequestBody::Hello(hello) = body {
+        let sealed_name = hello.sealed_name.clone();
         let mut next = greet(store, authenticated, hello).await?;
+        if !sealed_name.is_empty() {
+            summary.sealed_name = sealed_name;
+        }
         let welcome = welcome(store, &mut next).await?;
+        if next.account.is_some() {
+            summary.device = Some(next.device.clone());
+        }
         *caller = Some(next);
         return Ok(Some(welcome));
     }
@@ -130,8 +168,14 @@ where
     };
     if let RequestBody::Register(register) = body {
         let (user, code, quota) = (who.user.clone(), register.code, settings.quota);
+        // A code admits a new device only if it was used now: a person already known registers
+        // again without one being taken, and a device with only their key is not let in that way.
+        let known = who.account.is_some();
         let account = blocking(store, move |s| s.register(&user, &code, quota)).await?;
-        tracing::info!(account = account.id, "a person registered");
+        if !known {
+            tracing::info!(account = account.id, "a person registered");
+            who.admitted = true;
+        }
         who.account = Some(account);
         return Ok(Some(welcome(store, who).await?));
     }
@@ -158,6 +202,7 @@ where
             let (library, author) = (who.library.clone(), who.author.clone());
             let batches = blocking(store, move |s| s.pull(id, &library, &author, pull.after, pull.limit)).await?;
             summary.batches_out += batches.batches.len();
+            summary.synced = true;
             ReplyBody::Batches(batches)
         }
         RequestBody::HasFiles(FileIds { ids }) => {
@@ -216,6 +261,20 @@ where
             }
             ReplyBody::Ok(protocol::Empty {})
         }
+        RequestBody::Introduce(introduce) => {
+            blocking(store, move |s| s.introduce(id, &introduce.device)).await?;
+            ReplyBody::Ok(protocol::Empty {})
+        }
+        RequestBody::PutKeys(put) => {
+            let library = who.library.clone();
+            blocking(store, move |s| s.put_keys(id, &library, put.epoch, &put.envelopes)).await?;
+            tracing::info!(account = id, epoch = put.epoch, "the library key rotated");
+            ReplyBody::Ok(protocol::Empty {})
+        }
+        RequestBody::GetKeys(_) => {
+            let (library, device) = (who.library.clone(), who.device.clone());
+            ReplyBody::Keys(blocking(store, move |s| s.keys_for(id, &library, &device)).await?)
+        }
         RequestBody::Hello(_) | RequestBody::Register(_) | RequestBody::Bye(_) => unreachable!("handled above"),
     };
     Ok(Some(Reply::of(reply)))
@@ -243,7 +302,17 @@ async fn greet(store: &Arc<Store>, authenticated: Option<&str>, hello: Hello) ->
     }
     let lookup = user.clone();
     let account = blocking(store, move |s| s.account_of(&lookup)).await?;
-    Ok(Caller { user, device: certificate.device, library: hello.library, author: hello.author, account })
+    let box_key = (quire_sync::keys::box_key_is_devices(&certificate.device, &hello.box_key, &hello.box_signature))
+        .then_some((hello.box_key, hello.box_signature));
+    Ok(Caller {
+        user,
+        device: certificate.device,
+        library: hello.library,
+        author: hello.author,
+        account,
+        box_key,
+        admitted: false,
+    })
 }
 
 /// The `Welcome` for `caller` (noting its device on its account, refused if revoked).
@@ -252,10 +321,15 @@ async fn welcome(store: &Arc<Store>, caller: &mut Caller) -> Result<Reply, HubEr
         return Ok(Reply::of(ReplyBody::Welcome(Welcome { registered: false, ..Welcome::default() })));
     };
     let (device, library, author) = (caller.device.clone(), caller.library.clone(), caller.author.clone());
-    let (last_number, hub_seq, used, libraries) = blocking(store, move |s| {
-        s.see_device(account.id, &device)?;
+    let (admitted, box_key) = (caller.admitted, caller.box_key.clone());
+    let (last_number, hub_seq, used, libraries, key_epoch) = blocking(store, move |s| {
+        s.see_device(account.id, &device, admitted)?;
+        s.note_author(account.id, &device, &author)?;
+        if let Some((key, signature)) = &box_key {
+            s.set_box_key(account.id, &device, key, signature)?;
+        }
         let (last, seq) = s.positions(account.id, &library, &author)?;
-        Ok((last, seq, s.used(account.id)?, s.libraries(account.id)?))
+        Ok((last, seq, s.used(account.id)?, s.libraries(account.id)?, s.key_epoch(account.id, &library)?))
     })
     .await?;
     Ok(Reply::of(ReplyBody::Welcome(Welcome {
@@ -265,6 +339,7 @@ async fn welcome(store: &Arc<Store>, caller: &mut Caller) -> Result<Reply, HubEr
         used,
         quota: account.quota,
         libraries,
+        key_epoch,
     })))
 }
 
@@ -318,6 +393,7 @@ mod tests {
             certificate: Some((&Certificate::issue(&[2; 32], &device)).into()),
             library: "lib_x".into(),
             author: device.clone(),
+            ..Hello::default()
         };
         protocol::send(&mut device_side, &Request::of(RequestBody::Hello(hello))).await.unwrap();
         let started = tokio::time::Instant::now();
@@ -345,6 +421,7 @@ mod tests {
             certificate: Some((&Certificate::issue(&[2; 32], &device)).into()),
             library: "lib_x".into(),
             author: device.clone(),
+            ..Hello::default()
         };
         let device_task = {
             let id = id.clone();

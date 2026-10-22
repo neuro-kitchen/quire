@@ -98,6 +98,6 @@ data class PeerState(val name: String, val deviceId: String)
 sealed interface ToolsConfirm {
     /** [other] is removed after its fields, projects, tags, notes, PDFs and highlights move to [keep]. */
     data class Merge(val keep: ReferenceLine, val other: ReferenceLine) : ToolsConfirm
-    /** The hub refuses [device] of this person from now on. */
-    data class RevokeHubDevice(val device: String) : ToolsConfirm
+    /** The hub refuses [device] (named [name]) of this person from now on. */
+    data class RevokeHubDevice(val device: String, val name: String) : ToolsConfirm
 }

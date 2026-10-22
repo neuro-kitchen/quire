@@ -1,6 +1,9 @@
 package dev.neurokitchen.quire
 
 import kotlinx.coroutines.withTimeout
+import dev.neurokitchen.quire.presentation.screens.notifications.components.NotificationsList
+import dev.neurokitchen.quire.domain.model.ActivityKind
+import dev.neurokitchen.quire.domain.model.ActivityItem
 import dev.neurokitchen.quire.presentation.screens.reader.components.ExtractedTable
 import dev.neurokitchen.quire.presentation.screens.reader.Pinned
 import dev.neurokitchen.quire.presentation.components.export_dialog.ENCODING_ASCII
@@ -11,6 +14,7 @@ import dev.neurokitchen.quire.presentation.components.export_dialog.OmitField
 import dev.neurokitchen.quire.presentation.components.export_dialog.ExportTarget
 import dev.neurokitchen.quire.presentation.components.export_dialog.ExportDialogContent
 import dev.neurokitchen.quire.presentation.components.export_dialog.ExportDialogState
+import dev.neurokitchen.quire.domain.model.HubDevice
 import dev.neurokitchen.quire.domain.model.ExportOptions
 import dev.neurokitchen.quire.domain.model.PaperTabKind
 import dev.neurokitchen.quire.domain.model.PaperTab
@@ -53,6 +57,8 @@ import dev.neurokitchen.quire.presentation.screens.library.SavedSearchState
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import dev.neurokitchen.quire.domain.repository.AttachmentRepository
 import dev.neurokitchen.quire.domain.repository.ExchangeRepository
 import dev.neurokitchen.quire.domain.repository.SearchRepository
@@ -329,10 +335,35 @@ class DesktopScreenshots {
                 deviceId = "k3q7v2m9x4c8w1p5n6r0t2y7u3i9o4e1a8s5d2f6g0h3j7l1z9b4",
                 userId = "u5n8e2w7q1r4t9y3",
                 peers = listOf(PeerState("laptop", "p9o8i7u6y5t4r3e2w1q0a9s8d7f6g5h4j3k2l1z0x9c8v7b6n5m4")),
+                hubId = "h4b1d0e9c8a7f6e5d4c3b2a1908f7e6d5c4b3a291807f6e5d4c3b2a19087f6e5",
+                hubDevices = run {
+                    val now = System.currentTimeMillis()
+                    listOf(
+                        HubDevice("k3q7v2m9x4c8w1p5n6r0t2y7u3i9o4e1a8s5d2f6g0h3j7l1z9b4", now - 86_400_000, now - 120_000, false, "Lab desktop", now - 120_000, 1, 0, 113, 0),
+                        HubDevice("p9o8i7u6y5t4r3e2w1q0a9s8d7f6g5h4j3k2l1z0x9c8v7b6n5m4", now - 3_600_000, now - 600_000, false, "Google Pixel 10 Pro", now - 600_000, 1, 1, 0, 113),
+                        HubDevice("x1x2x3", now - 7 * 86_400_000, now - 5 * 86_400_000, true, "Old laptop"),
+                    )
+                },
             ),
         )
-        render("desktop-tools-sync.png", width = 1100, height = 720) {
+        render("desktop-tools-sync.png", width = 1100, height = 900) {
             QuireTheme(desktop = true) { Surface { ToolsScreen(sync, onEvent = {}) } }
+        }
+    }
+
+    /** The notifications panel: what came from which device, and security events. */
+    @Test
+    fun notificationsPanel() {
+        val now = System.currentTimeMillis()
+        val items = listOf(
+            ActivityItem(5, now - 60_000, ActivityKind.NewDevice, "Unknown tablet"),
+            ActivityItem(4, now - 5 * 60_000, ActivityKind.Sync, "Google Pixel 10 Pro", listOf("note" to 2, "highlight" to 1, "reading" to 1)),
+            ActivityItem(3, now - 3_600_000, ActivityKind.WrongCode, null, number = 2, read = true),
+            ActivityItem(2, now - 2 * 3_600_000, ActivityKind.Unlinked, "Old laptop", number = 1, read = true),
+            ActivityItem(1, now - 3 * 86_400_000, ActivityKind.LinkAllowed, "Google Pixel 10 Pro", read = true),
+        )
+        render("desktop-notifications.png", width = 420, height = 420) {
+            QuireTheme(desktop = true) { Surface { NotificationsList(items, Modifier.padding(16.dp)) } }
         }
     }
 

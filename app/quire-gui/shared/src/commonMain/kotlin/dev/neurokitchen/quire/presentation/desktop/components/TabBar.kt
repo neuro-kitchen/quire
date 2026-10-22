@@ -86,6 +86,8 @@ fun TabBar(
     onCommandPaletteClick: () -> Unit = {},
     onCitationGraphClick: () -> Unit = {},
     onSetTheme: (AppTheme) -> Unit = {},
+    /** Beside sync on the right: the notifications bell. */
+    trailing: @Composable () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val colors = QuireTheme.colors
@@ -368,6 +370,7 @@ fun TabBar(
             )
         }
 
+        trailing()
         ToolbarIconButton(Res.drawable.ic_sync, stringResource(Res.string.library_sync) + " (Ctrl+R)", onClick = onSyncClick)
     }
 }

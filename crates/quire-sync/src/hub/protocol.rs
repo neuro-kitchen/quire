@@ -75,6 +75,9 @@ pub struct Batch {
     /// The hub's position of this batch (set by the hub in replies).
     #[prost(uint64, tag = "6")]
     pub seq: u64,
+    /// The library key epoch that sealed it (0: the key derived from the user key).
+    #[prost(uint32, tag = "7")]
+    pub epoch: u32,
 }
 
 /// First request: who is asking, about which library.
@@ -89,6 +92,16 @@ pub struct Hello {
     /// This library copy's device ID (the author of its batches).
     #[prost(string, tag = "4")]
     pub author: String,
+    /// This device's name sealed with the library key (`LibraryKey::seal_name`; empty: none), kept
+    /// by the hub for the person's other devices, unreadable to it.
+    #[prost(bytes = "vec", tag = "5")]
+    pub sealed_name: Vec<u8>,
+    /// This device's box key (X25519 public key: rotated library keys are sealed to it) and its
+    /// signature by the device key (`crate::keys`); empty: an older version without one.
+    #[prost(bytes = "vec", tag = "6")]
+    pub box_key: Vec<u8>,
+    #[prost(bytes = "vec", tag = "7")]
+    pub box_signature: Vec<u8>,
 }
 
 /// Binds this person to the hub with a one-time code (the setup code, an invitation or a link code).
@@ -166,11 +179,17 @@ pub enum RequestBody {
     Revoke(Revoke),
     #[prost(message, tag = "10")]
     Bye(Empty),
+    #[prost(message, tag = "11")]
+    Introduce(Introduce),
+    #[prost(message, tag = "12")]
+    PutKeys(PutKeys),
+    #[prost(message, tag = "13")]
+    GetKeys(Empty),
 }
 
 #[derive(Clone, PartialEq, prost::Message)]
 pub struct Request {
-    #[prost(oneof = "RequestBody", tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10")]
+    #[prost(oneof = "RequestBody", tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13")]
     pub body: Option<RequestBody>,
 }
 
@@ -189,6 +208,10 @@ pub enum ErrorCode {
     TooLarge = 6,
     /// Too many requests: try later.
     Busy = 7,
+    /// A new device that no device of the person introduced (and that brought no code).
+    NotIntroduced = 8,
+    /// Keys for an epoch that is not the next one (another device rotated first).
+    StaleEpoch = 9,
 }
 
 #[derive(Clone, PartialEq, prost::Message)]
@@ -219,6 +242,9 @@ pub struct Welcome {
     /// The libraries this account holds here (a new, empty copy joins one of them).
     #[prost(string, repeated, tag = "6")]
     pub libraries: Vec<String>,
+    /// The library's newest key epoch: a device behind it asks for its keys (`GetKeys`).
+    #[prost(uint32, tag = "7")]
+    pub key_epoch: u32,
 }
 
 #[derive(Clone, PartialEq, prost::Message)]
@@ -262,6 +288,64 @@ pub struct DeviceInfo {
     pub last_seen: i64,
     #[prost(bool, tag = "4")]
     pub revoked: bool,
+    /// Its name, sealed (empty: it never sent one).
+    #[prost(bytes = "vec", tag = "5")]
+    pub sealed_name: Vec<u8>,
+    /// Its last session that ended (milliseconds since 1970; 0: none recorded) and what it moved.
+    #[prost(int64, tag = "6")]
+    pub last_session: i64,
+    #[prost(uint32, tag = "7")]
+    pub batches_in: u32,
+    #[prost(uint32, tag = "8")]
+    pub batches_out: u32,
+    #[prost(uint32, tag = "9")]
+    pub files_in: u32,
+    #[prost(uint32, tag = "10")]
+    pub files_out: u32,
+    /// Its box key and the signature by its device key (empty: none yet).
+    #[prost(bytes = "vec", tag = "11")]
+    pub box_key: Vec<u8>,
+    #[prost(bytes = "vec", tag = "12")]
+    pub box_signature: Vec<u8>,
+    /// The library copies (their author IDs) this device syncs: what its changes are signed with.
+    #[prost(string, repeated, tag = "13")]
+    pub authors: Vec<String>,
+}
+
+/// An existing device lets the hub accept a new one of the same person (linking), once, for a
+/// little while: without it (or a code) a new device is refused.
+#[derive(Clone, PartialEq, prost::Message)]
+pub struct Introduce {
+    /// The new device's network ID.
+    #[prost(string, tag = "1")]
+    pub device: String,
+}
+
+/// A rotated library key: the whole chain sealed for one device (`crate::keys::seal_chain`).
+#[derive(Clone, PartialEq, prost::Message)]
+pub struct KeyEnvelope {
+    #[prost(string, tag = "1")]
+    pub device: String,
+    #[prost(bytes = "vec", tag = "2")]
+    pub sealed: Vec<u8>,
+}
+
+/// The library's next key epoch (the newest plus one), sealed for each remaining device.
+#[derive(Clone, PartialEq, prost::Message)]
+pub struct PutKeys {
+    #[prost(uint32, tag = "1")]
+    pub epoch: u32,
+    #[prost(message, repeated, tag = "2")]
+    pub envelopes: Vec<KeyEnvelope>,
+}
+
+/// This device's envelope of the library's newest epoch (empty `sealed`: none for it).
+#[derive(Clone, PartialEq, prost::Message)]
+pub struct Keys {
+    #[prost(uint32, tag = "1")]
+    pub epoch: u32,
+    #[prost(bytes = "vec", tag = "2")]
+    pub sealed: Vec<u8>,
 }
 
 #[derive(Clone, PartialEq, prost::Message)]
@@ -288,11 +372,13 @@ pub enum ReplyBody {
     File(FileHeader),
     #[prost(message, tag = "8")]
     Devices(DeviceList),
+    #[prost(message, tag = "9")]
+    Keys(Keys),
 }
 
 #[derive(Clone, PartialEq, prost::Message)]
 pub struct Reply {
-    #[prost(oneof = "ReplyBody", tags = "1, 2, 3, 4, 5, 6, 7, 8")]
+    #[prost(oneof = "ReplyBody", tags = "1, 2, 3, 4, 5, 6, 7, 8, 9")]
     pub body: Option<ReplyBody>,
 }
 
@@ -449,6 +535,7 @@ mod tests {
                 sealed: vec![0, 1, 255],
                 covers: 9,
                 seq: 0,
+                epoch: 2,
             }],
         }));
         send(&mut a, &push).await.unwrap();

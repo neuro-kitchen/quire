@@ -335,19 +335,46 @@
     <string name="tools_save">Save</string>
     <string name="tools_setup_code">Setup code (first time only)</string>
     <string name="tools_sync_hub">Sync with Hub</string>
-    <string name="tools_hub_report">%1$s pushed, %2$s applied; %3$s files up, %4$s down</string>
+    <string name="tools_hub_report">%1$s changes sent, %2$s received; %3$s PDFs uploaded, %4$s downloaded</string>
     <string name="tools_hub_registered">Registered with the hub.</string>
     <string name="tools_hub_joined">This device joined your library on the hub.</string>
     <string name="tools_hub_over_quota">%1$s PDFs not uploaded: the hub is full.</string>
-    <string name="tools_hub_devices">Devices on the hub</string>
-    <string name="tools_hub_load_devices">Show</string>
+    <string name="tools_hub_devices">Your devices</string>
+    <string name="tools_hub_load_devices">Refresh</string>
     <string name="tools_hub_this">this device</string>
-    <string name="tools_hub_revoked_mark">revoked</string>
-    <string name="tools_revoke">Revoke</string>
+    <string name="tools_hub_unnamed">Unnamed device</string>
+    <string name="tools_hub_connected">Connected to your hub</string>
+    <string name="tools_hub_own_relay">Through your own relay: nothing goes to n0.</string>
+    <string name="tools_hub_n0_relay">Through n0’s public relays (set your own relay to avoid them).</string>
+    <string name="tools_hub_change">Change…</string>
+    <string name="tools_hub_last_sync">Last sync %1$s: %2$s batches sent, %3$s received; %4$s PDFs up, %5$s down</string>
+    <string name="tools_hub_last_seen">Last seen %1$s</string>
+    <string name="tools_hub_no_devices">No device yet: sync with the hub first.</string>
+    <string name="notifications">Notifications</string>
+    <string name="notification_none">Nothing yet: what your other devices change, and any security event, shows here.</string>
+    <string name="notification_unnamed">An unnamed device</string>
+    <string name="notification_sync">%1$s: %2$s</string>
+    <string name="notification_linked">This device was linked to your devices.</string>
+    <string name="notification_link_allowed">“%1$s” was linked to your devices.</string>
+    <string name="notification_link_refused">You turned “%1$s” away.</string>
+    <string name="notification_unlinked">“%1$s” was unlinked and your library key changed: keep your recovery kit again.</string>
+    <string name="notification_key_changed">Your library key changed (a device was unlinked on another of your devices): keep your recovery kit again.</string>
+    <string name="notification_new_device">New device on your hub: “%1$s”. If it is not yours, unlink it.</string>
+    <string name="mobile_settings_notifications_hint">What your other devices changed, and security events</string>
+    <string name="mobile_settings_notifications_unread">%1$s new</string>
+    <string name="time_just_now">just now</string>
+    <string name="time_minutes_ago">%1$s min ago</string>
+    <string name="time_hours_ago">%1$s h ago</string>
+    <string name="time_days_ago">%1$s days ago</string>
+    <string name="tools_show_ids">Show IDs</string>
+    <string name="tools_hide_ids">Hide IDs</string>
+    <string name="tools_ids_hint">Hidden: anyone who sees them on screen or in a screenshot can find this device.</string>
+    <string name="tools_hub_revoked_mark">unlinked</string>
+    <string name="tools_revoke">Unlink</string>
     <string name="tools_recovery_kit">Recovery kit</string>
     <string name="tools_recovery_kit_hint">The hub cannot recover your library: keep this safe, outside your devices.</string>
-    <string name="tools_confirm_revoke_title">Revoke this device?</string>
-    <string name="tools_confirm_revoke_body">The hub refuses %1$s… from now on. It keeps what it already has.</string>
+    <string name="tools_confirm_revoke_title">Unlink “%1$s”?</string>
+    <string name="tools_confirm_revoke_body">The hub refuses it from now on, and your library key changes so it cannot read anything new. What it already holds stays on it.</string>
     <string name="tools_sharing">Sharing a project</string>
     <string name="tools_choose_project">Choose a project</string>
     <string name="tools_not_shared">Not shared.</string>
@@ -377,8 +404,9 @@
     <string name="tools_linked">This device is linked: it now syncs as %1$s</string>
     <string name="tools_link_allowed">“%1$s” is linked</string>
     <string name="tools_link_refused">The device was turned away: nothing was given</string>
-    <string name="tools_hub_synced">Synced with the hub: %1$s pushed, %2$s applied, %3$s files up, %4$s down</string>
-    <string name="tools_hub_revoked">The hub now refuses %1$s…</string>
+    <string name="tools_hub_synced">Synced with the hub: %1$s changes sent, %2$s received; %3$s PDFs uploaded, %4$s downloaded</string>
+    <string name="tools_hub_revoked_left_out">“%1$s” is unlinked; %2$s other device(s) run an older quire and need linking again to read new data. Keep your recovery kit again.</string>
+    <string name="tools_hub_revoked">“%1$s” is unlinked and your library key changed: show and keep your recovery kit again</string>
     <string name="reader_page_of">Page %1$s of %2$s (%3$s)</string>
     <string name="export_title">Export</string>
     <string name="export_subtitle">A file for LaTeX, Typst, Pandoc or Zotero: once, or kept up to date</string>
@@ -579,4 +607,40 @@
     <string name="cite_biblatex">BibLaTeX</string>
     <string name="cite_bibtex">BibTeX</string>
     <string name="cite_csl_json">CSL-JSON</string>
+    <plurals name="notification_wrong_code">
+        <item quantity="one">Someone tried a wrong link code while this device was showing one.</item>
+        <item quantity="other">%1$d wrong link codes were tried while this device was showing one.</item>
+    </plurals>
+    <plurals name="notification_count_reference">
+        <item quantity="one">%1$d reference</item>
+        <item quantity="other">%1$d references</item>
+    </plurals>
+    <plurals name="notification_count_note">
+        <item quantity="one">%1$d note</item>
+        <item quantity="other">%1$d notes</item>
+    </plurals>
+    <plurals name="notification_count_highlight">
+        <item quantity="one">%1$d highlight</item>
+        <item quantity="other">%1$d highlights</item>
+    </plurals>
+    <plurals name="notification_count_reading">
+        <item quantity="one">%1$d reading status</item>
+        <item quantity="other">%1$d reading statuses</item>
+    </plurals>
+    <plurals name="notification_count_project">
+        <item quantity="one">%1$d project</item>
+        <item quantity="other">%1$d projects</item>
+    </plurals>
+    <plurals name="notification_count_tag">
+        <item quantity="one">%1$d tag</item>
+        <item quantity="other">%1$d tags</item>
+    </plurals>
+    <plurals name="notification_count_attachment">
+        <item quantity="one">%1$d PDF</item>
+        <item quantity="other">%1$d PDFs</item>
+    </plurals>
+    <plurals name="notification_count_other">
+        <item quantity="one">%1$d other change</item>
+        <item quantity="other">%1$d other changes</item>
+    </plurals>
 </resources>

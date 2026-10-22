@@ -22,6 +22,7 @@
 //!   highlighted quotes are on them.
 //! - [`query`]: answering a [`Query`] with engine calls.
 
+mod activity;
 #[cfg(target_os = "android")]
 mod android;
 mod attachments;

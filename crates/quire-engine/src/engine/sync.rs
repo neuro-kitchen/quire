@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use quire_core::library::sharing;
 use quire_model::{ProjectMember, Role as MemberRole, SlugPath, UserId};
 use quire_sync::identity::{self, Certificate};
+use quire_sync::keys::{BoxKey, LibraryKeys};
 use quire_sync::seal::LibraryKey;
 use quire_sync::transport::{self, Device};
 use quire_sync::{Peer, Replica, Report, Side, SyncError};
@@ -22,6 +23,8 @@ use crate::secrets::{self, Store};
 const SECRET: &str = "sync-device-key";
 /// Name of the user's key (the same on all their devices) in the keyring.
 const USER_SECRET: &str = "sync-user-key";
+/// Name of this device's box key (rotated library keys are sealed to it; `quire_sync::keys`).
+const BOX_SECRET: &str = "sync-box-key";
 
 impl Engine {
     /// Our own relay (`sync.relay`), if set: the only one sync then uses.
@@ -77,16 +80,78 @@ impl Engine {
         Ok(LibraryKey::derive(&key, &library))
     }
 
-    /// What to keep somewhere safe before syncing through a hub: the user key alone recovers every
-    /// library from the hub on a new device (the hub cannot read them, so it cannot help otherwise).
-    pub fn recovery_kit(&self) -> Result<String> {
+    /// This device's box key and its signature by the device key (`quire_sync::keys`).
+    pub fn device_box(&self) -> Result<(BoxKey, Vec<u8>)> {
+        let (secret, _) = self.key(BOX_SECRET)?;
+        let (device, _) = self.sync_key()?;
+        let boxed = BoxKey::from_secret(secret);
+        let signature = boxed.signature(&device);
+        Ok((boxed, signature))
+    }
+
+    /// The keys of `library`: epoch 0 derived from the user key, later ones kept here.
+    pub fn library_keys_of(&self, library: &str) -> Result<LibraryKeys> {
+        let (user, _) = self.user_key()?;
+        let mut keys = LibraryKeys::new(LibraryKey::derive(&user, library));
+        let name = chain_secret(library);
+        if let Some((text, _)) = secrets::get(&name, &self.config_file().with_file_name(&name)) {
+            keys.merge(&LibraryKeys::parse_chain(&text));
+        }
+        Ok(keys)
+    }
+
+    /// The keys of this library.
+    pub async fn library_keys(&self) -> Result<LibraryKeys> {
+        let library = self.run(|lib| lib.library_id()).await?;
+        self.library_keys_of(&library)
+    }
+
+    /// Keeps the later keys of `library` (after a rotation, or given by another device).
+    pub fn save_library_keys_of(&self, library: &str, keys: &LibraryKeys) -> Result<()> {
+        let name = chain_secret(library);
+        secrets::set(&name, &keys.chain_text(), &self.config_file().with_file_name(&name))?;
+        Ok(())
+    }
+
+    /// Takes the library keys of a recovery kit (`<library ID>=<epoch>:<key>,…`).
+    pub fn import_library_keys(&self, text: &str) -> Result<()> {
+        let (library, chain) = text
+            .trim()
+            .split_once('=')
+            .ok_or_else(|| EngineError::Config("library keys look like `<library ID>=<epoch>:<key>,…`".into()))?;
+        let chain = LibraryKeys::parse_chain(chain);
+        if chain.is_empty() {
+            return Err(EngineError::Config("no library key in that text".into()));
+        }
+        let mut keys = self.library_keys_of(library.trim())?;
+        keys.merge(&chain);
+        self.save_library_keys_of(library.trim(), &keys)
+    }
+
+    /// What to keep somewhere safe before syncing through a hub: the user key recovers every
+    /// library from the hub on a new device (the hub cannot read them, so it cannot help otherwise),
+    /// with this library's later keys once a device was unlinked (they are not derived from it).
+    pub async fn recovery_kit(&self) -> Result<String> {
         let (user, _) = self.user_id()?;
         let key = self.export_user_key()?;
+        let library = self.run(|lib| lib.library_id()).await?;
+        let keys = self.library_keys_of(&library)?;
+        let later = if keys.chain().is_empty() {
+            String::new()
+        } else {
+            format!(
+                "Library keys: {library}={}\n\
+                 (a device was unlinked: newer data uses these; keep this kit again after each unlink;\n\
+                 on a new device also `quire user library-keys import '<the text after Library keys:>'`)\n",
+                keys.chain_text()
+            )
+        };
         Ok(format!(
             "quire recovery kit\n\
              \n\
              User ID:  {user}\n\
              User key: {key}\n\
+             {later}\
              \n\
              Keep this offline (printed, or in a password manager). On a new device:\n\
              `quire user key import <user key>`, then add your sync hub and sync.\n\
@@ -391,4 +456,10 @@ impl Replica for Wanting<'_> {
     async fn write_file(&self, hash: &str, bytes: Vec<u8>) -> quire_sync::Result<()> {
         self.inner.write_file(hash, bytes).await
     }
+}
+
+/// The secret holding a library's later keys: named by a hash of its ID (any text) so the name
+/// suits a keyring entry and a file.
+fn chain_secret(library: &str) -> String {
+    format!("library-keys-{}", &blake3::hash(library.as_bytes()).to_hex()[..16])
 }

@@ -24,6 +24,17 @@ enum Action {
     },
     /// What to keep safe before syncing through a hub (the hub cannot recover your library)
     RecoveryKit,
+    /// A library's later keys (after a device was unlinked), from a recovery kit
+    LibraryKeys {
+        #[command(subcommand)]
+        action: LibraryKeysAction,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum LibraryKeysAction {
+    /// Use the keys of a recovery kit's `Library keys:` line (`<library ID>=<epoch>:<key>,…`)
+    Import { keys: String },
 }
 
 #[derive(Subcommand, Debug)]
@@ -34,7 +45,7 @@ enum KeyAction {
     Import { key: String },
 }
 
-pub fn run(engine: &Engine, args: &UserArgs) -> anyhow::Result<()> {
+pub async fn run(engine: &Engine, args: &UserArgs) -> anyhow::Result<()> {
     match &args.action {
         Action::Id => {
             let (id, store) = engine.user_id()?;
@@ -51,7 +62,11 @@ pub fn run(engine: &Engine, args: &UserArgs) -> anyhow::Result<()> {
         }
         Action::RecoveryKit => {
             output::report(Tone::Warn, "secret", "print it or keep it in a password manager; never share it");
-            print!("{}", engine.recovery_kit()?);
+            print!("{}", engine.recovery_kit().await?);
+        }
+        Action::LibraryKeys { action: LibraryKeysAction::Import { keys } } => {
+            engine.import_library_keys(keys)?;
+            output::report(Tone::Ok, "imported", "the library's later keys");
         }
         Action::Key { action: KeyAction::Import { key } } => {
             let (id, store) = engine.import_user_key(key)?;

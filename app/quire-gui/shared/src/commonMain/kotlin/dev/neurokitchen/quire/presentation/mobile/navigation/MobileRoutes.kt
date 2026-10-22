@@ -81,4 +81,4 @@ internal val routeSavedState = SavedStateConfiguration {
 
 /** The phone's settings pages (the desktop's shortcuts and config file editor are not among them). */
 @Serializable
-enum class MobileSettingsPage { Appearance, Reading, Account, Libraries, Sync, About }
+enum class MobileSettingsPage { Appearance, Reading, Account, Libraries, Sync, Notifications, About }
