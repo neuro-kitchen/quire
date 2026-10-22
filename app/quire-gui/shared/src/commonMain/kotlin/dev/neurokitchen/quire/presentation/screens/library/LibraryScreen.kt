@@ -516,6 +516,7 @@ private fun OnePane(
                         when (event) {
                             is ReferenceCardEvent.OnClick -> onEvent(LibraryEvent.OnReferenceClick(event.id))
                             is ReferenceCardEvent.OnOpen -> onOpenReference(event.id, card.title)
+                            else -> Unit
                         }
                     })
                 }
