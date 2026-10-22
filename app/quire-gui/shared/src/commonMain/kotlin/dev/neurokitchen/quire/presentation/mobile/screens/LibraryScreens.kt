@@ -28,13 +28,16 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -89,8 +92,11 @@ import dev.neurokitchen.quire.resources.ic_auto_fix_high
 import dev.neurokitchen.quire.resources.ic_sell
 import dev.neurokitchen.quire.resources.ic_tune
 import dev.neurokitchen.quire.resources.library_my_library
+import dev.neurokitchen.quire.resources.library_new_collection
 import dev.neurokitchen.quire.resources.library_trash
 import dev.neurokitchen.quire.resources.library_unfiled
+import dev.neurokitchen.quire.resources.name_create
+import dev.neurokitchen.quire.resources.name_cancel
 import dev.neurokitchen.quire.resources.mobile_items
 import dev.neurokitchen.quire.resources.mobile_library_projects
 import dev.neurokitchen.quire.resources.mobile_library_saved
@@ -162,13 +168,6 @@ fun HomeTab(
                 LargeTitle(
                     title = "Quire",
                     subtitle = pluralStringResource(Res.plurals.mobile_items, state.totalCount, state.totalCount),
-                    icon = {
-                        Image(
-                            painter = painterResource(Res.drawable.ic_quire_logo),
-                            contentDescription = "Quire Logo",
-                            modifier = Modifier.size(36.dp),
-                        )
-                    },
                 )
             }
             item {
@@ -421,6 +420,39 @@ fun LibraryTab(
             onDismiss = {
                 viewModel.onEvent(MobileLibraryEvent.SetFolderSheetVisible(false))
             },
+            onAddProject = {
+                viewModel.onEvent(MobileLibraryEvent.OnOpenCreateProjectDialog)
+            },
+        )
+    }
+
+    if (state.isCreateProjectDialogOpen) {
+        var name by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { viewModel.onEvent(MobileLibraryEvent.OnDismissCreateProjectDialog) },
+            title = { Text(stringResource(Res.string.library_new_collection)) },
+            text = {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(stringResource(Res.string.library_new_collection)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.onEvent(MobileLibraryEvent.OnCreateProject(name)) },
+                    enabled = name.isNotBlank(),
+                ) {
+                    Text(stringResource(Res.string.name_create))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.onEvent(MobileLibraryEvent.OnDismissCreateProjectDialog) }) {
+                    Text(stringResource(Res.string.name_cancel))
+                }
+            },
         )
     }
 
@@ -560,12 +592,28 @@ internal fun LargeTitle(
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Column(modifier = Modifier.weight(1f, fill = false)) {
-            Text(title, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, color = QuireTheme.colors.fillPrimary)
+            if (title == "Quire") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        painter = painterResource(Res.drawable.ic_quire_logo),
+                        contentDescription = "Quire",
+                        modifier = Modifier.size(34.dp).padding(end = 1.dp),
+                    )
+                    Text(
+                        "uire",
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = QuireTheme.colors.fillPrimary,
+                    )
+                }
+            } else {
+                Text(title, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, color = QuireTheme.colors.fillPrimary)
+            }
             if (subtitle != null) {
                 Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = QuireTheme.colors.fillSecondary)
             }
         }
-        if (icon != null) {
+        if (icon != null && title != "Quire") {
             Box(modifier = Modifier.padding(start = Dimens.SpaceSm)) {
                 icon()
             }

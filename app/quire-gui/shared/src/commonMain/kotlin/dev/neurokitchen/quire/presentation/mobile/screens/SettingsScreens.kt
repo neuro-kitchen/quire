@@ -55,6 +55,9 @@ import dev.neurokitchen.quire.presentation.mobile.components.LocalMobileChrome
 import dev.neurokitchen.quire.presentation.mobile.components.MobileTopBar
 import dev.neurokitchen.quire.presentation.mobile.components.mobileContentPadding
 import dev.neurokitchen.quire.presentation.mobile.navigation.MobileSettingsPage
+import dev.neurokitchen.quire.presentation.mobile.navigation.ShelfKey
+import dev.neurokitchen.quire.resources.library_trash
+import dev.neurokitchen.quire.resources.mobile_settings_trash_hint
 import dev.neurokitchen.quire.presentation.screens.settings.SettingField
 import dev.neurokitchen.quire.presentation.screens.settings.SettingsEvent
 import dev.neurokitchen.quire.presentation.screens.settings.SettingsSection
@@ -108,6 +111,7 @@ fun SettingsTab(onOpen: (MobileSettingsPage) -> Unit) {
                 PageRow(Res.string.mobile_settings_account, Res.string.mobile_settings_account_hint) { onOpen(MobileSettingsPage.Account) }
                 PageRow(Res.string.mobile_settings_libraries, Res.string.mobile_settings_libraries_hint) { onOpen(MobileSettingsPage.Libraries) }
                 PageRow(Res.string.mobile_settings_sync, Res.string.mobile_settings_sync_hint) { onOpen(MobileSettingsPage.Sync) }
+                PageRow(Res.string.library_trash, Res.string.mobile_settings_trash_hint) { onOpen(MobileSettingsPage.Trash) }
             }
         }
         item { Spacer(Modifier.size(Dimens.SpaceMd)) }
@@ -122,10 +126,20 @@ fun SettingsTab(onOpen: (MobileSettingsPage) -> Unit) {
 fun SettingsPageScreen(
     page: MobileSettingsPage,
     onBack: () -> Unit,
+    onOpenDetails: (String) -> Unit = {},
+    onOpenReader: (String, String) -> Unit = { _, _ -> },
     viewModel: SettingsViewModel = koinViewModel(),
 ) {
     // Sync is the Tools tab's, not a settings section: its own screen.
     if (page == MobileSettingsPage.Sync) return SyncPageScreen(onBack)
+    if (page == MobileSettingsPage.Trash) {
+        return ShelfScreen(
+            shelf = ShelfKey(ShelfKey.Kind.Trash),
+            onBack = onBack,
+            onOpenDetails = onOpenDetails,
+            onOpenReader = onOpenReader,
+        )
+    }
     val section = when (page) {
         MobileSettingsPage.Account -> SettingsSection.General
         MobileSettingsPage.Libraries -> SettingsSection.Libraries
@@ -342,4 +356,5 @@ private fun MobileSettingsPage.title() = when (this) {
     MobileSettingsPage.Libraries -> Res.string.mobile_settings_libraries
     MobileSettingsPage.Sync -> Res.string.mobile_settings_sync
     MobileSettingsPage.About -> Res.string.mobile_settings_about
+    MobileSettingsPage.Trash -> Res.string.library_trash
 }

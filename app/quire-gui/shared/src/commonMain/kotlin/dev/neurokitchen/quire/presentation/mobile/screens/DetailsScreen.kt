@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -26,6 +27,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -131,7 +133,14 @@ fun DetailsScreen(
                 contentPadding = mobileContentPadding(),
                 verticalArrangement = Arrangement.spacedBy(Dimens.SpaceSm),
             ) {
-                item { Header(reference, onRead = { onOpenReader(reference.id, reference.title) }, onGetPdf = { onEvent(LibraryEvent.OnGetPdf) }) }
+                item {
+                    Header(
+                        reference = reference,
+                        isFetchingPdf = state.isFetchingPdf,
+                        onRead = { onOpenReader(reference.id, reference.title) },
+                        onGetPdf = { onEvent(LibraryEvent.OnGetPdf) },
+                    )
+                }
                 item { Status(reference) { onEvent(LibraryEvent.OnBatchSetReadingStatus(setOf(reference.id), it)) } }
                 if (reference.abstract.isNotBlank()) item { AbstractSection(reference.abstract) }
                 if (reference.fields.isNotEmpty()) item { InfoSection(reference) }
@@ -141,7 +150,7 @@ fun DetailsScreen(
                 item { FilesSection(reference) }
             }
         }
-        MobileTopBar(reference?.citeKey.orEmpty(), onBack, chrome.haze, actions = {
+        MobileTopBar("", onBack, chrome.haze, actions = {
             if (reference != null) Overflow(reference, onEvent, onBack)
         })
         state.notice?.let { notice ->
@@ -155,7 +164,12 @@ fun DetailsScreen(
 }
 
 @Composable
-private fun Header(reference: ReferenceDetailState, onRead: () -> Unit, onGetPdf: () -> Unit) {
+private fun Header(
+    reference: ReferenceDetailState,
+    isFetchingPdf: Boolean,
+    onRead: () -> Unit,
+    onGetPdf: () -> Unit,
+) {
     val colors = QuireTheme.colors
     Column(Modifier.fillMaxWidth().padding(horizontal = Dimens.SpaceLg), verticalArrangement = Arrangement.spacedBy(Dimens.SpaceXs)) {
         Text(reference.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, color = colors.fillPrimary)
@@ -164,49 +178,46 @@ private fun Header(reference: ReferenceDetailState, onRead: () -> Unit, onGetPdf
         Text(reference.year, style = MaterialTheme.typography.bodyMedium, color = colors.fillSecondary)
         Spacer(Modifier.size(Dimens.SpaceXs))
         if (!reference.hasPdf) {
-            // Split Button: [ Read | Find PDF ]
+            // Material 3 Expressive Split Button with clear separation
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(colors.accent),
+                modifier = Modifier.fillMaxWidth().height(48.dp),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceMin),
             ) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clickable(onClick = onRead),
-                    contentAlignment = Alignment.Center,
+                Button(
+                    onClick = onRead,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp, topEnd = 8.dp, bottomEnd = 8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = colors.onAccent),
+                    contentPadding = PaddingValues(horizontal = Dimens.SpaceMd),
                 ) {
                     Text(
                         stringResource(Res.string.details_read),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
-                        color = colors.onAccent,
                     )
                 }
-                Box(
-                    modifier = Modifier
-                        .width(1.dp)
-                        .fillMaxHeight(0.55f)
-                        .background(colors.onAccent.copy(alpha = 0.35f)),
-                )
-                Box(
-                    modifier = Modifier
-                        .wrapContentWidth()
-                        .fillMaxHeight()
-                        .clickable(onClick = onGetPdf)
-                        .padding(horizontal = 20.dp),
-                    contentAlignment = Alignment.Center,
+                Button(
+                    onClick = onGetPdf,
+                    enabled = !isFetchingPdf,
+                    modifier = Modifier.fillMaxHeight(),
+                    shape = RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp, topEnd = 24.dp, bottomEnd = 24.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = colors.onAccent),
+                    contentPadding = PaddingValues(horizontal = Dimens.SpaceMd),
                 ) {
-                    Text(
-                        stringResource(Res.string.item_get_pdf),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = colors.onAccent,
-                    )
+                    if (isFetchingPdf) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = colors.onAccent,
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Text(
+                            stringResource(Res.string.item_get_pdf),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
                 }
             }
         } else {
