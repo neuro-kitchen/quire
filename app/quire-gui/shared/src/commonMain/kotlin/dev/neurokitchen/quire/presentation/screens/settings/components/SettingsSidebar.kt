@@ -67,25 +67,26 @@ fun SettingsSidebar(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(34.dp)
-                    .clip(RoundedCornerShape(Dimens.RadiusBase))
-                    .background(if (isSelected) colors.accent else Color.Transparent)
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(Dimens.RadiusFull))
+                    // The selected section: a tinted pill, its icon and text in the accent.
+                    .background(if (isSelected) colors.accent.copy(alpha = 0.16f) else Color.Transparent)
                     .clickable { onClick(section) }
                     .padding(horizontal = Dimens.SpaceSm),
             ) {
                 Icon(
                     painterResource(icon),
                     contentDescription = null,
-                    tint = if (isSelected) colors.onAccent else colors.fillSecondary,
-                    modifier = Modifier.size(16.dp),
+                    tint = if (isSelected) colors.accent else colors.fillSecondary,
+                    modifier = Modifier.size(20.dp),
                 )
                 Spacer(Modifier.width(Dimens.SpaceSm))
                 Text(
                     section.displayTitle,
-                    style = MaterialTheme.typography.bodyMedium.copy(
+                    style = MaterialTheme.typography.bodyLarge.copy(
                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                     ),
-                    color = if (isSelected) colors.onAccent else colors.fillPrimary,
+                    color = if (isSelected) colors.accent else colors.fillPrimary,
                 )
             }
         }

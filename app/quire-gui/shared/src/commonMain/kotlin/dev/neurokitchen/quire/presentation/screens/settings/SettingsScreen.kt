@@ -1,5 +1,15 @@
 package dev.neurokitchen.quire.presentation.screens.settings
 
+import dev.neurokitchen.quire.presentation.designsystem.components.settings.SettingsGroup
+import dev.neurokitchen.quire.presentation.designsystem.components.settings.SettingsHeader
+import androidx.compose.ui.graphics.Shape
+import dev.neurokitchen.quire.resources.settings_hint_appearance
+import dev.neurokitchen.quire.resources.settings_hint_reader
+import dev.neurokitchen.quire.resources.settings_hint_general
+import dev.neurokitchen.quire.resources.settings_hint_libraries
+import dev.neurokitchen.quire.resources.settings_hint_export
+import dev.neurokitchen.quire.resources.settings_hint_shortcuts
+import dev.neurokitchen.quire.resources.settings_hint_config
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -145,19 +155,16 @@ private fun SettingsCategoryContent(
 ) {
     val colors = QuireTheme.colors
     Column(modifier) {
-        // Category Header
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(state.section.displayTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = colors.fillPrimary)
-                Text(
-                    if (state.configPath.isNotEmpty()) stringResource(Res.string.settings_file_location, state.configPath)
-                    else "Configure preferences, appearance, shortcuts, and sync",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.fillSecondary,
-                )
-            }
-        }
-        HorizontalDivider(color = colors.fillQuarternary, modifier = Modifier.padding(vertical = Dimens.SpaceSm))
+        // The section in large type and what it is for; the file's path only where the file is edited.
+        SettingsHeader(
+            state.section.displayTitle,
+            if (state.section == SettingsSection.ConfigFile && state.configPath.isNotEmpty()) {
+                stringResource(Res.string.settings_file_location, state.configPath)
+            } else {
+                stringResource(state.section.hint())
+            },
+            horizontalPadding = 0.dp,
+        )
 
         val error = state.error
         when {
@@ -175,12 +182,22 @@ private fun SettingsCategoryContent(
                 onRevert = { onEvent(SettingsEvent.OnRawRevert) },
             )
             else -> LazyColumn(Modifier.weight(1f)) {
-                items(state.fields, key = { it.key }) { field ->
-                    SettingRow(
-                        field,
-                        onDraftChange = { onEvent(SettingsEvent.OnDraftChange(field.key, it)) },
-                        onApply = { onEvent(SettingsEvent.OnApply(field.key)) },
-                        onReset = { onEvent(SettingsEvent.OnReset(field.key)) },
+                item {
+                    // One segmented group: each setting its own rounded block.
+                    SettingsGroup(
+                        horizontalPadding = 0.dp,
+                        rows = state.fields.map { field ->
+                            @Composable { shape: Shape ->
+                                Box(Modifier.fillMaxWidth().clip(shape).background(colors.cardBackground).padding(horizontal = Dimens.SpaceMd, vertical = Dimens.SpaceXs)) {
+                                    SettingRow(
+                                        field,
+                                        onDraftChange = { onEvent(SettingsEvent.OnDraftChange(field.key, it)) },
+                                        onApply = { onEvent(SettingsEvent.OnApply(field.key)) },
+                                        onReset = { onEvent(SettingsEvent.OnReset(field.key)) },
+                                    )
+                                }
+                            }
+                        },
                     )
                 }
                 if (!state.isLoading && state.fields.isEmpty()) {
@@ -501,3 +518,14 @@ private fun ShortcutCategoryCard(title: String, shortcuts: List<Pair<String, Str
     }
 }
 
+
+/** What each section is for, under its title. */
+private fun SettingsSection.hint() = when (this) {
+    SettingsSection.Appearance -> Res.string.settings_hint_appearance
+    SettingsSection.Reader -> Res.string.settings_hint_reader
+    SettingsSection.General -> Res.string.settings_hint_general
+    SettingsSection.Libraries -> Res.string.settings_hint_libraries
+    SettingsSection.Export -> Res.string.settings_hint_export
+    SettingsSection.Shortcuts -> Res.string.settings_hint_shortcuts
+    SettingsSection.ConfigFile -> Res.string.settings_hint_config
+}
