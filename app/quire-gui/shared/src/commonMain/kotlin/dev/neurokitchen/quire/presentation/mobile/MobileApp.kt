@@ -9,6 +9,19 @@ import dev.neurokitchen.quire.presentation.mobile.components.MobileNavigationRai
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import dev.neurokitchen.quire.presentation.mobile.components.MinimizedBarHeight
+import dev.neurokitchen.quire.presentation.mobile.components.ShortBarHeight
 import dev.neurokitchen.quire.presentation.mobile.share.sharedIdentifiers
 import dev.neurokitchen.quire.presentation.mobile.share.SharedItem
 import dev.neurokitchen.quire.presentation.mobile.share.ShareInbox
@@ -180,11 +193,40 @@ fun MobileApp() {
         }
         val showBar = navigation.isAtTabRoot
         BoxWithConstraints(Modifier.fillMaxSize().background(QuireTheme.colors.background)) {
-            // Wide windows (tablets, unfolded phones, landscape): the tabs as a rail at the start.
-            val wide = maxWidth >= WideWindow
-            val chrome = MobileChrome(haze, bottomBar = if (showBar && !wide) bottomBarSpace() else 0.dp)
+            val isLandscape = maxWidth > maxHeight
+            // When rotated in landscape, menu is at the bottom (YouTube style) and minimized.
+            // Only large tablets in portrait orientation use the side rail.
+            val wide = !isLandscape && maxWidth >= WideWindow
+            val chrome = MobileChrome(haze, bottomBar = if (showBar && !wide) bottomBarSpace(isLandscape) else 0.dp)
+
+            val density = LocalDensity.current
+            val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            val barHeight = if (isLandscape) MinimizedBarHeight else ShortBarHeight
+            val totalBarPx = with(density) { (barHeight + navBarBottom + 16.dp).toPx() }
+            var bottomBarOffsetPx by rememberSaveable { mutableFloatStateOf(0f) }
+
+            val nestedScrollConnection = remember(totalBarPx, isLandscape) {
+                object : NestedScrollConnection {
+                    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                        if (isLandscape) {
+                            val delta = available.y
+                            val newOffset = bottomBarOffsetPx + delta
+                            bottomBarOffsetPx = newOffset.coerceIn(-totalBarPx, 0f)
+                        } else {
+                            bottomBarOffsetPx = 0f
+                        }
+                        return Offset.Zero
+                    }
+                }
+            }
+
             CompositionLocalProvider(LocalMobileChrome provides chrome) {
-                Box(Modifier.fillMaxSize().padding(start = if (showBar && wide) RailWidth else 0.dp)) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(start = if (showBar && wide) RailWidth else 0.dp)
+                        .nestedScroll(nestedScrollConnection)
+                ) {
                     NavDisplay(
                         entries = navigation.entries(entryProvider(navigation)),
                         onBack = navigation::back,
@@ -202,6 +244,9 @@ fun MobileApp() {
                                 }
                             },
                             bottom = chrome.bottomBar,
+                            modifier = Modifier.graphicsLayer {
+                                translationY = -bottomBarOffsetPx
+                            },
                         )
                     }
                     if (showBar && !wide) {
@@ -209,7 +254,12 @@ fun MobileApp() {
                             current = navigation.tab,
                             onSelect = navigation::select,
                             haze = haze,
-                            modifier = Modifier.align(Alignment.BottomCenter),
+                            isLandscape = isLandscape,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .graphicsLayer {
+                                    translationY = -bottomBarOffsetPx
+                                },
                         )
                     }
                 }

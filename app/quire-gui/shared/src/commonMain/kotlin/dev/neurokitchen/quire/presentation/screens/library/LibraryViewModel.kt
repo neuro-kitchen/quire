@@ -401,6 +401,11 @@ class LibraryViewModel(
                 view.update { it.copy(selectedId = null, selectedIds = emptySet()) }
                 Notice.Done(Res.string.notice_restored)
             }
+            is LibraryEvent.OnRestoreId -> act {
+                library.restoreReference(event.id)
+                view.update { it.copy(selectedId = null, selectedIds = it.selectedIds - event.id) }
+                Notice.Done(Res.string.notice_restored)
+            }
             is LibraryEvent.OnNameDialog -> view.update { it.copy(nameDialog = event.dialog) }
             is LibraryEvent.OnNameConfirm -> {
                 val dialog = view.value.nameDialog ?: return
