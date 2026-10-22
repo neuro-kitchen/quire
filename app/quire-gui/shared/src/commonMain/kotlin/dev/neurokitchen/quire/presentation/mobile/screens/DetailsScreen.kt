@@ -1,5 +1,7 @@
 package dev.neurokitchen.quire.presentation.mobile.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -7,12 +9,18 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AssistChip
@@ -155,14 +163,64 @@ private fun Header(reference: ReferenceDetailState, onRead: () -> Unit, onGetPdf
         if (authors.isNotBlank()) Text(authors, style = MaterialTheme.typography.bodyMedium, color = colors.fillSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis)
         Text(reference.year, style = MaterialTheme.typography.bodyMedium, color = colors.fillSecondary)
         Spacer(Modifier.size(Dimens.SpaceXs))
-        Row(horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceXs)) {
+        if (!reference.hasPdf) {
+            // Split Button: [ Read | Find PDF ]
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(colors.accent),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable(onClick = onRead),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        stringResource(Res.string.details_read),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.onAccent,
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .fillMaxHeight(0.55f)
+                        .background(colors.onAccent.copy(alpha = 0.35f)),
+                )
+                Box(
+                    modifier = Modifier
+                        .wrapContentWidth()
+                        .fillMaxHeight()
+                        .clickable(onClick = onGetPdf)
+                        .padding(horizontal = 20.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        stringResource(Res.string.item_get_pdf),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.onAccent,
+                    )
+                }
+            }
+        } else {
             Button(
                 onClick = onRead,
                 colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = colors.onAccent),
-                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-            ) { Text(stringResource(Res.string.details_read)) }
-            if (!reference.hasPdf) {
-                TextButton(onClick = onGetPdf, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(Res.string.item_get_pdf)) }
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+            ) {
+                Text(
+                    stringResource(Res.string.details_read),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         }
     }
