@@ -3,6 +3,14 @@ package dev.neurokitchen.quire.presentation.mobile.screens
 import dev.neurokitchen.quire.presentation.mobile.screens.home.HomeViewModel
 import dev.neurokitchen.quire.presentation.mobile.screens.library.MobileLibraryViewModel
 import dev.neurokitchen.quire.presentation.mobile.screens.library.MobileLibraryEvent
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.text.font.FontFamily
+import dev.neurokitchen.quire.presentation.components.notice.NoticeBar
+import dev.neurokitchen.quire.resources.ic_sync
+import dev.neurokitchen.quire.resources.item_restore
 import dev.neurokitchen.quire.presentation.components.cite.CiteButton
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FilterChip
@@ -184,19 +192,16 @@ fun HomeTab(
             } else if (!state.isLoading && state.reading.isEmpty() && state.recent.isEmpty()) {
                 item { EmptyNote(stringResource(Res.string.home_empty)) }
             }
-            section(
-                Res.string.home_continue,
-                state.reading,
-                onOpenDetails,
-                onOpenReader,
+            continueReadingSection(
+                cards = state.reading,
+                onOpenDetails = onOpenDetails,
+                onOpenReader = onOpenReader,
                 onLongClick = { viewModel.onEvent(HomeEvent.OnReferenceLongClick(it)) },
-                onSeeAll = null,
             )
-            section(
-                Res.string.home_recent,
-                state.recent,
-                onOpenDetails,
-                onOpenReader,
+            recentlyAddedSection(
+                cards = state.recent,
+                onOpenDetails = onOpenDetails,
+                onOpenReader = onOpenReader,
                 onLongClick = { viewModel.onEvent(HomeEvent.OnReferenceLongClick(it)) },
                 onSeeAll = { onOpenShelf(all) },
             )
@@ -327,8 +332,43 @@ fun DaysReadCard(
     }
 }
 
-private fun LazyListScope.section(
-    title: org.jetbrains.compose.resources.StringResource,
+private fun LazyListScope.continueReadingSection(
+    cards: List<ReferenceCardState>,
+    onOpenDetails: (String) -> Unit,
+    onOpenReader: (String, String) -> Unit,
+    onLongClick: (ReferenceCardState) -> Unit,
+) {
+    if (cards.isEmpty()) return
+    item(key = "header-continue-reading") {
+        Column(
+            Modifier.fillMaxWidth().padding(start = Dimens.SpaceLg, end = Dimens.SpaceLg, top = Dimens.SpaceLg, bottom = 4.dp),
+        ) {
+            Text(
+                stringResource(Res.string.home_continue),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = QuireTheme.colors.fillPrimary,
+            )
+            Text(
+                "Pick up where you left off",
+                style = MaterialTheme.typography.bodySmall,
+                color = QuireTheme.colors.fillSecondary,
+            )
+        }
+    }
+    items(cards.take(HOME_SECTION_SIZE), key = { "continue-${it.id}" }) { card ->
+        Box(Modifier.padding(horizontal = Dimens.SpaceMd, vertical = 2.dp)) {
+            ContinueReadingCard(
+                card = card,
+                onOpenDetails = onOpenDetails,
+                onOpenReader = onOpenReader,
+                onLongClick = onLongClick,
+            )
+        }
+    }
+}
+
+private fun LazyListScope.recentlyAddedSection(
     cards: List<ReferenceCardState>,
     onOpenDetails: (String) -> Unit,
     onOpenReader: (String, String) -> Unit,
@@ -336,18 +376,30 @@ private fun LazyListScope.section(
     onSeeAll: (() -> Unit)?,
 ) {
     if (cards.isEmpty()) return
-    item(key = "header-$title") {
+    item(key = "header-recently-added") {
         Row(
-            Modifier.fillMaxWidth().padding(start = Dimens.SpaceLg, end = Dimens.SpaceXs, top = Dimens.SpaceMd),
+            Modifier.fillMaxWidth().padding(start = Dimens.SpaceLg, end = Dimens.SpaceXs, top = Dimens.SpaceLg, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(stringResource(title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = QuireTheme.colors.fillPrimary, modifier = Modifier.weight(1f))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(Res.string.home_recent),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = QuireTheme.colors.fillPrimary,
+                )
+                Text(
+                    "Latest additions to your library",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = QuireTheme.colors.fillSecondary,
+                )
+            }
             if (onSeeAll != null && cards.size > HOME_SECTION_SIZE) {
                 androidx.compose.material3.TextButton(onClick = onSeeAll) { Text(stringResource(Res.string.home_see_all)) }
             }
         }
     }
-    items(cards.take(HOME_SECTION_SIZE), key = { "$title-${it.id}" }) { card ->
+    items(cards.take(HOME_SECTION_SIZE), key = { "recent-${it.id}" }) { card ->
         Box(Modifier.padding(horizontal = Dimens.SpaceMd)) {
             ReferenceCard(
                 card,
@@ -361,6 +413,134 @@ private fun LazyListScope.section(
                 showCiteKey = false,
                 action = { CiteButton(card.id, card.citeKey) },
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun ContinueReadingCard(
+    card: ReferenceCardState,
+    onOpenDetails: (String) -> Unit,
+    onOpenReader: (String, String) -> Unit,
+    onLongClick: (ReferenceCardState) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = QuireTheme.colors
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = colors.cardBackground,
+        ),
+        border = BorderStroke(1.dp, colors.accent.copy(alpha = 0.22f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .combinedClickable(
+                onClick = { onOpenDetails(card.id) },
+                onLongClick = { onLongClick(card) },
+            ),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(colors.accent),
+                    )
+                    Text(
+                        text = "IN PROGRESS",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.8.sp,
+                        ),
+                        color = colors.accent,
+                    )
+                }
+
+                if (card.year.isNotBlank()) {
+                    Text(
+                        text = card.year,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                        ),
+                        color = colors.fillSecondary,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            Text(
+                text = card.title,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontFamily = FontFamily.Serif,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp,
+                    lineHeight = 21.sp,
+                ),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                color = colors.fillPrimary,
+            )
+
+            if (card.creator.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = card.creator,
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = colors.fillSecondary,
+                )
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                androidx.compose.material3.FilledTonalButton(
+                    onClick = { onOpenReader(card.id, card.title) },
+                    shape = RoundedCornerShape(Dimens.RadiusFull),
+                    colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
+                        containerColor = colors.accent.copy(alpha = 0.16f),
+                        contentColor = colors.accent,
+                    ),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                    modifier = Modifier.height(34.dp),
+                ) {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_library_books),
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "Resume",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                        ),
+                    )
+                }
+
+                CiteButton(card.id, card.citeKey)
+            }
         }
     }
 }
@@ -457,59 +637,65 @@ fun LibraryTab(
     }
 
     Box(Modifier.fillMaxSize()) {
-        LazyColumn(
-            Modifier.fillMaxSize().hazeSource(LocalMobileChrome.current.haze),
-            contentPadding = mobileContentPadding(topBar = false),
-            verticalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
+        PullToRefreshBox(
+            isRefreshing = state.isRefreshing,
+            onRefresh = { viewModel.onEvent(MobileLibraryEvent.OnRefresh) },
+            modifier = Modifier.fillMaxSize(),
         ) {
-            item {
-                LargeTitle(
-                    stringResource(Res.string.destination_library),
-                    pluralStringResource(Res.plurals.mobile_items, state.references.size, state.references.size),
-                )
-            }
-            item {
-                LibraryFilterRow(
-                    source = state.source,
-                    projects = state.projectChoices,
-                    onOpenFolders = { viewModel.onEvent(MobileLibraryEvent.SetFolderSheetVisible(true)) },
-                    onSelectSource = { viewModel.onEvent(MobileLibraryEvent.OnSelectSource(it)) },
-                )
-            }
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = Dimens.SpaceLg, end = Dimens.SpaceLg, top = 2.dp, bottom = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = pluralStringResource(Res.plurals.mobile_items, state.references.size, state.references.size),
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp, fontWeight = FontWeight.Medium),
-                        color = QuireTheme.colors.fillSecondary,
+            LazyColumn(
+                Modifier.fillMaxSize().hazeSource(LocalMobileChrome.current.haze),
+                contentPadding = mobileContentPadding(topBar = false),
+                verticalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
+            ) {
+                item {
+                    LargeTitle(
+                        stringResource(Res.string.destination_library),
+                        pluralStringResource(Res.plurals.mobile_items, state.references.size, state.references.size),
                     )
                 }
-            }
-            val error = state.error
-            if (error != null) {
-                item { EmptyNote(error) }
-            } else if (!state.isLoading && state.references.isEmpty()) {
-                item { EmptyNote(stringResource(Res.string.mobile_nothing_here)) }
-            }
-            items(state.references, key = { it.id }) { card ->
-                Box(Modifier.padding(horizontal = Dimens.SpaceMd)) {
-                    LibraryReferenceRow(
-                        card,
-                        onEvent = { event ->
-                            when (event) {
-                                is ReferenceCardEvent.OnClick -> onOpenDetails(event.id)
-                                is ReferenceCardEvent.OnOpen -> onOpenReader(event.id, card.title)
-                                is ReferenceCardEvent.OnLongClick -> viewModel.onEvent(MobileLibraryEvent.OnReferenceLongClick(event.card))
-                            }
-                        },
-                        action = { CiteButton(card.id, card.citeKey) },
+                item {
+                    LibraryFilterRow(
+                        source = state.source,
+                        projects = state.projectChoices,
+                        onOpenFolders = { viewModel.onEvent(MobileLibraryEvent.SetFolderSheetVisible(true)) },
+                        onSelectSource = { viewModel.onEvent(MobileLibraryEvent.OnSelectSource(it)) },
                     )
+                }
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = Dimens.SpaceLg, end = Dimens.SpaceLg, top = 2.dp, bottom = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = pluralStringResource(Res.plurals.mobile_items, state.references.size, state.references.size),
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp, fontWeight = FontWeight.Medium),
+                            color = QuireTheme.colors.fillSecondary,
+                        )
+                    }
+                }
+                val error = state.error
+                if (error != null) {
+                    item { EmptyNote(error) }
+                } else if (!state.isLoading && state.references.isEmpty()) {
+                    item { EmptyNote(stringResource(Res.string.mobile_nothing_here)) }
+                }
+                items(state.references, key = { it.id }) { card ->
+                    Box(Modifier.padding(horizontal = Dimens.SpaceMd)) {
+                        LibraryReferenceRow(
+                            card,
+                            onEvent = { event ->
+                                when (event) {
+                                    is ReferenceCardEvent.OnClick -> onOpenDetails(event.id)
+                                    is ReferenceCardEvent.OnOpen -> onOpenReader(event.id, card.title)
+                                    is ReferenceCardEvent.OnLongClick -> viewModel.onEvent(MobileLibraryEvent.OnReferenceLongClick(event.card))
+                                }
+                            },
+                            action = { CiteButton(card.id, card.citeKey) },
+                        )
+                    }
                 }
             }
         }
@@ -536,9 +722,26 @@ fun ShelfScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val title = shelf.title()
     val chrome = LocalMobileChrome.current
+    val isTrash = shelf.kind == ShelfKey.Kind.Trash
+
     Box(Modifier.fillMaxSize()) {
-        ReferenceList(state, onOpenDetails, onOpenReader, Modifier.hazeSource(chrome.haze))
+        ReferenceList(
+            state = state,
+            onOpenDetails = onOpenDetails,
+            onOpenReader = onOpenReader,
+            onRestore = if (isTrash) { id -> viewModel.onEvent(LibraryEvent.OnRestoreId(id)) } else null,
+            modifier = Modifier.hazeSource(chrome.haze),
+        )
         MobileTopBar(title, onBack, chrome.haze)
+        state.notice?.let { notice ->
+            NoticeBar(
+                notice = notice,
+                onDismiss = { viewModel.onEvent(LibraryEvent.OnDismissNotice) },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = chrome.bottomBar + Dimens.SpaceMd, start = Dimens.SpaceMd, end = Dimens.SpaceMd),
+            )
+        }
     }
 }
 
@@ -548,6 +751,7 @@ internal fun ReferenceList(
     onOpenDetails: (String) -> Unit,
     onOpenReader: (String, String) -> Unit,
     modifier: Modifier = Modifier,
+    onRestore: ((String) -> Unit)? = null,
     header: (LazyListScope.() -> Unit)? = null,
     contentPadding: PaddingValues = mobileContentPadding(),
 ) {
@@ -572,7 +776,33 @@ internal fun ReferenceList(
                         }
                     },
                     showCiteKey = false,
-                    action = { CiteButton(card.id, card.citeKey) },
+                    action = if (onRestore != null) {
+                        {
+                            androidx.compose.material3.FilledTonalButton(
+                                onClick = { onRestore(card.id) },
+                                shape = RoundedCornerShape(Dimens.RadiusFull),
+                                colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = QuireTheme.colors.accent.copy(alpha = 0.16f),
+                                    contentColor = QuireTheme.colors.accent,
+                                ),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                modifier = Modifier.height(32.dp),
+                            ) {
+                                Icon(
+                                    painter = painterResource(Res.drawable.ic_sync),
+                                    contentDescription = stringResource(Res.string.item_restore),
+                                    modifier = Modifier.size(14.dp),
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = stringResource(Res.string.item_restore),
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 12.sp),
+                                )
+                            }
+                        }
+                    } else {
+                        { CiteButton(card.id, card.citeKey) }
+                    },
                 )
             }
         }

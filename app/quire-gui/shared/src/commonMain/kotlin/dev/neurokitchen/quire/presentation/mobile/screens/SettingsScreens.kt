@@ -102,7 +102,7 @@ fun SettingsTab(onOpen: (MobileSettingsPage) -> Unit) {
         Modifier.fillMaxSize().hazeSource(LocalMobileChrome.current.haze),
         contentPadding = mobileContentPadding(topBar = false),
     ) {
-        item { LargeTitle(stringResource(Res.string.destination_settings), null) }
+        item { LargeTitle(stringResource(Res.string.destination_settings), "Preferences and library data") }
         item {
             Group {
                 PageRow(Res.string.mobile_settings_appearance, Res.string.mobile_settings_appearance_hint) { onOpen(MobileSettingsPage.Appearance) }

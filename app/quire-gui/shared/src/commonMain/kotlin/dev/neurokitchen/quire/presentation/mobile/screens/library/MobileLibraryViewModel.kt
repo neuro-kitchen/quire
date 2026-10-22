@@ -33,6 +33,7 @@ class MobileLibraryViewModel(
     private val expandedProjects = MutableStateFlow<Set<String>>(emptySet())
     private val actionSheetRef = MutableStateFlow<ReferenceCardState?>(null)
     private val confirmDeleteRef = MutableStateFlow<ReferenceCardState?>(null)
+    private val isRefreshing = MutableStateFlow(false)
 
     private val referencesFlow = source.flatMapLatest { currentSource ->
         library.references(LibraryQuery(source = currentSource))
@@ -65,11 +66,13 @@ class MobileLibraryViewModel(
         actionSheetRef,
         confirmDeleteRef,
         isCreateProjectDialogOpen,
-    ) { base, sheetRef, deleteRef, isCreateOpen ->
+        isRefreshing,
+    ) { base, sheetRef, deleteRef, isCreateOpen, refreshing ->
         base.copy(
             actionSheetReference = sheetRef,
             confirmDeleteReference = deleteRef,
             isCreateProjectDialogOpen = isCreateOpen,
+            isRefreshing = refreshing,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -131,6 +134,18 @@ class MobileLibraryViewModel(
                     val item = all.find { it.id == event.id }
                     if (item != null) {
                         library.updateReference(item.copy(hasPdf = true))
+                    }
+                }
+            }
+            MobileLibraryEvent.OnRefresh -> {
+                viewModelScope.launch {
+                    isRefreshing.value = true
+                    try {
+                        library.reopen()
+                        library.rebuildStaleTexts()
+                    } catch (_: Exception) {
+                    } finally {
+                        isRefreshing.value = false
                     }
                 }
             }
