@@ -1,5 +1,8 @@
 package dev.neurokitchen.quire.presentation.mobile
 
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlin.math.abs
 import dev.neurokitchen.quire.presentation.screens.library.AddTab
 import dev.neurokitchen.quire.presentation.mobile.components.AddFabMenu
 import androidx.compose.ui.semantics.semantics
@@ -226,6 +229,9 @@ fun MobileApp() {
                         .fillMaxSize()
                         .padding(start = if (showBar && wide) RailWidth else 0.dp)
                         .nestedScroll(nestedScrollConnection)
+                        // Swipe left/right on a tab's root to change tab (Home → Library → …).
+                        // Children that scroll sideways consume the drag first.
+                        .then(if (showBar) Modifier.tabSwipe(navigation) else Modifier)
                 ) {
                     NavDisplay(
                         entries = navigation.entries(entryProvider(navigation)),
@@ -275,6 +281,22 @@ fun MobileApp() {
         }
     }
 }
+
+/** Changes tab after a horizontal drag of at least [TabSwipeDistance]. */
+private fun Modifier.tabSwipe(navigation: MobileNavigation): Modifier = pointerInput(navigation) {
+    val threshold = TabSwipeDistance.toPx()
+    var dragged = 0f
+    detectHorizontalDragGestures(
+        onDragStart = { dragged = 0f },
+        onDragEnd = { if (abs(dragged) >= threshold) navigation.swipe(forward = dragged < 0) },
+        onHorizontalDrag = { change, dx ->
+            change.consume()
+            dragged += dx
+        },
+    )
+}
+
+private val TabSwipeDistance = 72.dp
 
 /** Material's medium window width: from here the tabs are a rail, not a bottom bar. */
 private val WideWindow = 600.dp
