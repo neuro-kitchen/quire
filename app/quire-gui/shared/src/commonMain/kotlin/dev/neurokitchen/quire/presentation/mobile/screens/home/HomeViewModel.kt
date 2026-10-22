@@ -16,7 +16,17 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.isoDayNumber
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
+import kotlinx.datetime.todayIn
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
+@OptIn(ExperimentalTime::class)
 class HomeViewModel(
     private val library: LibraryRepository,
     private val preferences: PreferencesRepository = SamplePreferencesRepository(),
@@ -35,15 +45,10 @@ class HomeViewModel(
         val reading = cards.filter { it.reading == ReadingStatus.Reading || it.reading == ReadingStatus.Read }
         val recent = cards.sortedByDescending { it.dateAdded }
 
-        val today = try {
-            java.time.LocalDate.now()
-        } catch (_: Exception) {
-            null
-        }
+        // Common code runs on every platform (iOS too): kotlinx-datetime, not java.time.
+        val today = runCatching { Clock.System.todayIn(TimeZone.currentSystemDefault()) }.getOrNull()
 
-        val readingDates = prefs.readingDays.mapNotNull {
-            try { java.time.LocalDate.parse(it) } catch (_: Exception) { null }
-        }.toMutableSet()
+        val readingDates = prefs.readingDays.mapNotNull { runCatching { LocalDate.parse(it) }.getOrNull() }.toMutableSet()
 
         if (today != null && reading.isNotEmpty() && readingDates.isEmpty()) {
             readingDates.add(today)
@@ -54,19 +59,19 @@ class HomeViewModel(
         var streakCount = 0
 
         if (today != null) {
-            val dayOfWeekVal = today.dayOfWeek.value // 1 (Mon) .. 7 (Sun)
-            val monday = today.minusDays((dayOfWeekVal - 1).toLong())
+            val dayOfWeekVal = today.dayOfWeek.isoDayNumber // 1 (Mon) .. 7 (Sun)
+            val monday = today.minus(dayOfWeekVal - 1, DateTimeUnit.DAY)
             for (i in 0..6) {
-                val d = monday.plusDays(i.toLong())
+                val d = monday.plus(i, DateTimeUnit.DAY)
                 if (d in readingDates) {
                     activeDaysOfWeek.add(i)
                 }
             }
 
-            var checkDate = if (today in readingDates) today else today.minusDays(1)
+            var checkDate = if (today in readingDates) today else today.minus(1, DateTimeUnit.DAY)
             while (checkDate in readingDates) {
                 streakCount++
-                checkDate = checkDate.minusDays(1)
+                checkDate = checkDate.minus(1, DateTimeUnit.DAY)
             }
         }
 
