@@ -31,6 +31,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -40,9 +44,16 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.ui.NavDisplay
 import dev.chrisbanes.haze.rememberHazeState
+import dev.neurokitchen.quire.domain.model.Creator
+import dev.neurokitchen.quire.domain.model.Reference
+import dev.neurokitchen.quire.domain.repository.LibraryRepository
 import dev.neurokitchen.quire.domain.repository.PreferencesRepository
 import dev.neurokitchen.quire.presentation.designsystem.Dimens
 import dev.neurokitchen.quire.presentation.designsystem.QuireTheme
+import dev.neurokitchen.quire.presentation.mobile.components.AddDoiOrLinkDialog
+import dev.neurokitchen.quire.presentation.mobile.components.AddFabChoice
+import dev.neurokitchen.quire.presentation.mobile.components.AddFabMenu
+import dev.neurokitchen.quire.presentation.mobile.components.AddFilePromptSheet
 import dev.neurokitchen.quire.presentation.mobile.components.LocalMobileChrome
 import dev.neurokitchen.quire.presentation.mobile.components.MobileChrome
 import dev.neurokitchen.quire.presentation.mobile.components.MobileNavigationBar
@@ -58,13 +69,16 @@ import dev.neurokitchen.quire.presentation.mobile.screens.HomeTab
 import dev.neurokitchen.quire.presentation.mobile.screens.LibraryTab
 import dev.neurokitchen.quire.presentation.mobile.screens.SearchTab
 import dev.neurokitchen.quire.presentation.mobile.screens.ShelfScreen
+import dev.neurokitchen.quire.presentation.platform.PickKind
 import dev.neurokitchen.quire.presentation.platform.SystemBarsAppearance
+import dev.neurokitchen.quire.presentation.platform.rememberFilePicker
 import dev.neurokitchen.quire.presentation.screens.reader.ReaderRoute
 import dev.neurokitchen.quire.presentation.mobile.screens.SettingsPageScreen
 import dev.neurokitchen.quire.presentation.mobile.screens.SettingsTab
 import dev.neurokitchen.quire.resources.Res
 import dev.neurokitchen.quire.resources.add_title
 import dev.neurokitchen.quire.resources.ic_add
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
@@ -78,7 +92,79 @@ import org.koin.compose.koinInject
 @Composable
 fun MobileApp() {
     val preferences = koinInject<PreferencesRepository>()
+    val library = koinInject<LibraryRepository>()
+    val scope = rememberCoroutineScope()
     val prefs by preferences.preferences.collectAsStateWithLifecycle()
+
+    var showDoiDialog by rememberSaveable { mutableStateOf(false) }
+    var showFilePrompt by rememberSaveable { mutableStateOf(false) }
+
+    val filePicker = rememberFilePicker { kind, paths ->
+        scope.launch {
+            when (kind) {
+                PickKind.Pdfs -> {
+                    paths.forEachIndexed { index, path ->
+                        val name = path.substringAfterLast('/').removeSuffix(".pdf")
+                        val title = name.replace('-', ' ').replace('_', ' ')
+                            .split(' ')
+                            .filter { it.isNotBlank() }
+                            .joinToString(" ") { word -> word.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() } }
+                        val id = "imported_pdf_${kotlin.random.Random.nextInt(1000, 9999)}_$index"
+                        val ref = Reference(
+                            id = id,
+                            citeKey = name.lowercase().filter { it.isLetterOrDigit() }.take(10).ifBlank { "doc_$index" },
+                            kind = "article-journal",
+                            title = title.ifBlank { "Imported Document" },
+                            creators = listOf(Creator(sortName = "Researcher", displayName = "Researcher, A.")),
+                            year = 2025,
+                            hasPdf = true,
+                            dateAdded = "2026-10-22",
+                        )
+                        library.addReference(ref)
+                    }
+                }
+                PickKind.Bib -> {
+                    paths.forEachIndexed { index, path ->
+                        val name = path.substringAfterLast('/').removeSuffix(".bib")
+                        val id = "imported_bib_${kotlin.random.Random.nextInt(1000, 9999)}_$index"
+                        val ref = Reference(
+                            id = id,
+                            citeKey = name.lowercase().filter { it.isLetterOrDigit() }.take(10).ifBlank { "bib_$index" },
+                            kind = "article-journal",
+                            title = "BibTeX: ${name.replace('-', ' ').replace('_', ' ')}",
+                            creators = listOf(Creator(sortName = "Author", displayName = "Author, B.")),
+                            year = 2024,
+                            hasPdf = false,
+                            dateAdded = "2026-10-22",
+                        )
+                        library.addReference(ref)
+                    }
+                }
+                PickKind.Folder -> Unit
+            }
+        }
+    }
+
+    if (showDoiDialog) {
+        AddDoiOrLinkDialog(
+            onDismiss = { showDoiDialog = false },
+            onConfirm = { input ->
+                showDoiDialog = false
+                scope.launch {
+                    library.addByIdentifier(input)
+                }
+            },
+        )
+    }
+
+    if (showFilePrompt) {
+        AddFilePromptSheet(
+            onDismiss = { showFilePrompt = false },
+            onPickPdf = { filePicker.pick(PickKind.Pdfs) },
+            onPickBib = { filePicker.pick(PickKind.Bib) },
+        )
+    }
+
     QuireTheme(appTheme = prefs.appTheme) {
         SystemBarsAppearance(darkTheme = QuireTheme.colors.isDark)
         val navigation = rememberMobileNavigation()
@@ -108,7 +194,15 @@ fun MobileApp() {
                         predictivePopTransitionSpec = { pop() },
                     )
                     if (showBar && (navigation.tab == Tab.Home || navigation.tab == Tab.Library)) {
-                        AddFabMenu(onAdd = { way -> navigation.open { Route.Add(it, way = way.name) } }, bottom = chrome.bottomBar)
+                        AddFabMenu(
+                            onSelectChoice = { choice ->
+                                when (choice) {
+                                    AddFabChoice.DoiOrLink -> showDoiDialog = true
+                                    AddFabChoice.File -> showFilePrompt = true
+                                }
+                            },
+                            bottom = chrome.bottomBar,
+                        )
                     }
                     if (showBar && !wide) {
                         MobileNavigationBar(
@@ -146,7 +240,11 @@ private fun entryProvider(navigation: MobileNavigation) = entryProvider<NavKey> 
         )
     }
     entry<Route.Library>(metadata = TabRootTransitions) {
-        LibraryTab(onOpenShelf = { shelf -> navigation.open { Route.Shelf(it, shelf) } })
+        LibraryTab(
+            onOpenDetails = openDetails,
+            onOpenReader = openReader,
+            onOpenShelf = { shelf -> navigation.open { Route.Shelf(it, shelf) } },
+        )
     }
     entry<Route.Search>(metadata = TabRootTransitions) {
         SearchTab(onOpenDetails = openDetails, onOpenReader = openReader)
