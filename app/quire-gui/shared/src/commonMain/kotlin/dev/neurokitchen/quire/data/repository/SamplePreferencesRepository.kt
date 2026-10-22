@@ -34,4 +34,9 @@ class SamplePreferencesRepository(initial: GuiPreferences = GuiPreferences()) : 
     override suspend fun setReaderLayout(layout: ReaderLayout) {
         _prefs.update { it.copy(readerLayout = layout) }
     }
+
+    override suspend fun recordReadingToday() {
+        val today = "2026-10-22"
+        _prefs.update { it.copy(readingDays = it.readingDays + today) }
+    }
 }

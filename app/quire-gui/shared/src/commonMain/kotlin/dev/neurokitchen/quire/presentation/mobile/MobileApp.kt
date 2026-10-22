@@ -180,11 +180,11 @@ fun MobileApp() {
         }
         val showBar = navigation.isAtTabRoot
         BoxWithConstraints(Modifier.fillMaxSize().background(QuireTheme.colors.background)) {
-            // Wide windows (tablets, unfolded phones): the tabs as a rail at the start, always shown.
+            // Wide windows (tablets, unfolded phones, landscape): the tabs as a rail at the start.
             val wide = maxWidth >= WideWindow
             val chrome = MobileChrome(haze, bottomBar = if (showBar && !wide) bottomBarSpace() else 0.dp)
             CompositionLocalProvider(LocalMobileChrome provides chrome) {
-                Box(Modifier.fillMaxSize().padding(start = if (wide) RailWidth else 0.dp)) {
+                Box(Modifier.fillMaxSize().padding(start = if (showBar && wide) RailWidth else 0.dp)) {
                     NavDisplay(
                         entries = navigation.entries(entryProvider(navigation)),
                         onBack = navigation::back,
@@ -213,7 +213,7 @@ fun MobileApp() {
                         )
                     }
                 }
-                if (wide) {
+                if (showBar && wide) {
                     MobileNavigationRail(
                         current = navigation.tab,
                         onSelect = navigation::select,
@@ -252,7 +252,14 @@ private fun entryProvider(navigation: MobileNavigation) = entryProvider<NavKey> 
     entry<Route.Settings>(metadata = TabRootTransitions) {
         SettingsTab(onOpen = { page -> navigation.open { Route.SettingsPage(it, page) } })
     }
-    entry<Route.SettingsPage> { key -> SettingsPageScreen(key.page, onBack = navigation::back) }
+    entry<Route.SettingsPage> { key ->
+        SettingsPageScreen(
+            key.page,
+            onBack = navigation::back,
+            onOpenDetails = openDetails,
+            onOpenReader = openReader,
+        )
+    }
     entry<Route.Shelf> { key ->
         ShelfScreen(key.shelf, onBack = navigation::back, onOpenDetails = openDetails, onOpenReader = openReader)
     }

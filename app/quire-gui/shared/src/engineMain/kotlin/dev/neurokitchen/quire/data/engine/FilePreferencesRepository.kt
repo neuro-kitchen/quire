@@ -37,12 +37,16 @@ class FilePreferencesRepository(
             val readerFont = ReaderFont.entries.firstOrNull { it.name.equals(readerFontStr, ignoreCase = true) }
                 ?: ReaderFont.Serif
             val fontSize = props.getProperty("reader.fontSize")?.toIntOrNull() ?: 16
+            val readingDaysStr = props.getProperty("reading.days").orEmpty()
+            val readingDays = if (readingDaysStr.isBlank()) emptySet()
+                else readingDaysStr.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
             GuiPreferences(
                 appTheme = appTheme,
                 readerTheme = readerTheme,
                 readerFont = readerFont,
                 readerFontSize = fontSize,
                 readerLayout = readerLayout(props),
+                readingDays = readingDays,
             )
         } catch (_: Exception) {
             GuiPreferences()
@@ -65,6 +69,7 @@ class FilePreferencesRepository(
                 props.setProperty("reader.layout.two", layout.two.joinToString(";"))
                 props.setProperty("reader.layout.three", layout.three.joinToString(";"))
             }
+            props.setProperty("reading.days", prefs.readingDays.joinToString(","))
             preferencesFile.outputStream().use { props.store(it, "Quire GUI Preferences") }
         } catch (_: Exception) {}
     }
@@ -92,6 +97,20 @@ class FilePreferencesRepository(
     override suspend fun setReaderLayout(layout: ReaderLayout) {
         _prefs.update { it.copy(readerLayout = layout) }
         save(_prefs.value)
+    }
+
+    override suspend fun recordReadingToday() {
+        val today = try {
+            java.time.LocalDate.now().toString()
+        } catch (_: Exception) {
+            "2026-10-22"
+        }
+        val current = _prefs.value
+        if (today !in current.readingDays) {
+            val updated = current.copy(readingDays = current.readingDays + today)
+            _prefs.value = updated
+            save(updated)
+        }
     }
 
     /** The saved layout; any value missing or unreadable is the default's. */

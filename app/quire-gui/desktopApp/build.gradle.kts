@@ -32,6 +32,12 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm)
             packageName = "quire"
             packageVersion = "0.1.0"
+            linux {
+                iconFile.set(project.file("src/main/resources/icons/linux.png"))
+            }
+            windows {
+                iconFile.set(project.file("src/main/resources/icons/windows.ico"))
+            }
         }
     }
 }

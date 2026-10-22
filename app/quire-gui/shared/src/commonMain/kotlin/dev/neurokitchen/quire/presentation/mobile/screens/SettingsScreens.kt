@@ -1,5 +1,6 @@
 package dev.neurokitchen.quire.presentation.mobile.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -53,6 +55,9 @@ import dev.neurokitchen.quire.presentation.mobile.components.LocalMobileChrome
 import dev.neurokitchen.quire.presentation.mobile.components.MobileTopBar
 import dev.neurokitchen.quire.presentation.mobile.components.mobileContentPadding
 import dev.neurokitchen.quire.presentation.mobile.navigation.MobileSettingsPage
+import dev.neurokitchen.quire.presentation.mobile.navigation.ShelfKey
+import dev.neurokitchen.quire.resources.library_trash
+import dev.neurokitchen.quire.resources.mobile_settings_trash_hint
 import dev.neurokitchen.quire.presentation.screens.settings.SettingField
 import dev.neurokitchen.quire.presentation.screens.settings.SettingsEvent
 import dev.neurokitchen.quire.presentation.screens.settings.SettingsSection
@@ -62,6 +67,7 @@ import dev.neurokitchen.quire.presentation.screens.notifications.NotificationsVi
 import dev.neurokitchen.quire.resources.Res
 import dev.neurokitchen.quire.resources.destination_settings
 import dev.neurokitchen.quire.resources.ic_chevron_right
+import dev.neurokitchen.quire.resources.ic_quire_logo
 import dev.neurokitchen.quire.resources.mobile_settings_about
 import dev.neurokitchen.quire.resources.mobile_settings_about_hint
 import dev.neurokitchen.quire.resources.mobile_settings_account
@@ -115,6 +121,7 @@ fun SettingsTab(onOpen: (MobileSettingsPage) -> Unit) {
                     Res.string.mobile_settings_notifications_hint,
                     badge = if (notifications.unread > 0) stringResource(Res.string.mobile_settings_notifications_unread, notifications.unread) else null,
                 ) { onOpen(MobileSettingsPage.Notifications) }
+                PageRow(Res.string.library_trash, Res.string.mobile_settings_trash_hint) { onOpen(MobileSettingsPage.Trash) }
             }
         }
         item { Spacer(Modifier.size(Dimens.SpaceMd)) }
@@ -129,11 +136,21 @@ fun SettingsTab(onOpen: (MobileSettingsPage) -> Unit) {
 fun SettingsPageScreen(
     page: MobileSettingsPage,
     onBack: () -> Unit,
+    onOpenDetails: (String) -> Unit = {},
+    onOpenReader: (String, String) -> Unit = { _, _ -> },
     viewModel: SettingsViewModel = koinViewModel(),
 ) {
     // Sync is the Tools tab's, not a settings section: its own screen.
     if (page == MobileSettingsPage.Sync) return SyncPageScreen(onBack)
     if (page == MobileSettingsPage.Notifications) return NotificationsPageScreen(onBack)
+    if (page == MobileSettingsPage.Trash) {
+        return ShelfScreen(
+            shelf = ShelfKey(ShelfKey.Kind.Trash),
+            onBack = onBack,
+            onOpenDetails = onOpenDetails,
+            onOpenReader = onOpenReader,
+        )
+    }
     val section = when (page) {
         MobileSettingsPage.Account -> SettingsSection.General
         MobileSettingsPage.Libraries -> SettingsSection.Libraries
@@ -158,8 +175,18 @@ fun SettingsPageScreen(
                 MobileSettingsPage.Sync, MobileSettingsPage.Notifications -> Unit
                 MobileSettingsPage.About -> item {
                     Group {
-                        Column(Modifier.fillMaxWidth().padding(Dimens.SpaceMd)) {
-                            Text("Quire", style = MaterialTheme.typography.titleMedium, color = QuireTheme.colors.fillPrimary)
+                        Column(
+                            Modifier.fillMaxWidth().padding(Dimens.SpaceLg),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Image(
+                                painter = painterResource(Res.drawable.ic_quire_logo),
+                                contentDescription = "Quire Logo",
+                                modifier = Modifier.size(64.dp),
+                            )
+                            Spacer(Modifier.height(Dimens.SpaceMd))
+                            Text("Quire", style = MaterialTheme.typography.titleLarge, color = QuireTheme.colors.fillPrimary)
+                            Spacer(Modifier.height(Dimens.SpaceXs))
                             Text(stringResource(Res.string.mobile_settings_version, state.version), style = MaterialTheme.typography.bodyMedium, color = QuireTheme.colors.fillSecondary)
                         }
                     }
@@ -342,4 +369,5 @@ private fun MobileSettingsPage.title() = when (this) {
     MobileSettingsPage.Sync -> Res.string.mobile_settings_sync
     MobileSettingsPage.Notifications -> Res.string.notifications
     MobileSettingsPage.About -> Res.string.mobile_settings_about
+    MobileSettingsPage.Trash -> Res.string.library_trash
 }
