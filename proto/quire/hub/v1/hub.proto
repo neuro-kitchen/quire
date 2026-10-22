@@ -27,6 +27,8 @@ message Batch {
   bytes sealed = 4;
   uint64 covers = 5;
   uint64 seq = 6;
+  // The library key epoch that sealed it (0: the key derived from the user key).
+  uint32 epoch = 7;
 }
 
 message Hello {
@@ -34,6 +36,11 @@ message Hello {
   Certificate certificate = 2;
   string library = 3;
   string author = 4;
+  // This device's name sealed with the library key (empty: none); the hub keeps it, unreadable.
+  bytes sealed_name = 5;
+  // This device's box key (X25519) and its signature by the device key; rotated keys are sealed to it.
+  bytes box_key = 6;
+  bytes box_signature = 7;
 }
 
 message Register { string code = 1; }
@@ -63,6 +70,9 @@ message Request {
     Empty devices = 8;
     Revoke revoke = 9;
     Empty bye = 10;
+    Introduce introduce = 11;
+    PutKeys put_keys = 12;
+    Empty get_keys = 13;
   }
 }
 
@@ -75,6 +85,8 @@ enum ErrorCode {
   NOT_FOUND = 5;
   TOO_LARGE = 6;
   BUSY = 7;
+  NOT_INTRODUCED = 8;
+  STALE_EPOCH = 9;
 }
 
 message Error {
@@ -89,6 +101,8 @@ message Welcome {
   uint64 used = 4;
   uint64 quota = 5;
   repeated string libraries = 6;
+  // The library's newest key epoch.
+  uint32 key_epoch = 7;
 }
 
 message Pushed { uint64 hub_seq = 1; }
@@ -110,6 +124,34 @@ message DeviceInfo {
   int64 first_seen = 2;
   int64 last_seen = 3;
   bool revoked = 4;
+  // Its name, sealed (empty: it never sent one).
+  bytes sealed_name = 5;
+  // Its last session that ended (milliseconds since 1970; 0: none) and what it moved.
+  int64 last_session = 6;
+  uint32 batches_in = 7;
+  uint32 batches_out = 8;
+  uint32 files_in = 9;
+  uint32 files_out = 10;
+  bytes box_key = 11;
+  bytes box_signature = 12;
+  // The library copies (author IDs) this device syncs.
+  repeated string authors = 13;
+}
+
+// An existing device lets the hub accept a new device of the same person, once.
+message Introduce { string device = 1; }
+// A rotated library key: the chain sealed for one device.
+message KeyEnvelope {
+  string device = 1;
+  bytes sealed = 2;
+}
+message PutKeys {
+  uint32 epoch = 1;
+  repeated KeyEnvelope envelopes = 2;
+}
+message Keys {
+  uint32 epoch = 1;
+  bytes sealed = 2;
 }
 
 message DeviceList { repeated DeviceInfo devices = 1; }
@@ -124,5 +166,6 @@ message Reply {
     FileIds present = 6;
     FileHeader file = 7;
     DeviceList devices = 8;
+    Keys keys = 9;
   }
 }

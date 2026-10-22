@@ -12,6 +12,7 @@ import dev.neurokitchen.quire.domain.repository.PreferencesRepository
 import dev.neurokitchen.quire.domain.repository.ReaderRepository
 import dev.neurokitchen.quire.domain.repository.SearchRepository
 import dev.neurokitchen.quire.domain.repository.SettingsRepository
+import dev.neurokitchen.quire.domain.repository.NotificationsRepository
 import dev.neurokitchen.quire.domain.repository.SyncRepository
 import dev.neurokitchen.quire.ffi.openLibraryAt
 import org.koin.core.module.Module
@@ -42,6 +43,7 @@ fun androidEngineModule(context: Context): Module {
         single<ExchangeRepository> { EngineExchangeRepository(get()) }
         single<LibrariesRepository> { EngineLibrariesRepository(get(), config) }
         single<SyncRepository> { EngineSyncRepository(get()) }
+        single<NotificationsRepository> { EngineNotificationsRepository(get()) }
         single<PdfRepository> { EnginePdfRepository() }
         single<SettingsRepository> { EngineSettingsRepository(config) }
     }

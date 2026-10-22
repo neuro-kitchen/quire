@@ -16,11 +16,12 @@ use quire_core::sync::{MergeSummary, Row};
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
 use super::protocol::{
-    self, Batch, BatchKind, Batches, ErrorCode, FileIds, GetFile, Hello, Pull, Push, PutFile, Register, Reply,
-    ReplyBody, Request, RequestBody, Welcome,
+    self, Batch, BatchKind, Batches, ErrorCode, FileIds, GetFile, Hello, Introduce, KeyEnvelope, Keys, Pull, Push,
+    PutFile, PutKeys, Register, Reply, ReplyBody, Request, RequestBody, Welcome,
 };
 use crate::error::{Result, SyncError};
-use crate::seal::{Kind, LibraryKey};
+use crate::keys::{self, BoxKey, LibraryKeys};
+use crate::seal::{self, Kind};
 use crate::session::{Peer, Replica};
 
 /// Rows per pushed batch (a batch is one sealed message).
@@ -33,8 +34,14 @@ pub const SNAPSHOT_AFTER: u64 = 200;
 /// A library copy as a hub session sees it: a [`Replica`] (change log, merge, files) plus the key
 /// and what a hub needs that a device session does not.
 pub trait HubReplica: Replica {
-    /// The key sealing this library's data for the hub.
-    fn library_key(&self) -> impl Future<Output = Result<LibraryKey>> + Send;
+    /// The library's keys: epoch 0 (derived from the user key) and any later ones kept here.
+    fn library_keys(&self) -> impl Future<Output = Result<LibraryKeys>> + Send;
+    /// Keeps the library's keys after this device got or made a later epoch.
+    fn save_library_keys(&self, keys: &LibraryKeys) -> impl Future<Output = Result<()>> + Send;
+    /// This device's box key (rotated keys are sealed to it) and its signature by the device key.
+    fn device_box(&self) -> Option<(BoxKey, Vec<u8>)> {
+        None
+    }
     /// Hashes of the files here.
     fn local_files(&self) -> impl Future<Output = Result<Vec<String>>> + Send;
     /// Every row of the library (a snapshot).
@@ -42,6 +49,47 @@ pub trait HubReplica: Replica {
     /// Files to download in this session (missing here and wanted now: all of them, or only those
     /// kept offline when PDFs load as they are opened).
     fn wanted_files(&self) -> impl Future<Output = Result<Vec<String>>> + Send;
+    /// This device's name for the person's other devices (sealed before it reaches the hub).
+    fn device_name(&self) -> Option<String> {
+        None
+    }
+}
+
+/// What unlinking a device did to the library's key.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Rotation {
+    /// The new key epoch.
+    pub epoch: u32,
+    /// Devices it was sealed for (this one included).
+    pub sealed_for: usize,
+    /// Remaining devices that could not get it (an older version: no box key, or a bad signature):
+    /// they cannot read what is sealed from now on until linked again.
+    pub left_out: Vec<String>,
+    /// The unlinked device's name, if it had sent one.
+    pub name: Option<String>,
+}
+
+/// One of this person's devices as the hub knows it, its name opened here.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HubDevice {
+    pub device: String,
+    /// `None`: it never sent one (an older version), or it does not open with this library's key.
+    pub name: Option<String>,
+    /// Milliseconds since 1970.
+    pub first_seen: i64,
+    pub last_seen: i64,
+    pub revoked: bool,
+    /// Its last session that ended (0: none recorded), and what it moved then.
+    pub last_session: i64,
+    pub batches_in: u32,
+    pub batches_out: u32,
+    pub files_in: u32,
+    pub files_out: u32,
+    /// Its box key and the signature by its device key (empty: an older version).
+    pub box_key: Vec<u8>,
+    pub box_signature: Vec<u8>,
+    /// The library copies (author IDs) it syncs: whose changes are its own.
+    pub authors: Vec<String>,
 }
 
 /// How a hub session runs.
@@ -84,6 +132,12 @@ pub struct HubReport {
     /// Files here the hub said it lacks and did not take (over quota): no longer safe to evict,
     /// whatever an earlier session said.
     pub not_on_hub: Vec<String>,
+    /// What came in, by the library copy that last changed it (an author ID) and kind: counts.
+    pub arrived: Vec<(String, String, usize)>,
+    /// This person's devices after the sync (their names opened here): who sent what, and new ones.
+    pub devices: Vec<HubDevice>,
+    /// The library key moved to this epoch in this session (another device unlinked one).
+    pub key_received: Option<u32>,
 }
 
 /// The peer a hub is in the change log (its cursor, and the origin of rows pulled from it).
@@ -95,7 +149,7 @@ struct Session<'a, R, Rd, Wr> {
     replica: &'a R,
     reader: &'a mut Rd,
     writer: &'a mut Wr,
-    key: LibraryKey,
+    keys: LibraryKeys,
     library: String,
     author: String,
     peer: Peer,
@@ -124,13 +178,77 @@ where
         }
     }
 
-    async fn hello(&mut self, code: Option<&str>, report: &mut HubReport) -> Result<Welcome> {
-        let hello = Hello {
+    /// Who is talking: the certificate, the library and author, this device's name (sealed with
+    /// the newest key) and its box key (signed by the device key).
+    fn hello_message(&self) -> Hello {
+        let certificate = self.replica.certificate();
+        let (epoch, key) = self.keys.current();
+        let sealed_name = self
+            .replica
+            .device_name()
+            .and_then(|name| key.seal_name(&self.library, &certificate.device, epoch, &name).ok())
+            .unwrap_or_default();
+        let (box_key, box_signature) =
+            self.replica.device_box().map(|(key, signature)| (key.public().to_vec(), signature)).unwrap_or_default();
+        Hello {
             protocol: protocol::PROTOCOL,
-            certificate: Some((&self.replica.certificate()).into()),
+            certificate: Some((&certificate).into()),
             library: self.library.clone(),
             author: self.author.clone(),
+            sealed_name,
+            box_key,
+            box_signature,
+        }
+    }
+
+    /// Gets this device's envelope of the library's newest epoch and keeps the keys in it; returns
+    /// that epoch.
+    async fn fetch_keys(&mut self) -> Result<u32> {
+        let Keys { epoch, sealed } = match self.ask(RequestBody::GetKeys(protocol::Empty {})).await? {
+            ReplyBody::Keys(keys) => keys,
+            other => return Err(unexpected("Keys", &other)),
         };
+        let Some((mine, _)) = self.replica.device_box().filter(|_| !sealed.is_empty()) else {
+            return Err(self.keys.get(epoch).map(|_| ()).expect_err("an epoch beyond this device's"));
+        };
+        let device = self.replica.certificate().device;
+        let chain = keys::open_chain(&mine, &sealed, &self.library, &device, epoch)?;
+        self.keys.merge(&chain);
+        self.keys.get(epoch)?;
+        self.replica.save_library_keys(&self.keys).await?;
+        Ok(epoch)
+    }
+
+    /// This person's devices, their names opened with this library's keys.
+    async fn devices(&mut self) -> Result<Vec<HubDevice>> {
+        let list = match self.ask(RequestBody::Devices(super::protocol::Empty {})).await? {
+            ReplyBody::Devices(list) => list.devices,
+            other => return Err(unexpected("Devices", &other)),
+        };
+        Ok(list
+            .into_iter()
+            .map(|d| HubDevice {
+                name: seal::name_epoch(&d.sealed_name)
+                    .and_then(|epoch| self.keys.get(epoch).ok())
+                    .and_then(|key| key.open_name(&self.library, &d.device, &d.sealed_name)),
+                device: d.device,
+                first_seen: d.first_seen,
+                last_seen: d.last_seen,
+                revoked: d.revoked,
+                last_session: d.last_session,
+                batches_in: d.batches_in,
+                batches_out: d.batches_out,
+                files_in: d.files_in,
+                files_out: d.files_out,
+                box_key: d.box_key,
+                box_signature: d.box_signature,
+                authors: d.authors,
+            })
+            .collect())
+    }
+
+    async fn hello(&mut self, code: Option<&str>, report: &mut HubReport) -> Result<Welcome> {
+        let hello = self.hello_message();
         let welcome = match self.ask(RequestBody::Hello(hello)).await? {
             ReplyBody::Welcome(welcome) => welcome,
             other => return Err(unexpected("Welcome", &other)),
@@ -160,7 +278,8 @@ where
             for part in rows.chunks(ROWS_PER_BATCH) {
                 let plain = serde_json::to_vec(part).map_err(|e| SyncError::Protocol(e.to_string()))?;
                 let number = u64::try_from(last).unwrap_or(0);
-                let sealed = self.key.seal_batch(Kind::Changes, &self.library, &self.author, number, &plain)?;
+                let (epoch, key) = self.keys.current();
+                let sealed = key.seal_batch(Kind::Changes, &self.library, &self.author, number, epoch, &plain)?;
                 let batch = Batch {
                     author: self.author.clone(),
                     number,
@@ -168,6 +287,7 @@ where
                     sealed,
                     covers: 0,
                     seq: 0,
+                    epoch,
                 };
                 match self.ask(RequestBody::Push(Push { batches: vec![batch] })).await? {
                     ReplyBody::Pushed(_) => {}
@@ -194,11 +314,26 @@ where
             for batch in &batches {
                 let kind =
                     BatchKind::try_from(batch.kind).map_err(|_| SyncError::Protocol("unknown batch kind".into()))?;
-                let plain =
-                    self.key.open_batch(kind.into(), &self.library, &batch.author, batch.number, &batch.sealed)?;
+                let key = self.keys.get(batch.epoch)?;
+                let plain = key.open_batch(
+                    kind.into(),
+                    &self.library,
+                    &batch.author,
+                    batch.number,
+                    batch.epoch,
+                    &batch.sealed,
+                )?;
                 let mut part: Vec<Row> =
                     serde_json::from_slice(&plain).map_err(|e| SyncError::Protocol(format!("a batch's rows: {e}")))?;
                 rows.append(&mut part);
+            }
+            // What came in, by the copy that last changed it and kind (for the person's notifications).
+            for row in &rows {
+                let (by, kind) = (row.version().1.to_string(), row.kind());
+                match report.arrived.iter_mut().find(|(b, k, _)| *b == by && k == kind) {
+                    Some((_, _, count)) => *count += 1,
+                    None => report.arrived.push((by, kind.to_string(), 1)),
+                }
             }
             // Rows of one delivery merge together, in hub order, so they find what they point to.
             if !rows.is_empty() {
@@ -220,7 +355,7 @@ where
 
     async fn upload_files(&mut self, report: &mut HubReport) -> Result<()> {
         let ids: HashMap<String, String> =
-            self.replica.local_files().await?.into_iter().map(|hash| (self.key.file_id(&hash), hash)).collect();
+            self.replica.local_files().await?.into_iter().map(|hash| (self.keys.base().file_id(&hash), hash)).collect();
         if ids.is_empty() {
             return Ok(());
         }
@@ -235,7 +370,8 @@ where
                 report.not_on_hub.push(hash.clone());
                 continue;
             };
-            let sealed = self.key.seal_file(id, &bytes)?;
+            let (epoch, key) = self.keys.current();
+            let sealed = key.seal_file(id, epoch, &bytes)?;
             protocol::send(
                 self.writer,
                 &Request::of(RequestBody::PutFile(PutFile { id: id.clone(), size: sealed.len() as u64 })),
@@ -261,7 +397,8 @@ where
     async fn snapshot(&mut self, covers: u64) -> Result<()> {
         let rows = self.replica.snapshot().await?;
         let plain = serde_json::to_vec(&rows).map_err(|e| SyncError::Protocol(e.to_string()))?;
-        let sealed = self.key.seal_batch(Kind::Snapshot, &self.library, &self.author, covers, &plain)?;
+        let (epoch, key) = self.keys.current();
+        let sealed = key.seal_batch(Kind::Snapshot, &self.library, &self.author, covers, epoch, &plain)?;
         let batch = Batch {
             author: self.author.clone(),
             number: covers,
@@ -269,6 +406,7 @@ where
             sealed,
             covers,
             seq: 0,
+            epoch,
         };
         match self.ask(RequestBody::Push(Push { batches: vec![batch] })).await? {
             ReplyBody::Pushed(_) => Ok(()),
@@ -309,7 +447,7 @@ where
         replica,
         reader,
         writer,
-        key: replica.library_key().await?,
+        keys: replica.library_keys().await?,
         library,
         author: replica.device(),
         peer: hub_peer(hub, &certificate.user),
@@ -329,8 +467,15 @@ where
         replica.adopt(only).await?;
         report.joined = true;
         session.library = replica.library_id().await?;
-        session.key = replica.library_key().await?;
+        session.keys = replica.library_keys().await?;
         welcome = session.hello(None, report).await?;
+    }
+    // A device was unlinked since this one last synced: the library key moved on.
+    if welcome.key_epoch > session.keys.current().0 {
+        match session.fetch_keys().await {
+            Ok(epoch) => report.key_received = Some(epoch),
+            Err(error) => return Err(session.end_with(error).await),
+        }
     }
     Ok((session, welcome))
 }
@@ -384,12 +529,8 @@ where
         session.snapshot(position).await?;
         report.snapshot = true;
     }
-    let hello = Hello {
-        protocol: protocol::PROTOCOL,
-        certificate: Some((&session.replica.certificate()).into()),
-        library: session.library.clone(),
-        author: session.author.clone(),
-    };
+    report.devices = session.devices().await?;
+    let hello = session.hello_message();
     if let ReplyBody::Welcome(after) = session.ask(RequestBody::Hello(hello)).await? {
         (report.used, report.quota) = (after.used, after.quota);
     }
@@ -421,7 +562,7 @@ where
     Rd: AsyncRead + Unpin,
     Wr: AsyncWrite + Unpin,
 {
-    let id = session.key.file_id(hash);
+    let id = session.keys.base().file_id(hash);
     let header = match session.ask(RequestBody::GetFile(GetFile { id: id.clone() })).await {
         Ok(ReplyBody::File(header)) => header,
         Ok(other) => return Err(unexpected("File", &other)),
@@ -429,19 +570,16 @@ where
         Err(e) => return Err(e),
     };
     let sealed = protocol::receive_bytes(session.reader, header.size).await?;
-    let plain = session.key.open_file(&id, &sealed)?;
+    let epoch =
+        seal::file_epoch(&sealed).ok_or_else(|| SyncError::Protocol("a file from the hub is not sealed".into()))?;
+    let plain = session.keys.get(epoch)?.open_file(&id, &sealed)?;
     // `write_file` refuses bytes whose BLAKE3 hash is not `hash`.
     session.replica.write_file(hash, plain).await?;
     Ok(true)
 }
 
 /// This person's devices known to the hub.
-pub async fn devices<R, Rd, Wr>(
-    replica: &R,
-    hub: &str,
-    reader: &mut Rd,
-    writer: &mut Wr,
-) -> Result<Vec<super::protocol::DeviceInfo>>
+pub async fn devices<R, Rd, Wr>(replica: &R, hub: &str, reader: &mut Rd, writer: &mut Wr) -> Result<Vec<HubDevice>>
 where
     R: HubReplica,
     Rd: AsyncRead + Unpin,
@@ -449,17 +587,25 @@ where
 {
     let mut report = HubReport::default();
     let (mut session, _) = open(replica, hub, None, reader, writer, &mut report).await?;
-    let list = match session.ask(RequestBody::Devices(super::protocol::Empty {})).await {
-        Ok(ReplyBody::Devices(list)) => list.devices,
-        Ok(other) => return Err(session.end_with(unexpected("Devices", &other)).await),
-        Err(error) => return Err(session.end_with(error).await),
-    };
-    session.bye().await?;
-    Ok(list)
+    match session.devices().await {
+        Ok(devices) => {
+            session.bye().await?;
+            Ok(devices)
+        }
+        Err(error) => Err(session.end_with(error).await),
+    }
 }
 
-/// Makes the hub refuse `device` (a network ID) of this person from now on.
-pub async fn revoke<R, Rd, Wr>(replica: &R, hub: &str, device: &str, reader: &mut Rd, writer: &mut Wr) -> Result<()>
+/// Unlinks `device` (a network ID) of this person: the hub refuses it from now on, and the
+/// library key rotates (`crate::keys`): a new random key, sealed for each remaining device whose
+/// box key its device key signed. Returns what the rotation did.
+pub async fn unlink<R, Rd, Wr>(
+    replica: &R,
+    hub: &str,
+    device: &str,
+    reader: &mut Rd,
+    writer: &mut Wr,
+) -> Result<Rotation>
 where
     R: HubReplica,
     Rd: AsyncRead + Unpin,
@@ -467,7 +613,77 @@ where
 {
     let mut report = HubReport::default();
     let (mut session, _) = open(replica, hub, None, reader, writer, &mut report).await?;
-    match session.ask(RequestBody::Revoke(super::protocol::Revoke { device: device.trim().to_string() })).await {
+    let revoke = RequestBody::Revoke(super::protocol::Revoke { device: device.trim().to_string() });
+    let done = async {
+        match session.ask(revoke).await? {
+            ReplyBody::Ok(_) => {}
+            other => return Err(unexpected("Ok", &other)),
+        }
+        // Another device may rotate at the same moment: then take its keys and rotate after it.
+        match rotate(&mut session, device).await {
+            Err(SyncError::Hub { code, .. }) if code == ErrorCode::StaleEpoch as i32 => {
+                session.fetch_keys().await?;
+                rotate(&mut session, device).await
+            }
+            other => other,
+        }
+    }
+    .await;
+    match done {
+        Ok(rotation) => {
+            session.bye().await?;
+            Ok(rotation)
+        }
+        Err(error) => Err(session.end_with(error).await),
+    }
+}
+
+/// The next epoch: a random key, sealed with the whole chain for each device not revoked
+/// (`unlinked`: the device just unlinked, named in the result).
+async fn rotate<R, Rd, Wr>(session: &mut Session<'_, R, Rd, Wr>, unlinked: &str) -> Result<Rotation>
+where
+    R: HubReplica,
+    Rd: AsyncRead + Unpin,
+    Wr: AsyncWrite + Unpin,
+{
+    let devices = session.devices().await?;
+    let mut keys = session.keys.clone();
+    let epoch = keys.rotate()?;
+    let chain = keys.chain();
+    let name = devices.iter().find(|d| d.device == unlinked.trim()).and_then(|d| d.name.clone());
+    let mut rotation = Rotation { epoch, name, ..Rotation::default() };
+    let mut envelopes = Vec::new();
+    for d in devices.iter().filter(|d| !d.revoked) {
+        let public: Option<[u8; 32]> = d.box_key.as_slice().try_into().ok();
+        match public.filter(|p| keys::box_key_is_devices(&d.device, p, &d.box_signature)) {
+            Some(public) => envelopes.push(KeyEnvelope {
+                device: d.device.clone(),
+                sealed: keys::seal_chain(&chain, &public, &session.library, &d.device, epoch)?,
+            }),
+            None => rotation.left_out.push(d.device.clone()),
+        }
+    }
+    rotation.sealed_for = envelopes.len();
+    match session.ask(RequestBody::PutKeys(PutKeys { epoch, envelopes })).await? {
+        ReplyBody::Ok(_) => {}
+        other => return Err(unexpected("Ok", &other)),
+    }
+    // Kept only once the hub holds the envelopes: what is sealed from now on is readable elsewhere.
+    session.keys = keys;
+    session.replica.save_library_keys(&session.keys).await?;
+    Ok(rotation)
+}
+
+/// Lets the hub accept `device` (a network ID), a new device of this person being linked.
+pub async fn introduce<R, Rd, Wr>(replica: &R, hub: &str, device: &str, reader: &mut Rd, writer: &mut Wr) -> Result<()>
+where
+    R: HubReplica,
+    Rd: AsyncRead + Unpin,
+    Wr: AsyncWrite + Unpin,
+{
+    let mut report = HubReport::default();
+    let (mut session, _) = open(replica, hub, None, reader, writer, &mut report).await?;
+    match session.ask(RequestBody::Introduce(Introduce { device: device.trim().to_string() })).await {
         Ok(ReplyBody::Ok(_)) => session.bye().await,
         Ok(other) => Err(session.end_with(unexpected("Ok", &other)).await),
         Err(error) => Err(session.end_with(error).await),
@@ -491,6 +707,7 @@ fn unexpected(wanted: &str, got: &ReplyBody) -> SyncError {
         ReplyBody::Present(_) => "Present",
         ReplyBody::File(_) => "File",
         ReplyBody::Devices(_) => "Devices",
+        ReplyBody::Keys(_) => "Keys",
     };
     SyncError::Protocol(format!("the hub answered {name}, expected {wanted}"))
 }
@@ -548,8 +765,12 @@ mod stalling_hub {
     }
 
     impl HubReplica for Empty {
-        async fn library_key(&self) -> Result<LibraryKey> {
-            Ok(LibraryKey::derive(&[7; 32], "lib_test"))
+        async fn library_keys(&self) -> Result<LibraryKeys> {
+            Ok(LibraryKeys::new(crate::seal::LibraryKey::derive(&[7; 32], "lib_test")))
+        }
+
+        async fn save_library_keys(&self, _: &LibraryKeys) -> Result<()> {
+            Ok(())
         }
         async fn local_files(&self) -> Result<Vec<String>> {
             Ok(Vec::new())

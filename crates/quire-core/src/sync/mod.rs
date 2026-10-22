@@ -60,6 +60,25 @@ impl Row {
         }
     }
 
+    /// What the row is, in one word (for what a sync brought: "2 notes, 1 highlight").
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::Reference(_) => "reference",
+            Self::Project(_) => "project",
+            Self::Membership(_) => "membership",
+            Self::Tag(_) => "tag",
+            Self::Tagging(_) => "tagging",
+            Self::Note(_) => "note",
+            Self::Highlight(_) => "highlight",
+            Self::Relation(_) => "relation",
+            Self::Attachment(_) => "attachment",
+            Self::Distinct(_) => "distinct",
+            Self::Reading(_) => "reading",
+            Self::SavedSearch(_) => "saved_search",
+            Self::Member(_) => "member",
+        }
+    }
+
     /// The user's own records: they go to the user's devices only, never to collaborators.
     pub fn is_personal(&self) -> bool {
         matches!(self, Self::Reading(_) | Self::SavedSearch(_))

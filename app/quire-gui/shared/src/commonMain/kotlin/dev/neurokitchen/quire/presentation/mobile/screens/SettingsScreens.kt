@@ -58,6 +58,7 @@ import dev.neurokitchen.quire.presentation.screens.settings.SettingsEvent
 import dev.neurokitchen.quire.presentation.screens.settings.SettingsSection
 import dev.neurokitchen.quire.presentation.screens.settings.SettingsState
 import dev.neurokitchen.quire.presentation.screens.settings.SettingsViewModel
+import dev.neurokitchen.quire.presentation.screens.notifications.NotificationsViewModel
 import dev.neurokitchen.quire.resources.Res
 import dev.neurokitchen.quire.resources.destination_settings
 import dev.neurokitchen.quire.resources.ic_chevron_right
@@ -75,6 +76,9 @@ import dev.neurokitchen.quire.resources.mobile_settings_reading
 import dev.neurokitchen.quire.resources.mobile_settings_reading_hint
 import dev.neurokitchen.quire.resources.mobile_settings_sync
 import dev.neurokitchen.quire.resources.mobile_settings_sync_hint
+import dev.neurokitchen.quire.resources.mobile_settings_notifications_hint
+import dev.neurokitchen.quire.resources.mobile_settings_notifications_unread
+import dev.neurokitchen.quire.resources.notifications
 import dev.neurokitchen.quire.resources.mobile_settings_reader_font
 import dev.neurokitchen.quire.resources.mobile_settings_reader_size
 import dev.neurokitchen.quire.resources.mobile_settings_reader_theme
@@ -105,6 +109,12 @@ fun SettingsTab(onOpen: (MobileSettingsPage) -> Unit) {
                 PageRow(Res.string.mobile_settings_account, Res.string.mobile_settings_account_hint) { onOpen(MobileSettingsPage.Account) }
                 PageRow(Res.string.mobile_settings_libraries, Res.string.mobile_settings_libraries_hint) { onOpen(MobileSettingsPage.Libraries) }
                 PageRow(Res.string.mobile_settings_sync, Res.string.mobile_settings_sync_hint) { onOpen(MobileSettingsPage.Sync) }
+                val notifications by koinViewModel<NotificationsViewModel>().state.collectAsStateWithLifecycle()
+                PageRow(
+                    Res.string.notifications,
+                    Res.string.mobile_settings_notifications_hint,
+                    badge = if (notifications.unread > 0) stringResource(Res.string.mobile_settings_notifications_unread, notifications.unread) else null,
+                ) { onOpen(MobileSettingsPage.Notifications) }
             }
         }
         item { Spacer(Modifier.size(Dimens.SpaceMd)) }
@@ -123,6 +133,7 @@ fun SettingsPageScreen(
 ) {
     // Sync is the Tools tab's, not a settings section: its own screen.
     if (page == MobileSettingsPage.Sync) return SyncPageScreen(onBack)
+    if (page == MobileSettingsPage.Notifications) return NotificationsPageScreen(onBack)
     val section = when (page) {
         MobileSettingsPage.Account -> SettingsSection.General
         MobileSettingsPage.Libraries -> SettingsSection.Libraries
@@ -144,7 +155,7 @@ fun SettingsPageScreen(
                 MobileSettingsPage.Reading -> item { ReadingPage(state, onEvent) }
                 MobileSettingsPage.Account -> item { FieldsPage(state, onEvent, emptyNote = null) }
                 MobileSettingsPage.Libraries -> item { FieldsPage(state, onEvent, emptyNote = stringResource(Res.string.mobile_settings_libraries_empty)) }
-                MobileSettingsPage.Sync -> Unit
+                MobileSettingsPage.Sync, MobileSettingsPage.Notifications -> Unit
                 MobileSettingsPage.About -> item {
                     Group {
                         Column(Modifier.fillMaxWidth().padding(Dimens.SpaceMd)) {
@@ -307,7 +318,7 @@ private fun FieldRow(field: SettingField, onEvent: (SettingsEvent) -> Unit) {
 
 /** A row opening a settings page: its name and what is in it. */
 @Composable
-private fun PageRow(title: StringResource, hint: StringResource, onClick: () -> Unit) {
+private fun PageRow(title: StringResource, hint: StringResource, badge: String? = null, onClick: () -> Unit) {
     val colors = QuireTheme.colors
     Row(
         Modifier.fillMaxWidth().heightIn(min = 64.dp).clickable(onClick = onClick).padding(horizontal = Dimens.SpaceMd, vertical = Dimens.SpaceXs),
@@ -317,6 +328,7 @@ private fun PageRow(title: StringResource, hint: StringResource, onClick: () -> 
             Text(stringResource(title), style = MaterialTheme.typography.bodyLarge, color = colors.fillPrimary)
             Text(stringResource(hint), style = MaterialTheme.typography.bodySmall, color = colors.fillSecondary)
         }
+        badge?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = colors.accentRed) }
         Spacer(Modifier.width(Dimens.SpaceXs))
         Icon(painterResource(Res.drawable.ic_chevron_right), contentDescription = null, tint = colors.fillSecondary)
     }
@@ -328,5 +340,6 @@ private fun MobileSettingsPage.title() = when (this) {
     MobileSettingsPage.Account -> Res.string.mobile_settings_account
     MobileSettingsPage.Libraries -> Res.string.mobile_settings_libraries
     MobileSettingsPage.Sync -> Res.string.mobile_settings_sync
+    MobileSettingsPage.Notifications -> Res.string.notifications
     MobileSettingsPage.About -> Res.string.mobile_settings_about
 }

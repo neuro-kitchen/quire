@@ -52,6 +52,45 @@ impl Hub {
         client
     }
 
+    /// `by` (a device already on the hub) introduces `new` (linking does this before the keys).
+    async fn introduce(&self, by: &Engine, new: &Engine) {
+        let (device, _) = new.sync_id().unwrap();
+        let (left, right) = tokio::io::duplex(256 * 1024);
+        let (mut left_read, mut left_write) = tokio::io::split(left);
+        let (mut right_read, mut right_write) = tokio::io::split(right);
+        let (client, server) = tokio::join!(
+            by.hub_introduce_session(&self.id, &device, &mut left_read, &mut left_write),
+            quire_hub::session::serve(&self.store, &self.settings, None, &mut right_read, &mut right_write),
+        );
+        server.unwrap();
+        client.unwrap();
+    }
+
+    async fn unlink(&self, by: &Engine, gone: &Engine) -> quire_sync::hub::Rotation {
+        let (device, _) = gone.sync_id().unwrap();
+        let (left, right) = tokio::io::duplex(256 * 1024);
+        let (mut left_read, mut left_write) = tokio::io::split(left);
+        let (mut right_read, mut right_write) = tokio::io::split(right);
+        let (client, server) = tokio::join!(
+            by.hub_unlink_session(&self.id, &device, &mut left_read, &mut left_write),
+            quire_hub::session::serve(&self.store, &self.settings, None, &mut right_read, &mut right_write),
+        );
+        server.unwrap();
+        client.unwrap()
+    }
+
+    async fn devices(&self, device: &Engine) -> Vec<quire_sync::hub::HubDevice> {
+        let (left, right) = tokio::io::duplex(256 * 1024);
+        let (mut left_read, mut left_write) = tokio::io::split(left);
+        let (mut right_read, mut right_write) = tokio::io::split(right);
+        let (client, server) = tokio::join!(
+            device.hub_devices_session(&self.id, &mut left_read, &mut left_write),
+            quire_hub::session::serve(&self.store, &self.settings, None, &mut right_read, &mut right_write),
+        );
+        server.unwrap();
+        client.unwrap()
+    }
+
     async fn fetch(&self, device: &Engine, hash: &str) -> bool {
         let (left, right) = tokio::io::duplex(256 * 1024);
         let (mut left_read, mut left_write) = tokio::io::split(left);
@@ -122,7 +161,8 @@ async fn devices_converge_through_a_hub_that_reads_nothing() {
     assert!(first.registered && first.pushed >= 4, "{first:?}");
     assert_eq!(first.files_uploaded, 1);
 
-    // The second device needs no code (its certificate is the same person's) and joins.
+    // The second device needs no code once one of the person's devices introduced it (linking), and joins.
+    hub.introduce(&a, &b).await;
     let joined = hub.sync(&b, options(None)).await.unwrap();
     assert!(joined.joined && !joined.registered, "{joined:?}");
     assert!(joined.pulled.applied >= 4, "{joined:?}");
@@ -192,6 +232,7 @@ async fn a_snapshot_lets_a_new_device_start_from_it() {
     }
     let (key, _) = filled(&a, dirs[0].path()).await;
     hub.sync(&a, options(Some(&hub.setup_code()))).await.unwrap();
+    hub.introduce(&a, &b).await;
     hub.sync(&b, options(None)).await.unwrap();
     b.tag(&key, &["later".to_string()]).await.unwrap();
     hub.sync(&b, options(None)).await.unwrap();
@@ -202,6 +243,7 @@ async fn a_snapshot_lets_a_new_device_start_from_it() {
     assert!(disk_before > 0);
 
     // C starts from the snapshot: everything, including B's tag that came in a dropped batch.
+    hub.introduce(&a, &c).await;
     let joined = hub.sync(&c, options(None)).await.unwrap();
     assert!(joined.joined, "{joined:?}");
     let (reference, _) = c.show(&key).await.unwrap();
@@ -223,6 +265,7 @@ async fn over_quota_files_wait_and_metadata_still_syncs() {
     let report = hub.sync(&a, options(Some(&hub.setup_code()))).await.unwrap();
     assert!(report.over_quota >= 1, "{report:?}");
     assert!(report.quota == 4 * 1024 && report.used <= report.quota, "{report:?}");
+    hub.introduce(&a, &b).await;
     hub.sync(&b, options(None)).await.unwrap();
     assert_eq!(b.notes(Some(&key)).await.unwrap().len(), 1, "metadata syncs anyway");
     let _ = hash;
@@ -257,6 +300,7 @@ async fn by_default_a_device_downloads_every_pdf_at_sync() {
     b.import_user_key(&a.export_user_key().unwrap()).unwrap();
     let (key, _) = filled(&a, dir_a.path()).await;
     hub.sync(&a, options(Some(&hub.setup_code()))).await.unwrap();
+    hub.introduce(&a, &b).await;
     let report = hub.sync(&b, options(None)).await.unwrap();
     assert_eq!(report.files_downloaded, 1, "{report:?}");
     assert!(b.pdfs_of(&key).await.unwrap().1[0].1.is_file());
@@ -282,6 +326,7 @@ async fn kept_offline_papers_come_at_sync_and_eviction_keeps_what_matters() {
     a.link("three", &"thesis".parse().unwrap()).await.unwrap();
     hub.sync(&a, options(Some(&hub.setup_code()))).await.unwrap();
 
+    hub.introduce(&a, &b).await;
     let first = hub.sync(&b, options(None)).await.unwrap();
     assert_eq!(first.files_downloaded, 0, "nothing kept offline yet: {first:?}");
     b.keep_project_offline(&"thesis".parse().unwrap(), true).await.unwrap();
@@ -353,4 +398,149 @@ async fn a_file_the_hub_no_longer_holds_is_not_evicted() {
     let b = lazy_engine(dir.path(), 1).await;
     let eviction = b.evict_pdfs().await.unwrap();
     assert_eq!(eviction.removed, 0, "no hub holds them now: {eviction:?}");
+}
+
+/// Each device's name reaches the person's other devices through the hub, sealed: the hub's disk
+/// never holds it, and the device list shows it with what each device last synced.
+#[tokio::test]
+async fn device_names_travel_sealed_and_the_list_shows_activity() {
+    let hub = Hub::new(0);
+    let (dir_a, dir_b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    std::fs::write(dir_a.path().join("config.toml"), "[device]\nname = \"Ana's laptop\"\n").unwrap();
+    std::fs::write(dir_b.path().join("config.toml"), "[device]\nname = \"Ana's phone\"\n").unwrap();
+    let (a, b) = (engine(dir_a.path(), None).await, engine(dir_b.path(), None).await);
+    b.import_user_key(&a.export_user_key().unwrap()).unwrap();
+    filled(&a, dir_a.path()).await;
+    hub.sync(&a, options(Some(&hub.setup_code()))).await.unwrap();
+    hub.introduce(&a, &b).await;
+    hub.sync(&b, options(None)).await.unwrap();
+
+    let devices = hub.devices(&b).await;
+    let names: Vec<_> = devices.iter().map(|d| d.name.clone()).collect();
+    assert_eq!(names, [Some("Ana's laptop".to_string()), Some("Ana's phone".to_string())]);
+    let laptop = &devices[0];
+    assert!(laptop.last_session > 0 && laptop.batches_in >= 1 && laptop.files_in == 1, "{laptop:?}");
+    for plain in ["Ana's laptop", "Ana's phone"] {
+        assert!(!contains(&hub.bytes_on_disk(), plain), "the hub's disk holds `{plain}`");
+    }
+}
+
+/// Linking a device needs this device to sync through a hub first (the new one gets the library
+/// from it, and the link uses its relay): refused before any network is touched.
+#[tokio::test]
+async fn linking_waits_for_a_hub() {
+    let dir = tempfile::tempdir().unwrap();
+    let a = engine(dir.path(), None).await;
+    let refused = a.link_offer().await.err().expect("refused without a hub");
+    assert!(refused.to_string().contains("no sync hub yet"), "{refused}");
+}
+
+/// The whole story of an unlinked device: a device with the user key alone is not let in until
+/// introduced; unlinking rotates the library key, the remaining device takes the new key by
+/// itself, the unlinked one (and any new ID it makes with the user key) is shut out, a device
+/// linked after reads everything, and the recovery kit carries the new key.
+#[tokio::test]
+async fn unlinking_rotates_the_key_and_shuts_the_device_out() {
+    let hub = Hub::new(0);
+    let dirs: Vec<_> = (0..5).map(|_| tempfile::tempdir().unwrap()).collect();
+    let mut devices = Vec::new();
+    for dir in &dirs {
+        devices.push(engine(dir.path(), None).await);
+    }
+    let [laptop, phone, tablet, thief, later] = &devices[..] else { unreachable!() };
+    for other in [phone, tablet, thief, later] {
+        other.import_user_key(&laptop.export_user_key().unwrap()).unwrap();
+    }
+    let (key, _) = filled(laptop, dirs[0].path()).await;
+    hub.sync(laptop, options(Some(&hub.setup_code()))).await.unwrap();
+
+    // The user key alone does not let a new device in.
+    let refused = hub.sync(phone, options(None)).await.unwrap_err();
+    assert!(refused.to_string().contains("link it from one of your devices"), "{refused}");
+    hub.introduce(laptop, phone).await;
+    hub.introduce(laptop, tablet).await;
+    hub.sync(phone, options(None)).await.unwrap();
+    hub.sync(tablet, options(None)).await.unwrap();
+
+    // Unlink the tablet: the key rotates, sealed for the laptop and the phone.
+    let rotation = hub.unlink(laptop, tablet).await;
+    assert_eq!((rotation.epoch, rotation.sealed_for, rotation.left_out.len()), (1, 2, 0), "{rotation:?}");
+    laptop.add_note(Some(&key), "after the unlink").await.unwrap();
+    hub.sync(laptop, options(None)).await.unwrap();
+
+    // The phone takes the new key by itself and reads the new note.
+    hub.sync(phone, options(None)).await.unwrap();
+    let notes: Vec<_> = phone.notes(Some(&key)).await.unwrap().into_iter().map(|n| n.body).collect();
+    assert!(notes.iter().any(|n| n == "after the unlink"), "{notes:?}");
+    assert_eq!(phone.library_keys().await.unwrap().current().0, 1);
+    let told: Vec<_> = phone.activity(20).await.unwrap().into_iter().map(|a| (a.kind, a.detail)).collect();
+    assert!(
+        told.contains(&("key_changed".to_string(), "1".to_string())),
+        "the phone is told the key changed: {told:?}"
+    );
+    let told: Vec<_> = laptop.activity(20).await.unwrap().into_iter().map(|a| (a.kind, a.detail)).collect();
+    assert!(told.contains(&("unlinked".to_string(), "1".to_string())), "{told:?}");
+
+    // The tablet is refused, and has no key of epoch 1; a new ID made with the user key is refused too.
+    let refused = hub.sync(tablet, options(None)).await.unwrap_err();
+    assert!(refused.to_string().contains("removed from your account"), "{refused}");
+    assert_eq!(tablet.library_keys().await.unwrap().current().0, 0);
+    let refused = hub.sync(thief, options(None)).await.unwrap_err();
+    assert!(refused.to_string().contains("link it from one of your devices"), "{refused}");
+
+    // A device set up after the unlink with the recovery kit's library keys (what linking gives it),
+    // introduced: it reads everything, old and new.
+    let kit = laptop.recovery_kit().await.unwrap();
+    let keys_line = kit.lines().find_map(|l| l.strip_prefix("Library keys: ")).expect("the kit names the new key");
+    later.import_library_keys(keys_line).unwrap();
+    hub.introduce(laptop, later).await;
+    hub.sync(later, options(None)).await.unwrap();
+    let notes: Vec<_> = later.notes(Some(&key)).await.unwrap().into_iter().map(|n| n.body).collect();
+    assert!(notes.iter().any(|n| n == "after the unlink") && notes.iter().any(|n| n == NOTE), "{notes:?}");
+
+    // The recovery kit holds the new key; the hub's disk holds no plain text.
+    assert!(kit.contains(&laptop.library_keys().await.unwrap().chain_text()));
+    for plain in ["after the unlink", NOTE, "Diaphragm pacing"] {
+        assert!(!contains(&hub.bytes_on_disk(), plain), "the hub's disk holds `{plain}`");
+    }
+}
+
+/// Each device's notifications: what came from which of the person's devices (by name), a device
+/// new to it, and an unlink. Nothing about the device's own changes.
+#[tokio::test]
+async fn notifications_say_what_came_from_whom() {
+    let hub = Hub::new(0);
+    let (dir_a, dir_b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    std::fs::write(dir_a.path().join("config.toml"), "[device]\nname = \"Ana's laptop\"\n").unwrap();
+    std::fs::write(dir_b.path().join("config.toml"), "[device]\nname = \"Ana's phone\"\n").unwrap();
+    let (a, b) = (engine(dir_a.path(), None).await, engine(dir_b.path(), None).await);
+    b.import_user_key(&a.export_user_key().unwrap()).unwrap();
+    let (key, _) = filled(&a, dir_a.path()).await;
+    hub.sync(&a, options(Some(&hub.setup_code()))).await.unwrap();
+    assert!(a.activity(10).await.unwrap().is_empty(), "the first device list only teaches: {:?}", a.activity(10).await);
+
+    hub.introduce(&a, &b).await;
+    hub.sync(&b, options(None)).await.unwrap();
+    let from_laptop = b.activity(10).await.unwrap().into_iter().find(|n| n.kind == "sync").expect("what came");
+    assert_eq!(from_laptop.source.as_deref(), Some("Ana's laptop"));
+    for part in ["reference=1", "note=1", "highlight=1", "attachment=1"] {
+        assert!(from_laptop.detail.split(',').any(|p| p == part), "{part} in {}", from_laptop.detail);
+    }
+
+    // The laptop sees the phone for the first time, then what it changed.
+    b.add_note(Some(&key), "from the phone").await.unwrap();
+    hub.sync(&b, options(None)).await.unwrap();
+    hub.sync(&a, options(None)).await.unwrap();
+    let told = a.activity(10).await.unwrap();
+    assert!(told.iter().any(|n| n.kind == "new_device" && n.source.as_deref() == Some("Ana's phone")), "{told:?}");
+    let note = told.iter().find(|n| n.kind == "sync").expect("the phone's note");
+    assert_eq!((note.source.as_deref(), note.detail.as_str()), (Some("Ana's phone"), "note=1"));
+    assert_eq!(a.unread_activity().await.unwrap(), 2);
+    a.mark_activity_read().await.unwrap();
+    assert_eq!(a.unread_activity().await.unwrap(), 0);
+
+    // Unlinking is noted, by name.
+    hub.unlink(&a, &b).await;
+    let unlinked = a.activity(1).await.unwrap().remove(0);
+    assert_eq!((unlinked.kind.as_str(), unlinked.source.as_deref()), ("unlinked", Some("Ana's phone")));
 }

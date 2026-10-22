@@ -28,10 +28,18 @@ pub struct HubReportRecord {
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
 pub struct HubDeviceRecord {
     pub device: String,
+    /// Its name, opened on this device (`None`: it never sent one).
+    pub name: Option<String>,
     /// Milliseconds since 1970.
     pub first_seen: i64,
     pub last_seen: i64,
     pub revoked: bool,
+    /// Its last session that ended (0: none recorded), and what it moved then.
+    pub last_session: i64,
+    pub batches_in: u32,
+    pub batches_out: u32,
+    pub files_in: u32,
+    pub files_out: u32,
 }
 
 /// A PDF ready to read; `source` `here`, `hub`, `peer` (with `detail` its name) or `found` (with
@@ -42,6 +50,15 @@ pub struct OpenedPdfRecord {
     pub hash: String,
     pub source: String,
     pub detail: Option<String>,
+}
+
+/// What unlinking a device did: the library key's new epoch, the devices it was sealed for, and
+/// those left out (an older version: they need linking again to read new data).
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct UnlinkRecord {
+    pub epoch: u32,
+    pub sealed_for: u32,
+    pub left_out: u32,
 }
 
 /// A `quire://hub?…` link read (`.tasks/T14-security.md`): the hub, our own relay, a one-time code.
@@ -101,23 +118,38 @@ impl QuireLibrary {
                 .into_iter()
                 .map(|d| HubDeviceRecord {
                     device: d.device,
+                    name: d.name,
                     first_seen: d.first_seen,
                     last_seen: d.last_seen,
                     revoked: d.revoked,
+                    last_session: d.last_session,
+                    batches_in: d.batches_in,
+                    batches_out: d.batches_out,
+                    files_in: d.files_in,
+                    files_out: d.files_out,
                 })
                 .collect())
         })
         .await
     }
 
-    /// Makes the hub refuse `device` (a device ID) of this person from now on.
-    pub async fn hub_revoke(&self, device: String) -> Result<()> {
-        self.with(|engine| async move { Ok(engine.hub_revoke(&device).await?) }).await
+    /// Unlinks `device` (a device ID) of this person: the hub refuses it from now on and the
+    /// library key rotates (what is sealed after cannot be read there).
+    pub async fn hub_unlink(&self, device: String) -> Result<UnlinkRecord> {
+        self.with(|engine| async move {
+            let rotation = engine.hub_unlink(&device).await?;
+            Ok(UnlinkRecord {
+                epoch: rotation.epoch,
+                sealed_for: rotation.sealed_for as u32,
+                left_out: rotation.left_out.len() as u32,
+            })
+        })
+        .await
     }
 
     /// What to keep safe before syncing through a hub: the hub cannot recover the library.
     pub async fn recovery_kit(&self) -> Result<String> {
-        self.with(|engine| async move { Ok(engine.recovery_kit()?) }).await
+        self.with(|engine| async move { Ok(engine.recovery_kit().await?) }).await
     }
 
     /// The PDF of the reference `id`, fetched if it is not on this device (the hub, another of the

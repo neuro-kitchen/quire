@@ -8,7 +8,9 @@
 pub mod client;
 pub mod protocol;
 
-pub use client::{HubReplica, HubReport, SyncOptions, devices, fetch_file, hub_peer, revoke, sync};
+pub use client::{
+    HubDevice, HubReplica, HubReport, Rotation, SyncOptions, devices, fetch_file, hub_peer, introduce, sync, unlink,
+};
 
 /// The application protocol of hub connections.
 pub const ALPN: &[u8] = b"quire/hub/1";

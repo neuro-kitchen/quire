@@ -43,6 +43,9 @@ pub struct Config {
     /// How this device reaches its peers and hub (`[sync]`).
     #[serde(default)]
     pub sync: SyncSettings,
+    /// This device (`[device]`).
+    #[serde(default)]
+    pub device: DeviceSettings,
     /// How this device keeps PDF files (`[files]`): all, or as they are opened.
     #[serde(default)]
     pub files: FilesSettings,
@@ -84,6 +87,13 @@ pub struct PeerEntry {
 pub struct HubEntry {
     /// Its ID (`quire-hub id`, or printed when the hub starts).
     pub id: Option<String>,
+}
+
+/// This device.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub struct DeviceSettings {
+    /// Its name on the person's other devices (sent to the hub sealed: it cannot read it).
+    pub name: Option<String>,
 }
 
 /// How this device reaches its peers and the hub.

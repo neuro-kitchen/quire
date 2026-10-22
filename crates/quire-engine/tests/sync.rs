@@ -159,7 +159,7 @@ async fn one_persons_devices_share_the_library_key() {
         c.library_key().await.unwrap().file_id("h"),
         "another person"
     );
-    assert!(a.recovery_kit().unwrap().contains(&a.export_user_key().unwrap()));
+    assert!(a.recovery_kit().await.unwrap().contains(&a.export_user_key().unwrap()));
 }
 
 /// With PDFs loading as they are opened, a direct sync with another device brings no file; asking

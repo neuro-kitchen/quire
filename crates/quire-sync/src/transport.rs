@@ -10,7 +10,7 @@ use iroh::endpoint::presets;
 use iroh::{Endpoint, EndpointAddr, EndpointId, RelayMode, RelayUrl, SecretKey};
 
 use crate::error::{Result, SyncError};
-use crate::hub::protocol::DeviceInfo;
+use crate::hub::HubDevice;
 use crate::hub::{HubReplica, HubReport, SyncOptions};
 use crate::session::{self, Replica, Report, Side};
 
@@ -143,7 +143,7 @@ impl Device {
     }
 
     /// This person's devices known to the hub `hub`.
-    pub async fn hub_devices<R: HubReplica>(&self, replica: &R, hub: &str) -> Result<Vec<DeviceInfo>> {
+    pub async fn hub_devices<R: HubReplica>(&self, replica: &R, hub: &str) -> Result<Vec<HubDevice>> {
         let (id, connection) = self.connect(hub, crate::hub::ALPN).await?;
         let (mut send, mut receive) = connection.open_bi().await.map_err(|e| SyncError::Network(e.to_string()))?;
         let devices = crate::hub::devices(replica, &id.to_string(), &mut receive, &mut send).await;
@@ -151,13 +151,27 @@ impl Device {
         devices
     }
 
-    /// Makes the hub `hub` refuse `device` of this person from now on.
-    pub async fn hub_revoke<R: HubReplica>(&self, replica: &R, hub: &str, device: &str) -> Result<()> {
+    /// Unlinks `device` of this person at the hub `hub` (refused from now on; the key rotates).
+    pub async fn hub_unlink<R: HubReplica>(
+        &self,
+        replica: &R,
+        hub: &str,
+        device: &str,
+    ) -> Result<crate::hub::Rotation> {
         let (id, connection) = self.connect(hub, crate::hub::ALPN).await?;
         let (mut send, mut receive) = connection.open_bi().await.map_err(|e| SyncError::Network(e.to_string()))?;
-        let revoked = crate::hub::revoke(replica, &id.to_string(), device, &mut receive, &mut send).await;
-        finish(connection, send, revoked.is_ok()).await;
-        revoked
+        let unlinked = crate::hub::unlink(replica, &id.to_string(), device, &mut receive, &mut send).await;
+        finish(connection, send, unlinked.is_ok()).await;
+        unlinked
+    }
+
+    /// Lets the hub `hub` accept `device`, a new device of this person being linked.
+    pub async fn hub_introduce<R: HubReplica>(&self, replica: &R, hub: &str, device: &str) -> Result<()> {
+        let (id, connection) = self.connect(hub, crate::hub::ALPN).await?;
+        let (mut send, mut receive) = connection.open_bi().await.map_err(|e| SyncError::Network(e.to_string()))?;
+        let introduced = crate::hub::introduce(replica, &id.to_string(), device, &mut receive, &mut send).await;
+        finish(connection, send, introduced.is_ok()).await;
+        introduced
     }
 
     /// Syncs `replica` with the device `peer` (its ID).

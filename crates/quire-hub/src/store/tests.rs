@@ -7,7 +7,15 @@ fn store() -> (tempfile::TempDir, Store) {
 }
 
 fn batch(author: &str, number: u64, sealed: &[u8]) -> Batch {
-    Batch { author: author.into(), number, kind: BatchKind::Changes as i32, sealed: sealed.to_vec(), covers: 0, seq: 0 }
+    Batch {
+        author: author.into(),
+        number,
+        kind: BatchKind::Changes as i32,
+        sealed: sealed.to_vec(),
+        covers: 0,
+        seq: 0,
+        epoch: 0,
+    }
 }
 
 fn snapshot(author: &str, covers: u64) -> Batch {
@@ -18,6 +26,7 @@ fn snapshot(author: &str, covers: u64) -> Batch {
         sealed: b"snap".to_vec(),
         covers,
         seq: 0,
+        epoch: 0,
     }
 }
 
@@ -98,11 +107,11 @@ fn files_quota_use_revocation_and_deletion() {
     assert_eq!(s.get_file(a, &id).unwrap().unwrap(), b"sealed bytes");
     s.push(a, "lib", "phone", &batch("phone", 1, b"1234")).unwrap();
     assert_eq!(s.used(a).unwrap(), 12 + 4);
-    s.see_device(a, "dev-1").unwrap();
+    s.see_device(a, "dev-1", true).unwrap();
     assert!(s.revoke(a, "dev-1").unwrap());
-    refused(s.see_device(a, "dev-1"), ErrorCode::Revoked);
+    refused(s.see_device(a, "dev-1", true), ErrorCode::Revoked);
     let b = s.new_code(Purpose::Invite, None, None).and_then(|c| s.register("bob", &c, 0)).unwrap().id;
-    refused(s.see_device(b, "dev-1"), ErrorCode::Revoked);
+    refused(s.see_device(b, "dev-1", true), ErrorCode::Revoked);
     assert!(!s.revoke(b, "dev-1").unwrap(), "not Bob's device");
     assert!(s.get_file(b, &id).unwrap().is_none(), "Bob cannot read Alice's files");
     s.delete_account(a).unwrap();
@@ -141,4 +150,64 @@ fn an_account_made_first_is_deleted_with_everything_it_stored() {
     assert!(s.libraries(account).unwrap().is_empty());
     assert!(!dir.path().join("files").join(account.to_string()).exists());
     refused(s.register("alice", &code, 0), ErrorCode::BadCode);
+}
+
+/// The device list shows each device's last session and its sealed name (kept when a later session
+/// sends none); another account's device is never recorded.
+#[test]
+fn a_session_is_recorded_for_the_device_list() {
+    let (_dir, s) = store();
+    let a = s.register("alice", &s.owner_code().unwrap().unwrap(), 0).unwrap().id;
+    s.see_device(a, "phone", true).unwrap();
+    s.record_session(a, "phone", b"sealed-name", [1, 2, 3, 4]).unwrap();
+    s.record_session(a, "phone", b"", [0, 5, 0, 6]).unwrap();
+    s.record_session(a, "stranger", b"x", [9, 9, 9, 9]).unwrap();
+    let devices = s.devices(a).unwrap();
+    assert_eq!(devices.len(), 1);
+    let phone = &devices[0];
+    assert_eq!(phone.sealed_name, b"sealed-name", "kept from the earlier session");
+    assert_eq!((phone.batches_in, phone.batches_out, phone.files_in, phone.files_out), (0, 5, 0, 6));
+    assert!(phone.last_session > 0);
+}
+
+/// A new device of a known person needs an introduction (or a code used now); one introduction
+/// lets it in once, and also brings back a device that was unlinked.
+#[test]
+fn new_devices_need_an_introduction() {
+    let (_dir, s) = store();
+    let a = s.register("alice", &s.owner_code().unwrap().unwrap(), 0).unwrap().id;
+    s.see_device(a, "laptop", true).unwrap();
+    refused(s.see_device(a, "stolen-key", false), ErrorCode::NotIntroduced);
+    s.introduce(a, "phone").unwrap();
+    s.see_device(a, "phone", false).unwrap();
+    s.see_device(a, "phone", false).unwrap();
+    assert!(s.revoke(a, "phone").unwrap());
+    refused(s.see_device(a, "phone", false), ErrorCode::Revoked);
+    s.introduce(a, "phone").unwrap();
+    s.see_device(a, "phone", false).unwrap();
+    let b = s.register("bob", &s.new_code(Purpose::Invite, None, None).unwrap(), 0).unwrap().id;
+    refused(s.introduce(b, "laptop"), ErrorCode::Protocol);
+}
+
+/// Key envelopes go only to the account's live devices, epoch after epoch; each device gets its own.
+#[test]
+fn key_envelopes_follow_the_epochs() {
+    use quire_sync::hub::protocol::{KeyEnvelope, Keys};
+    let (_dir, s) = store();
+    let a = s.register("alice", &s.owner_code().unwrap().unwrap(), 0).unwrap().id;
+    for device in ["laptop", "phone", "old"] {
+        s.see_device(a, device, true).unwrap();
+    }
+    s.revoke(a, "old").unwrap();
+    let envelope = |device: &str, sealed: &[u8]| KeyEnvelope { device: device.into(), sealed: sealed.to_vec() };
+    assert_eq!(s.key_epoch(a, "lib").unwrap(), 0);
+    refused(s.put_keys(a, "lib", 2, &[envelope("laptop", b"x")]), ErrorCode::StaleEpoch);
+    refused(s.put_keys(a, "lib", 1, &[envelope("old", b"x")]), ErrorCode::Protocol);
+    s.put_keys(a, "lib", 1, &[envelope("laptop", b"for-laptop"), envelope("phone", b"for-phone")]).unwrap();
+    assert_eq!(s.key_epoch(a, "lib").unwrap(), 1);
+    assert_eq!(s.keys_for(a, "lib", "phone").unwrap(), Keys { epoch: 1, sealed: b"for-phone".to_vec() });
+    assert!(s.keys_for(a, "lib", "old").unwrap().sealed.is_empty(), "nothing for the unlinked device");
+    refused(s.put_keys(a, "lib", 1, &[envelope("laptop", b"y")]), ErrorCode::StaleEpoch);
+    assert_eq!(s.key_epoch(a, "other-library").unwrap(), 0, "per library");
+    s.delete_account(a).unwrap();
 }

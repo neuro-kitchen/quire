@@ -18,6 +18,7 @@
 //! - [`tags`]: tags, notes and related references.
 
 mod abstracts;
+pub mod activity;
 mod alerts;
 pub mod backup;
 mod duplicates;

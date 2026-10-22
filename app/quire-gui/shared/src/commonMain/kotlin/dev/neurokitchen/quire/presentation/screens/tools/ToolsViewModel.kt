@@ -13,6 +13,7 @@ import dev.neurokitchen.quire.domain.repository.LibraryRepository
 import dev.neurokitchen.quire.domain.repository.SettingsRepository
 import dev.neurokitchen.quire.domain.repository.SyncRepository
 import dev.neurokitchen.quire.presentation.components.notice.Notice
+import dev.neurokitchen.quire.presentation.platform.deviceName
 import dev.neurokitchen.quire.presentation.components.reference_card.ReferenceCardState
 import dev.neurokitchen.quire.resources.Res
 import dev.neurokitchen.quire.resources.notice_added
@@ -23,6 +24,7 @@ import dev.neurokitchen.quire.resources.tools_auto_stopped
 import dev.neurokitchen.quire.resources.tools_backed_up
 import dev.neurokitchen.quire.resources.tools_dismissed
 import dev.neurokitchen.quire.resources.tools_hub_revoked
+import dev.neurokitchen.quire.resources.tools_hub_revoked_left_out
 import dev.neurokitchen.quire.resources.tools_hub_saved
 import dev.neurokitchen.quire.resources.tools_hub_synced
 import dev.neurokitchen.quire.resources.tools_link_allowed
@@ -97,9 +99,14 @@ class ToolsViewModel(
                         Notice.Done(Res.string.tools_merged, listOf(confirm.keep.title))
                     }
                     is ToolsConfirm.RevokeHubDevice -> act {
-                        sync.revokeHubDevice(confirm.device)
+                        val unlinked = sync.unlinkHubDevice(confirm.device)
                         loadHubDevices()
-                        Notice.Done(Res.string.tools_hub_revoked, listOf(confirm.device.take(12)))
+                        // The key rotated: what the recovery kit holds is out of date.
+                        if (unlinked.leftOut > 0) {
+                            Notice.Done(Res.string.tools_hub_revoked_left_out, listOf(confirm.name, unlinked.leftOut))
+                        } else {
+                            Notice.Done(Res.string.tools_hub_revoked, listOf(confirm.name))
+                        }
                     }
                 }
             }
@@ -398,7 +405,11 @@ class ToolsViewModel(
         val peers = entries.mapNotNull { entry -> PEER.matchEntire(entry.key)?.let { PeerState(it.groupValues[1], entry.value) } }
         val hubId = entries.firstOrNull { it.key == HUB_KEY }?.value
         val relay = entries.firstOrNull { it.key == RELAY_KEY }?.value
+        // This device's name for the others (sealed on its way to the hub): the model or host name.
+        if (entries.none { it.key == NAME_KEY }) runCatching { settings.set(NAME_KEY, deviceName()) }
         _state.update { it.copy(sync = it.sync.copy(deviceId = deviceId, userId = userId, peers = peers, hubId = hubId, relay = relay)) }
+        // The device list, when there is a hub (it asks the hub: a failure is not this section's).
+        if (hubId != null) runCatching { loadHubDevices() }
     }
 
     private suspend fun loadMembers(path: String) {
@@ -428,6 +439,7 @@ class ToolsViewModel(
         val PEER = Regex("""peers\.(.+)\.id""")
         const val HUB_KEY = "hub.id"
         const val RELAY_KEY = "sync.relay"
+        const val NAME_KEY = "device.name"
 
         fun peerKey(name: String) = "peers.$name.id"
     }

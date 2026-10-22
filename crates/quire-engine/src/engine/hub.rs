@@ -2,9 +2,8 @@
 //! config (`[hub] id`), the library as a [`HubReplica`] (the same change log, merge and files as a
 //! device session, plus the library key, the files here and a snapshot of every row).
 
-use quire_sync::hub::protocol::DeviceInfo;
-use quire_sync::hub::{HubReplica, HubReport, SyncOptions};
-use quire_sync::seal::LibraryKey;
+use quire_sync::hub::{HubDevice, HubReplica, HubReport, Rotation, SyncOptions};
+use quire_sync::keys::{BoxKey, LibraryKeys};
 use quire_sync::transport::{self, Device};
 
 use super::Engine;
@@ -12,6 +11,13 @@ use super::sync::LibraryReplica;
 use crate::error::{EngineError, Result};
 
 impl Engine {
+    /// This device's name for the person's other devices: the setting `device.name`, else the
+    /// host's name where there is one.
+    pub fn device_name(&self) -> Option<String> {
+        let set = self.config.device.name.as_deref().map(str::trim).filter(|n| !n.is_empty());
+        set.map(str::to_string).or_else(|| std::env::var("HOSTNAME").ok().filter(|n| !n.trim().is_empty()))
+    }
+
     /// The hub this device syncs through (its ID), from the config.
     pub fn hub_id(&self) -> Result<String> {
         match &self.config.hub.id {
@@ -44,6 +50,7 @@ impl Engine {
         })
         .await?;
         self.evict_pdfs().await?;
+        self.record_sync(&report).await?;
         Ok(report)
     }
 
@@ -59,23 +66,72 @@ impl Engine {
     }
 
     /// This person's devices known to the hub.
-    pub async fn hub_devices(&self) -> Result<Vec<DeviceInfo>> {
+    pub async fn hub_devices(&self) -> Result<Vec<HubDevice>> {
         let hub = self.hub_id()?;
         let (key, _) = self.sync_key()?;
         let device = Device::bind(&key, self.relay()).await?;
         let devices = device.hub_devices(&LibraryReplica(self), &hub).await;
         device.close().await;
-        Ok(devices?)
+        let devices = devices?;
+        self.note_devices(&devices).await?;
+        Ok(devices)
     }
 
-    /// Makes the hub refuse `device` (a device ID) of this person from now on (a lost phone).
-    pub async fn hub_revoke(&self, device: &str) -> Result<()> {
+    /// Unlinks `device` (a device ID) of this person: the hub refuses it from now on, and the
+    /// library key rotates so it cannot read what is sealed after (`quire_sync::keys`).
+    pub async fn hub_unlink(&self, device: &str) -> Result<Rotation> {
         let hub = self.hub_id()?;
         let (key, _) = self.sync_key()?;
         let me = Device::bind(&key, self.relay()).await?;
-        let revoked = me.hub_revoke(&LibraryReplica(self), &hub, device).await;
+        let unlinked = me.hub_unlink(&LibraryReplica(self), &hub, device).await;
         me.close().await;
-        Ok(revoked?)
+        let rotation = unlinked?;
+        self.record_activity(super::activity::kind::UNLINKED, rotation.name.as_deref(), &rotation.epoch.to_string())
+            .await?;
+        Ok(rotation)
+    }
+
+    /// Lets the hub accept `device`, a new device of this person being linked (once, for minutes).
+    pub async fn hub_introduce(&self, device: &str) -> Result<()> {
+        let hub = self.hub_id()?;
+        let (key, _) = self.sync_key()?;
+        let me = Device::bind(&key, self.relay()).await?;
+        let introduced = me.hub_introduce(&LibraryReplica(self), &hub, device).await;
+        me.close().await;
+        Ok(introduced?)
+    }
+
+    /// [`Engine::hub_unlink`] over `reader`/`writer` (tests).
+    pub async fn hub_unlink_session<Rd, Wr>(
+        &self,
+        hub: &str,
+        device: &str,
+        reader: &mut Rd,
+        writer: &mut Wr,
+    ) -> Result<Rotation>
+    where
+        Rd: tokio::io::AsyncRead + Unpin,
+        Wr: tokio::io::AsyncWrite + Unpin,
+    {
+        let rotation = quire_sync::hub::unlink(&LibraryReplica(self), hub, device, reader, writer).await?;
+        self.record_activity(super::activity::kind::UNLINKED, rotation.name.as_deref(), &rotation.epoch.to_string())
+            .await?;
+        Ok(rotation)
+    }
+
+    /// [`Engine::hub_introduce`] over `reader`/`writer` (tests).
+    pub async fn hub_introduce_session<Rd, Wr>(
+        &self,
+        hub: &str,
+        device: &str,
+        reader: &mut Rd,
+        writer: &mut Wr,
+    ) -> Result<()>
+    where
+        Rd: tokio::io::AsyncRead + Unpin,
+        Wr: tokio::io::AsyncWrite + Unpin,
+    {
+        Ok(quire_sync::hub::introduce(&LibraryReplica(self), hub, device, reader, writer).await?)
     }
 
     /// One hub session with `hub` (its ID) over `reader`/`writer` (any stream: QUIC in use, a
@@ -94,6 +150,21 @@ impl Engine {
         let report = quire_sync::hub::sync(&LibraryReplica(self), hub, options, reader, writer).await;
         self.mark_changed();
         self.after_hub_sync(report?).await
+    }
+
+    /// This person's devices known to the hub, over `reader`/`writer` (tests; [`Engine::hub_devices`]
+    /// in use).
+    pub async fn hub_devices_session<Rd, Wr>(
+        &self,
+        hub: &str,
+        reader: &mut Rd,
+        writer: &mut Wr,
+    ) -> Result<Vec<HubDevice>>
+    where
+        Rd: tokio::io::AsyncRead + Unpin,
+        Wr: tokio::io::AsyncWrite + Unpin,
+    {
+        Ok(quire_sync::hub::devices(&LibraryReplica(self), hub, reader, writer).await?)
     }
 
     /// Downloads the file `hash` over `reader`/`writer` (tests; [`Engine::fetch_from_hub`] in use).
@@ -122,8 +193,21 @@ fn replica<T>(result: Result<T>) -> quire_sync::Result<T> {
 }
 
 impl HubReplica for LibraryReplica<'_> {
-    async fn library_key(&self) -> quire_sync::Result<LibraryKey> {
-        replica(self.0.library_key().await)
+    async fn library_keys(&self) -> quire_sync::Result<LibraryKeys> {
+        replica(self.0.library_keys().await)
+    }
+
+    async fn save_library_keys(&self, keys: &LibraryKeys) -> quire_sync::Result<()> {
+        let library = replica(self.0.run(|lib| lib.library_id()).await)?;
+        replica(self.0.save_library_keys_of(&library, keys))
+    }
+
+    fn device_box(&self) -> Option<(BoxKey, Vec<u8>)> {
+        self.0.device_box().ok()
+    }
+
+    fn device_name(&self) -> Option<String> {
+        self.0.device_name()
     }
 
     async fn local_files(&self) -> quire_sync::Result<Vec<String>> {

@@ -43,6 +43,7 @@ pub use folder::FolderFile;
 pub use libraries::{LibraryChoice, LibraryInfo};
 
 // Types front ends receive from the engine.
+pub use engine::activity;
 pub use quire_core::library::duplicates::{Merged, Reason as DuplicateReason};
 pub use quire_core::library::update::{FieldChange, Outcome, Updated};
 pub use quire_core::{Added, Checked, CoreError, FailedInput, SearchHit};
@@ -56,6 +57,7 @@ pub use quire_model::{
     Project, Reading, ReadingStatus, Reference, SavedSearch, Severity, SlugPath, Tag, TagKind,
 };
 pub use quire_model::{ProjectMember, Role as MemberRole, UserId};
+pub use quire_store::Activity;
 pub use quire_sync::hub::{HubReport, SyncOptions as HubOptions};
 pub use quire_sync::link::HubLink;
 pub use quire_sync::pairing::{Grant as LinkGrant, Join as LinkJoin, Offer as LinkOffer, Request as LinkRequest};

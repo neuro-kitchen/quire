@@ -15,7 +15,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.neurokitchen.quire.presentation.designsystem.Dimens
@@ -114,7 +113,6 @@ internal fun SyncSection(state: ToolsState, onEvent: (ToolsEvent) -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(peer.name, style = MaterialTheme.typography.bodyMedium, color = QuireTheme.colors.fillPrimary)
-                    Text(peer.deviceId, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), color = QuireTheme.colors.fillSecondary, maxLines = 1)
                 }
                 SmallAction(Res.string.tools_sync_now, enabled = !state.isWorking) { onEvent(ToolsEvent.OnSyncWith(peer.name)) }
                 SmallAction(Res.string.menu_remove, enabled = !state.isWorking) { onEvent(ToolsEvent.OnRemovePeer(peer.name)) }
@@ -148,7 +146,6 @@ internal fun SyncSection(state: ToolsState, onEvent: (ToolsEvent) -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("${member.name} · ${roleLabel(member.role)}", style = MaterialTheme.typography.bodyMedium, color = QuireTheme.colors.fillPrimary)
-                        Text(member.userId, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), color = QuireTheme.colors.fillSecondary, maxLines = 1)
                     }
                     SmallAction(Res.string.menu_remove, enabled = !state.isWorking) { onEvent(ToolsEvent.OnUnshare(member.userId)) }
                 }

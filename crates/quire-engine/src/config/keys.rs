@@ -47,6 +47,7 @@ pub const KEYS: &[KeySpec] = &[
     key("libraries.*.path", ValueKind::Path, "folder of a registered library (see `quire library new`)"),
     key("peers.*.id", ValueKind::DeviceId, "a device to sync with: its ID (`quire sync id` on it)"),
     key("hub.id", ValueKind::DeviceId, "the sync hub this device syncs through: its ID (`quire-hub id`)"),
+    key("device.name", ValueKind::Text, "this device's name on your other devices (the hub cannot read it)"),
     key("sync.relay", ValueKind::Url, "your own iroh relay (e.g. http://192.168.1.10:3340); unset: n0's public relays"),
     key(
         "files.download",

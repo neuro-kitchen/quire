@@ -5,6 +5,7 @@ import dev.neurokitchen.quire.domain.model.HubLink
 import dev.neurokitchen.quire.domain.model.LinkJoin
 import dev.neurokitchen.quire.domain.model.LinkOffer
 import dev.neurokitchen.quire.domain.model.LinkRequest
+import dev.neurokitchen.quire.domain.model.UnlinkResult
 import dev.neurokitchen.quire.domain.model.HubReport
 import dev.neurokitchen.quire.domain.model.ProjectMember
 import dev.neurokitchen.quire.domain.model.SyncReport
@@ -62,9 +63,15 @@ class EngineSyncRepository(private val session: EngineSession) : SyncRepository 
     }
 
     override suspend fun hubDevices() =
-        session.library().hubDevices().map { HubDevice(it.device, it.firstSeen, it.lastSeen, it.revoked) }
+        session.library().hubDevices().map {
+            HubDevice(
+                it.device, it.firstSeen, it.lastSeen, it.revoked, it.name, it.lastSession,
+                it.batchesIn.toInt(), it.batchesOut.toInt(), it.filesIn.toInt(), it.filesOut.toInt(),
+            )
+        }
 
-    override suspend fun revokeHubDevice(device: String) = session.library().hubRevoke(device)
+    override suspend fun unlinkHubDevice(device: String) =
+        session.library().hubUnlink(device).let { UnlinkResult(it.epoch.toInt(), it.sealedFor.toInt(), it.leftOut.toInt()) }
     override suspend fun recoveryKit() = session.library().recoveryKit()
 
     private fun MemberRecord.toDomain() = ProjectMember(user, name, role)

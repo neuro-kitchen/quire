@@ -8,6 +8,7 @@ import dev.neurokitchen.quire.domain.model.HubLink
 import dev.neurokitchen.quire.domain.model.LinkJoin
 import dev.neurokitchen.quire.domain.model.LinkOffer
 import dev.neurokitchen.quire.domain.model.LinkRequest
+import dev.neurokitchen.quire.domain.model.UnlinkResult
 import dev.neurokitchen.quire.domain.model.HubReport
 import dev.neurokitchen.quire.domain.model.DuplicateGroup
 import dev.neurokitchen.quire.domain.model.ExportSelection
@@ -104,12 +105,10 @@ class ToolsViewModelTest {
         val codes = mutableListOf<String?>()
         val revoked = mutableListOf<String>()
         override suspend fun syncWithHub(code: String?) = HubReport(code != null, false, 4, 1, 2, 0, 0, 0, 0).also { codes += code }
-        override suspend fun hubDevices() = listOf(HubDevice("device-1", 0, 0, false), HubDevice("phone", 0, 0, "phone" in revoked))
+        override suspend fun hubDevices() = listOf(HubDevice("device-1", 0, 0, false, "Laptop"), HubDevice("phone", 0, 0, "phone" in revoked, "Pixel"))
         override suspend fun parseHubLink(text: String) =
             if (text.startsWith("quire://hub")) HubLink("hub-2", "http://10.0.0.2:3340", "ABCD-EFGH") else error("not a quire hub link")
-        override suspend fun revokeHubDevice(device: String) {
-            revoked += device
-        }
+        override suspend fun unlinkHubDevice(device: String) = UnlinkResult(1, 1, 0).also { revoked += device }
     }
 
     private class FakeLibraries : LibrariesRepository {
@@ -242,12 +241,28 @@ class ToolsViewModelTest {
         assertEquals(listOf<String?>("ABCD-EFGH"), sync.codes)
     }
 
+    /** This device gets a name for the others (once), and the device list comes with the section. */
+    @Test
+    fun theSyncSectionNamesThisDeviceAndListsTheDevices() = runTest {
+        settings.set("hub.id", "hub-1")
+        val vm = viewModel()
+        vm.onEvent(ToolsEvent.OnSectionSelect(ToolsSection.Sync))
+        val devices = vm.state.first { it.sync.hubDevices != null }.sync.hubDevices!!
+        assertEquals(listOf("Laptop", "Pixel"), devices.map { it.name })
+        val name = settings.entries().single { it.key == "device.name" }.value
+        assertTrue(name.isNotBlank())
+        settings.set("device.name", "Mine")
+        vm.onEvent(ToolsEvent.OnSectionSelect(ToolsSection.Sync))
+        vm.state.first { it.sync.hubDevices != null }
+        assertEquals("Mine", settings.entries().single { it.key == "device.name" }.value, "a chosen name is kept")
+    }
+
     @Test
     fun aHubDeviceIsRevokedOnlyOnceConfirmed() = runTest {
         val vm = viewModel()
         vm.onEvent(ToolsEvent.OnLoadHubDevices)
         assertEquals(2, vm.state.first { it.sync.hubDevices != null }.sync.hubDevices!!.size)
-        vm.onEvent(ToolsEvent.OnConfirm(ToolsConfirm.RevokeHubDevice("phone")))
+        vm.onEvent(ToolsEvent.OnConfirm(ToolsConfirm.RevokeHubDevice("phone", "Pixel")))
         assertTrue(sync.revoked.isEmpty())
         vm.onEvent(ToolsEvent.OnConfirmed)
         assertTrue(vm.state.first { s -> s.sync.hubDevices.orEmpty().any { it.revoked } }.sync.hubDevices!!.single { it.revoked }.device == "phone")

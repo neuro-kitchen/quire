@@ -1,5 +1,6 @@
 package dev.neurokitchen.quire.di
 
+import dev.neurokitchen.quire.presentation.screens.notifications.NotificationsViewModel
 import dev.neurokitchen.quire.presentation.screens.tools.ToolsViewModel
 import dev.neurokitchen.quire.data.repository.SampleLibraryRepository
 import dev.neurokitchen.quire.data.repository.SamplePdfRepository
@@ -16,6 +17,7 @@ import dev.neurokitchen.quire.domain.repository.PreferencesRepository
 import dev.neurokitchen.quire.domain.repository.ReaderRepository
 import dev.neurokitchen.quire.domain.repository.SearchRepository
 import dev.neurokitchen.quire.domain.repository.SettingsRepository
+import dev.neurokitchen.quire.domain.repository.NotificationsRepository
 import dev.neurokitchen.quire.domain.repository.SyncRepository
 import dev.neurokitchen.quire.presentation.mobile.screens.home.HomeViewModel
 import dev.neurokitchen.quire.presentation.mobile.screens.library.MobileLibraryViewModel
@@ -55,6 +57,7 @@ val sampleDataModule = module {
     single<ExchangeRepository> { object : ExchangeRepository {} }
     single<LibrariesRepository> { object : LibrariesRepository {} }
     single<SyncRepository> { object : SyncRepository {} }
+    single<NotificationsRepository> { object : NotificationsRepository {} }
 }
 
 val viewModelModule = module {
@@ -64,6 +67,7 @@ val viewModelModule = module {
     viewModelOf(::SettingsViewModel)
     viewModelOf(::DesktopViewModel)
     viewModelOf(::ToolsViewModel)
+    viewModelOf(::NotificationsViewModel)
     viewModelOf(::CiteViewModel)
     // One per open paper: its reference ID and title come as parameters.
     viewModel { (id: String, title: String) -> ReaderViewModel(id, title, get(), get(), preferences = getOrNull()) }

@@ -56,6 +56,8 @@ url = "2.5.8"
 
 # Sync between devices over QUIC: dial a device by its public key, hole punching, relay fallback
 iroh = "1.3.0"
+# X25519 for sealing a rotated library key to each device (already in the tree through iroh)
+curve25519-dalek = "5.0.0"
 # QR codes of `quire://` links in a terminal (the hub's log); no image support needed
 qrcode = { version = "0.14.1", default-features = false }
 

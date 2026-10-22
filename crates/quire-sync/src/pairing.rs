@@ -41,10 +41,13 @@ const MAX_NAME: usize = 64;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum Message {
-    /// The new device: the secret from the QR code, and its name to show.
+    /// The new device: the secret from the QR code, its name to show, and its device ID (the
+    /// offering device introduces it to the hub, which lets no unknown device in otherwise).
     Ask {
         secret: String,
         name: String,
+        #[serde(default)]
+        device: String,
     },
     /// The secret is right: the person decides on the offering device.
     Wait,
@@ -57,17 +60,23 @@ enum Message {
     },
 }
 
-/// What the offering device gives the new one: the person's user key, and their hub and relay.
+/// What the offering device gives the new one: the person's user key, their hub and relay, and
+/// the library's later keys (after an unlink they are not derived from the user key).
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Grant {
     pub user_key: String,
     pub hub: Option<String>,
     pub relay: Option<String>,
+    /// The library those keys are of, and the chain (`LibraryKeys::chain_text`; empty: none).
+    #[serde(default)]
+    pub library: Option<String>,
+    #[serde(default)]
+    pub library_keys: String,
 }
 
 impl std::fmt::Debug for Grant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // Never the key in logs.
+        // Never the keys in logs.
         f.debug_struct("Grant").field("hub", &self.hub).field("relay", &self.relay).finish_non_exhaustive()
     }
 }
@@ -135,17 +144,21 @@ async fn receive<R: AsyncRead + Unpin>(reader: &mut R, wait: Duration) -> Result
     tokio::time::timeout(wait, read).await.map_err(|_| SyncError::Link("the other device did not answer".into()))?
 }
 
-/// The offering side of one request: the asker's name if it gave the right secret (it is told to
-/// wait), `None` if not (it is refused).
-async fn answer<R, W>(reader: &mut R, writer: &mut W, secret: &[u8; 32]) -> Result<Option<String>>
+/// The offering side of one request: the asker's name and device ID if it gave the right secret
+/// (it is told to wait), `None` if not (it is refused).
+async fn answer<R, W>(reader: &mut R, writer: &mut W, secret: &[u8; 32]) -> Result<Option<(String, String)>>
 where
     R: AsyncRead + Unpin,
     W: AsyncWrite + Unpin,
 {
     match receive(reader, ANSWER_WAIT).await? {
-        Message::Ask { secret: given, name } if secret_matches(&given, secret) => {
+        Message::Ask { secret: given, name, device } if secret_matches(&given, secret) => {
+            if !crate::transport::is_device_id(&device) {
+                send(writer, &Message::Refuse { reason: "update quire on the new device".into() }).await?;
+                return Err(SyncError::Link("the new device runs an older quire: update it first".into()));
+            }
             send(writer, &Message::Wait).await?;
-            Ok(Some(clean_name(&name)))
+            Ok(Some((clean_name(&name), device.trim().to_string())))
         }
         Message::Ask { .. } => {
             send(writer, &Message::Refuse { reason: "wrong or old code".into() }).await?;
@@ -155,13 +168,15 @@ where
     }
 }
 
-/// The joining side's first step: asks with the secret and `name`; `Ok` once told to wait.
-async fn ask<R, W>(reader: &mut R, writer: &mut W, secret: &[u8; 32], name: &str) -> Result<()>
+/// The joining side's first step: asks with the secret, `name` and `device` (its ID); `Ok` once
+/// told to wait.
+async fn ask<R, W>(reader: &mut R, writer: &mut W, secret: &[u8; 32], name: &str, device: &str) -> Result<()>
 where
     R: AsyncRead + Unpin,
     W: AsyncWrite + Unpin,
 {
-    send(writer, &Message::Ask { secret: identity::key_to_hex(secret), name: name.to_string() }).await?;
+    let ask = Message::Ask { secret: identity::key_to_hex(secret), name: name.to_string(), device: device.to_string() };
+    send(writer, &ask).await?;
     match receive(reader, ANSWER_WAIT).await? {
         Message::Wait => Ok(()),
         Message::Refuse { reason } => Err(SyncError::Link(format!("the other device refused: {reason}"))),
@@ -187,6 +202,8 @@ pub struct Offer {
     endpoint: Endpoint,
     link: DeviceLink,
     deadline: Instant,
+    /// Requests with a wrong code so far (shown to the person: someone may have tried).
+    wrong: std::sync::atomic::AtomicUsize,
 }
 
 impl Offer {
@@ -198,7 +215,7 @@ impl Offer {
         let endpoint = transport::bind_endpoint(key, relay.as_ref(), vec![ALPN.to_vec()]).await?;
         let link =
             DeviceLink { id: endpoint.id().to_string(), relay: relay.map(|r| r.to_string()), secret: seal::random()? };
-        Ok(Self { endpoint, link, deadline: Instant::now() + WAIT })
+        Ok(Self { endpoint, link, deadline: Instant::now() + WAIT, wrong: Default::default() })
     }
 
     /// What to show (as a QR code or text).
@@ -206,10 +223,14 @@ impl Offer {
         &self.link
     }
 
+    /// How many requests came with a wrong code.
+    pub fn wrong_codes(&self) -> usize {
+        self.wrong.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
     /// Waits for a request with the right secret, refusing others; fails after [`WAIT`] or
     /// [`MAX_WRONG`] wrong secrets.
     pub async fn request(&self) -> Result<Request> {
-        let mut wrong = 0;
         loop {
             let left = self.deadline.saturating_duration_since(Instant::now());
             let incoming = tokio::time::timeout(left, self.endpoint.accept())
@@ -236,13 +257,13 @@ impl Offer {
                 continue;
             };
             match answer(&mut receive, &mut send, &self.link.secret).await {
-                Ok(Some(name)) => {
+                Ok(Some((name, device))) => {
                     let words = check_words(&self.link.secret, &self.endpoint.id(), &connection.remote_id());
-                    return Ok(Request { connection, send, name, words });
+                    return Ok(Request { connection, send, name, device, words });
                 }
                 Ok(None) => {
                     let _ = send.finish();
-                    wrong += 1;
+                    let wrong = self.wrong.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
                     tracing::warn!(wrong, "a device tried to link with a wrong code");
                     if wrong >= MAX_WRONG {
                         return Err(SyncError::Link("too many wrong codes: the offer is closed".into()));
@@ -268,6 +289,8 @@ pub struct Request {
     send: SendStream,
     /// The new device's name (as it said; only shown).
     pub name: String,
+    /// Its device ID, to introduce to the hub before allowing it.
+    pub device: String,
     /// The words both devices show.
     pub words: Vec<String>,
 }
@@ -302,8 +325,8 @@ pub struct Join {
 }
 
 impl Join {
-    /// Dials the offering device of `link` and asks, as `name`.
-    pub async fn connect(link: &DeviceLink, name: &str) -> Result<Self> {
+    /// Dials the offering device of `link` and asks, as `name`, this device being `device` (its ID).
+    pub async fn connect(link: &DeviceLink, name: &str, device: &str) -> Result<Self> {
         let relay = link.relay.as_deref().map(transport::parse_relay).transpose()?;
         let offering =
             EndpointId::from_str(&link.id).map_err(|e| SyncError::Link(format!("the code is damaged: {e}")))?;
@@ -312,7 +335,7 @@ impl Join {
         let asked = async {
             let connection = transport::dial(&endpoint, relay.as_ref(), offering, ALPN).await?;
             let (mut send, mut receive) = connection.open_bi().await.map_err(|e| SyncError::Network(e.to_string()))?;
-            ask(&mut receive, &mut send, &link.secret, name).await?;
+            ask(&mut receive, &mut send, &link.secret, name, device).await?;
             let _ = send.finish();
             Ok::<_, SyncError>((connection, receive))
         };
@@ -348,7 +371,13 @@ mod tests {
     use super::*;
 
     fn grant() -> Grant {
-        Grant { user_key: "ab".repeat(32), hub: Some("hub".into()), relay: None }
+        Grant {
+            user_key: "ab".repeat(32),
+            hub: Some("hub".into()),
+            relay: None,
+            library: Some("lib".into()),
+            library_keys: "1:cd".into(),
+        }
     }
 
     #[tokio::test]
@@ -358,16 +387,17 @@ mod tests {
         let (mut a_read, mut a_write) = tokio::io::split(&mut a);
         let (mut b_read, mut b_write) = tokio::io::split(&mut b);
         let offering = async {
-            let name = answer(&mut a_read, &mut a_write, &secret).await.unwrap();
+            let asked = answer(&mut a_read, &mut a_write, &secret).await.unwrap();
             send(&mut a_write, &Message::Give { grant: grant() }).await.unwrap();
-            name
+            asked
         };
+        let device = crate::transport::device_id(&[5; 32]);
         let joining = async {
-            ask(&mut b_read, &mut b_write, &secret, "Pixel\u{7} 9").await.unwrap();
+            ask(&mut b_read, &mut b_write, &secret, "Pixel\u{7} 9", &device).await.unwrap();
             granted(&mut b_read).await.unwrap()
         };
-        let (name, got) = tokio::join!(offering, joining);
-        assert_eq!(name.as_deref(), Some("Pixel 9"), "control characters are dropped");
+        let (asked, got) = tokio::join!(offering, joining);
+        assert_eq!(asked, Some(("Pixel 9".to_string(), device)), "control characters are dropped");
         assert_eq!(got, grant());
     }
 
@@ -376,9 +406,10 @@ mod tests {
         let (mut a, mut b) = tokio::io::duplex(4096);
         let (mut a_read, mut a_write) = tokio::io::split(&mut a);
         let (mut b_read, mut b_write) = tokio::io::split(&mut b);
+        let thief = crate::transport::device_id(&[6; 32]);
         let (offered, asked) = tokio::join!(
             answer(&mut a_read, &mut a_write, &[3; 32]),
-            ask(&mut b_read, &mut b_write, &[4; 32], "thief"),
+            ask(&mut b_read, &mut b_write, &[4; 32], "thief", &thief),
         );
         assert_eq!(offered.unwrap(), None);
         assert!(matches!(asked, Err(SyncError::Link(_))), "{asked:?}");
@@ -404,7 +435,8 @@ mod tests {
     }
 
     #[test]
-    fn the_key_never_shows_in_debug_output() {
-        assert!(!format!("{:?}", grant()).contains(&"ab".repeat(32)));
+    fn the_keys_never_show_in_debug_output() {
+        let shown = format!("{:?}", grant());
+        assert!(!shown.contains(&"ab".repeat(32)) && !shown.contains("1:cd"), "{shown}");
     }
 }

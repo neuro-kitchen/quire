@@ -6,6 +6,8 @@
 //!   [`notes`], [`relations`], [`highlights`], [`search`], [`imports`], [`reading`], [`alerts`], [`members`]: the queries, one module per table group,
 //!   each implementing its `quire-core` store trait.
 
+mod activity;
+pub use activity::Activity;
 mod alerts;
 mod attachments;
 mod auto_export;

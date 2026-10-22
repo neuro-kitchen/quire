@@ -5,6 +5,7 @@
 
 use std::sync::Arc;
 
+use quire_engine::activity::kind;
 use quire_engine::{Engine, LinkGrant, LinkJoin as Join, LinkOffer as Offer, LinkRequest as Request};
 use tokio::sync::{Mutex, Notify};
 
@@ -19,10 +20,26 @@ pub struct LinkRequestRecord {
 
 #[derive(uniffi::Object)]
 pub struct LinkOffer {
+    engine: Arc<Engine>,
     offer: Arc<Offer>,
     grant: LinkGrant,
     pending: Mutex<Option<Request>>,
     cancelled: Notify,
+    /// The offer ended (its notifications were written once).
+    ended: std::sync::atomic::AtomicBool,
+}
+
+impl LinkOffer {
+    /// Closes the offer and notes, once, any wrong codes tried while it was open.
+    async fn end(&self) {
+        self.offer.close().await;
+        if !self.ended.swap(true, std::sync::atomic::Ordering::Relaxed) {
+            let wrong = self.offer.wrong_codes();
+            if wrong > 0 {
+                let _ = self.engine.record_activity(kind::WRONG_CODE, None, &wrong.to_string()).await;
+            }
+        }
+    }
 }
 
 fn cancelled() -> QuireError {
@@ -41,8 +58,15 @@ impl LinkOffer {
     pub async fn next_request(self: Arc<Self>) -> Result<LinkRequestRecord> {
         on_runtime(async move {
             let request = tokio::select! {
-                request = self.offer.request() => request.map_err(quire_engine::EngineError::from)?,
+                request = self.offer.request() => request,
                 () = self.cancelled.notified() => return Err(cancelled()),
+            };
+            let request = match request {
+                Ok(request) => request,
+                Err(error) => {
+                    self.end().await;
+                    return Err(quire_engine::EngineError::from(error).into());
+                }
             };
             let record = LinkRequestRecord { name: request.name.clone(), words: request.words.clone() };
             *self.pending.lock().await = Some(request);
@@ -56,9 +80,18 @@ impl LinkOffer {
         on_runtime(async move {
             let request =
                 self.pending.lock().await.take().ok_or_else(|| QuireError::Invalid("no device is waiting".into()))?;
+            // The hub lets no unknown device in: introduce it first, then hand over the keys.
+            if let Err(error) = self.engine.hub_introduce(&request.device).await {
+                let _ = request.refuse().await;
+                self.end().await;
+                return Err(error.into());
+            }
+            let name = request.name.clone();
             let given = request.allow(&self.grant).await.map_err(quire_engine::EngineError::from);
-            self.offer.close().await;
-            Ok(given?)
+            self.end().await;
+            given?;
+            self.engine.record_activity(kind::LINK_ALLOWED, Some(&name), "").await?;
+            Ok(())
         })
         .await
     }
@@ -67,9 +100,11 @@ impl LinkOffer {
     pub async fn refuse(self: Arc<Self>) -> Result<()> {
         on_runtime(async move {
             if let Some(request) = self.pending.lock().await.take() {
+                let name = request.name.clone();
                 let _ = request.refuse().await;
+                self.engine.record_activity(kind::LINK_REFUSED, Some(&name), "").await?;
             }
-            self.offer.close().await;
+            self.end().await;
             Ok(())
         })
         .await
@@ -82,7 +117,7 @@ impl LinkOffer {
             if let Some(request) = self.pending.lock().await.take() {
                 let _ = request.refuse().await;
             }
-            self.offer.close().await;
+            self.end().await;
         })
         .await;
     }
@@ -108,7 +143,7 @@ impl LinkJoin {
         on_runtime(async move {
             let join = self.join.lock().await.take().ok_or_else(cancelled)?;
             let grant = join.finish().await.map_err(quire_engine::EngineError::from)?;
-            let (user, _) = self.engine.apply_grant(&grant)?;
+            let (user, _) = self.engine.apply_grant(&grant).await?;
             Ok(user.to_string())
         })
         .await
@@ -131,9 +166,11 @@ impl QuireLibrary {
         self.with(|engine| async move {
             let (offer, grant) = engine.link_offer().await?;
             Ok(Arc::new(LinkOffer {
+                engine,
                 offer: Arc::new(offer),
                 grant,
                 pending: Mutex::new(None),
+                ended: Default::default(),
                 cancelled: Notify::new(),
             }))
         })
