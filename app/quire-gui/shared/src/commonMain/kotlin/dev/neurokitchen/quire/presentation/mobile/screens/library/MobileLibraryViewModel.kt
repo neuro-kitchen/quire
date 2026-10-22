@@ -29,6 +29,7 @@ class MobileLibraryViewModel(
 
     private val source = MutableStateFlow<LibrarySource>(LibrarySource.All)
     private val isFolderSheetVisible = MutableStateFlow(false)
+    private val isCreateProjectDialogOpen = MutableStateFlow(false)
     private val expandedProjects = MutableStateFlow<Set<String>>(emptySet())
     private val actionSheetRef = MutableStateFlow<ReferenceCardState?>(null)
     private val confirmDeleteRef = MutableStateFlow<ReferenceCardState?>(null)
@@ -63,10 +64,12 @@ class MobileLibraryViewModel(
         baseState,
         actionSheetRef,
         confirmDeleteRef,
-    ) { base, sheetRef, deleteRef ->
+        isCreateProjectDialogOpen,
+    ) { base, sheetRef, deleteRef, isCreateOpen ->
         base.copy(
             actionSheetReference = sheetRef,
             confirmDeleteReference = deleteRef,
+            isCreateProjectDialogOpen = isCreateOpen,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -82,6 +85,23 @@ class MobileLibraryViewModel(
             }
             is MobileLibraryEvent.SetFolderSheetVisible -> {
                 isFolderSheetVisible.value = event.visible
+            }
+            MobileLibraryEvent.OnOpenCreateProjectDialog -> {
+                isFolderSheetVisible.value = false
+                isCreateProjectDialogOpen.value = true
+            }
+            MobileLibraryEvent.OnDismissCreateProjectDialog -> {
+                isCreateProjectDialogOpen.value = false
+            }
+            is MobileLibraryEvent.OnCreateProject -> {
+                isCreateProjectDialogOpen.value = false
+                viewModelScope.launch {
+                    val name = event.name.trim()
+                    if (name.isNotEmpty()) {
+                        val path = library.createProject(name)
+                        source.value = LibrarySource.InProject(path)
+                    }
+                }
             }
             is MobileLibraryEvent.OnProjectExpandToggle -> {
                 expandedProjects.update { set ->

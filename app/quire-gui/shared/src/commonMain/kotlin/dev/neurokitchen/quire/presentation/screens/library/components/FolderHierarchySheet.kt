@@ -38,11 +38,13 @@ import dev.neurokitchen.quire.presentation.designsystem.QuireTheme
 import dev.neurokitchen.quire.presentation.screens.library.ProjectRowState
 import dev.neurokitchen.quire.resources.Res
 import dev.neurokitchen.quire.resources.ic_close
+import dev.neurokitchen.quire.resources.ic_create_new_folder
 import dev.neurokitchen.quire.resources.ic_delete
 import dev.neurokitchen.quire.resources.ic_draft
 import dev.neurokitchen.quire.resources.ic_folder
 import dev.neurokitchen.quire.resources.ic_library_books
 import dev.neurokitchen.quire.resources.library_my_library
+import dev.neurokitchen.quire.resources.library_new_collection
 import dev.neurokitchen.quire.resources.library_trash
 import dev.neurokitchen.quire.resources.library_unfiled
 import org.jetbrains.compose.resources.painterResource
@@ -60,6 +62,7 @@ fun FolderHierarchySheet(
     projects: List<ProjectRowState>,
     onSelectSource: (LibrarySource) -> Unit,
     onDismiss: () -> Unit,
+    onAddProject: (() -> Unit)? = null,
     sheetState: SheetState = rememberModalBottomSheetState(),
 ) {
     val colors = QuireTheme.colors
@@ -88,7 +91,7 @@ fun FolderHierarchySheet(
             ) {
                 Column {
                     Text(
-                        text = "Library Hierarchy",
+                        text = "Library",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
@@ -96,26 +99,52 @@ fun FolderHierarchySheet(
                         color = colors.fillPrimary,
                     )
                     Text(
-                        text = "Browse collections and folder trees",
+                        text = "Browse collections and projects",
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                         color = colors.fillSecondary,
                     )
                 }
 
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(colors.fillQuinary)
-                        .clickable(onClick = onDismiss),
-                    contentAlignment = Alignment.Center,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Icon(
-                        painter = painterResource(Res.drawable.ic_close),
-                        contentDescription = "Close",
-                        tint = colors.fillSecondary,
-                        modifier = Modifier.size(18.dp),
-                    )
+                    if (onAddProject != null) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(colors.fillQuinary)
+                                .clickable {
+                                    onDismiss()
+                                    onAddProject()
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                painter = painterResource(Res.drawable.ic_create_new_folder),
+                                contentDescription = "New Collection",
+                                tint = colors.fillPrimary,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(colors.fillQuinary)
+                            .clickable(onClick = onDismiss),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_close),
+                            contentDescription = "Close",
+                            tint = colors.fillSecondary,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
                 }
             }
 
@@ -183,6 +212,19 @@ fun FolderHierarchySheet(
                             onClick = {
                                 onSelectSource(LibrarySource.InProject(project.id))
                                 onDismiss()
+                            },
+                        )
+                    }
+
+                    if (onAddProject != null) {
+                        HierarchyItem(
+                            title = stringResource(Res.string.library_new_collection),
+                            icon = Res.drawable.ic_create_new_folder,
+                            isSelected = false,
+                            depth = 1,
+                            onClick = {
+                                onDismiss()
+                                onAddProject()
                             },
                         )
                     }

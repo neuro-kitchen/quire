@@ -12,6 +12,8 @@ data class GuiPreferences(
     val readerFont: ReaderFont = ReaderFont.Serif,
     val readerFontSize: Int = 16,
     val readerLayout: ReaderLayout = ReaderLayout(),
+    /** Recorded reading dates as ISO strings YYYY-MM-DD. */
+    val readingDays: Set<String> = emptySet(),
 )
 
 /**
@@ -34,4 +36,5 @@ interface PreferencesRepository {
     suspend fun setReaderFont(font: ReaderFont)
     suspend fun setReaderFontSize(size: Int)
     suspend fun setReaderLayout(layout: ReaderLayout)
+    suspend fun recordReadingToday()
 }

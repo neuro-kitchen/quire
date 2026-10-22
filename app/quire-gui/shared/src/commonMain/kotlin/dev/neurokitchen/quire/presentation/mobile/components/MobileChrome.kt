@@ -1,9 +1,8 @@
 package dev.neurokitchen.quire.presentation.mobile.components
 
-import androidx.compose.material3.WideNavigationRailItemDefaults
-import androidx.compose.material3.WideNavigationRailItem
-import androidx.compose.material3.WideNavigationRailDefaults
-import androidx.compose.material3.WideNavigationRail
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -120,12 +119,12 @@ fun MobileNavigationBar(
     }
 }
 
-/** Width of the collapsed navigation rail (tablets, unfolded phones). */
-val RailWidth = 96.dp
+/** Width of the navigation rail (tablets, unfolded phones, landscape). */
+val RailWidth = 92.dp
 
 /**
- * The tabs on wide windows (600 dp and more: tablets, unfolded phones, desktop-sized windows),
- * as Material 3 Expressive's navigation rail at the start; frosted like the bottom bar.
+ * The tabs on wide windows (600 dp and more: tablets, unfolded phones, landscape windows),
+ * as Material 3's navigation rail at the start; frosted like the bottom bar.
  */
 @Composable
 fun MobileNavigationRail(
@@ -135,21 +134,28 @@ fun MobileNavigationRail(
     modifier: Modifier = Modifier,
 ) {
     val colors = QuireTheme.colors
-    WideNavigationRail(
+    NavigationRail(
         modifier = modifier.hazeBlur(HazeInput.Sources(haze), HazeMaterials.thin(colors.background)),
-        colors = WideNavigationRailDefaults.colors(containerColor = Color.Transparent),
+        containerColor = Color.Transparent,
+        contentColor = colors.fillPrimary,
     ) {
         Tab.entries.forEach { tab ->
-            WideNavigationRailItem(
+            NavigationRailItem(
                 selected = tab == current,
                 onClick = { onSelect(tab) },
                 icon = { Icon(painterResource(tab.icon()), contentDescription = null) },
-                label = { Text(stringResource(tab.label())) },
-                railExpanded = false,
-                colors = WideNavigationRailItemDefaults.colors(
+                label = {
+                    Text(
+                        stringResource(tab.label()),
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                },
+                colors = NavigationRailItemDefaults.colors(
                     selectedIconColor = colors.accent,
                     selectedTextColor = colors.fillPrimary,
-                    selectedIndicatorColor = colors.accent.copy(alpha = 0.16f),
+                    indicatorColor = colors.accent.copy(alpha = 0.16f),
                     unselectedIconColor = colors.fillSecondary,
                     unselectedTextColor = colors.fillSecondary,
                 ),

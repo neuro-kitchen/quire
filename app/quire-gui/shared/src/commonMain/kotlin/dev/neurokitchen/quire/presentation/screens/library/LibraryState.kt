@@ -53,6 +53,7 @@ data class LibraryState(
     val searchError: String? = null,
     val savedSearches: List<SavedSearchState> = emptyList(),
     val isQuickLookOpen: Boolean = false,
+    val isFetchingPdf: Boolean = false,
 )
 
 /** A saved search; [isActive] when its query is the one in the search field. */
