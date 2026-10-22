@@ -255,7 +255,10 @@ class ReaderViewModel(
     /** The PDF, the text and the reading status load at once: none waits for another. */
     private fun load() {
         viewModelScope.launch {
-            runCatching { reader.opened(referenceId) }.onSuccess { status -> _state.update { it.copy(reading = status) } }
+            runCatching { reader.opened(referenceId) }.onSuccess { status ->
+                _state.update { it.copy(reading = status) }
+                preferences?.recordReadingToday()
+            }
         }
         viewModelScope.launch { loadPdf() }
         viewModelScope.launch { loadText() }

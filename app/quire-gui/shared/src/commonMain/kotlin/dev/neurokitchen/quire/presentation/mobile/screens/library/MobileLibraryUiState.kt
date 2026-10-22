@@ -12,6 +12,7 @@ data class MobileLibraryUiState(
     val projects: List<ProjectRowState> = emptyList(),
     val projectChoices: List<Pair<String, String>> = emptyList(),
     val isFolderSheetVisible: Boolean = false,
+    val isCreateProjectDialogOpen: Boolean = false,
     val isLoading: Boolean = true,
     val error: String? = null,
     val actionSheetReference: ReferenceCardState? = null,
@@ -21,6 +22,9 @@ data class MobileLibraryUiState(
 sealed interface MobileLibraryEvent {
     data class OnSelectSource(val source: LibrarySource) : MobileLibraryEvent
     data class SetFolderSheetVisible(val visible: Boolean) : MobileLibraryEvent
+    data object OnOpenCreateProjectDialog : MobileLibraryEvent
+    data object OnDismissCreateProjectDialog : MobileLibraryEvent
+    data class OnCreateProject(val name: String) : MobileLibraryEvent
     data class OnProjectExpandToggle(val projectId: String) : MobileLibraryEvent
     data class OnReferenceLongClick(val card: ReferenceCardState) : MobileLibraryEvent
     data object OnDismissActionSheet : MobileLibraryEvent

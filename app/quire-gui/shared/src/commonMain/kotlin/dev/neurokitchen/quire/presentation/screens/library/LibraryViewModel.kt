@@ -48,6 +48,8 @@ import dev.neurokitchen.quire.resources.notice_saved
 import dev.neurokitchen.quire.resources.notice_note_removed
 import dev.neurokitchen.quire.resources.notice_pdf_downloaded
 import dev.neurokitchen.quire.resources.notice_pdf_present
+import dev.neurokitchen.quire.resources.notice_direct_download_failed_opening_page
+import dev.neurokitchen.quire.resources.notice_pdf_not_found
 import dev.neurokitchen.quire.resources.notice_pdf_attached
 import dev.neurokitchen.quire.resources.notice_pdf_other_paper
 import dev.neurokitchen.quire.resources.notice_pdfs_removed
@@ -172,6 +174,7 @@ class LibraryViewModel(
                 searchError = failure?.let { it.message ?: it.toString() },
                 savedSearches = saved.map { SavedSearchState(it.name, it.query, isActive = it.query == query.text) },
                 isQuickLookOpen = view.isQuickLookOpen,
+                isFetchingPdf = view.isFetchingPdf,
             )
         }.catch { emit(LibraryState(isLoading = false, error = it.message ?: it.toString())) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryState())
@@ -347,9 +350,31 @@ class LibraryViewModel(
             }
             is LibraryEvent.OnNoteDelete -> act { reader.removeNote(event.id); Notice.Done(Res.string.notice_note_removed) }
             LibraryEvent.OnGetPdf -> onSelected { id ->
-                val fetch = attachments.getPdf(id)
-                if (fetch.downloaded) Notice.Done(Res.string.notice_pdf_downloaded, listOf(fetch.source.orEmpty()))
-                else Notice.Done(Res.string.notice_pdf_present)
+                view.update { it.copy(isFetchingPdf = true) }
+                try {
+                    val fetch = attachments.getPdf(id)
+                    if (fetch.downloaded) {
+                        Notice.Done(Res.string.notice_pdf_downloaded, listOf(fetch.source.orEmpty()))
+                    } else {
+                        val page = attachments.browserPage(id)
+                        if (!page.isNullOrBlank()) {
+                            view.update { it.copy(pageToOpen = page) }
+                            Notice.Done(Res.string.notice_direct_download_failed_opening_page)
+                        } else {
+                            Notice.Done(Res.string.notice_pdf_not_found)
+                        }
+                    }
+                } catch (e: Exception) {
+                    val page = runCatching { attachments.browserPage(id) }.getOrNull()
+                    if (!page.isNullOrBlank()) {
+                        view.update { it.copy(pageToOpen = page) }
+                        Notice.Done(Res.string.notice_direct_download_failed_opening_page)
+                    } else {
+                        Notice.Done(Res.string.notice_pdf_not_found)
+                    }
+                } finally {
+                    view.update { it.copy(isFetchingPdf = false) }
+                }
             }
             is LibraryEvent.OnAttachPdf -> onSelected { id ->
                 val attached = attachments.attachPdf(id, event.path, strict = false)
@@ -556,6 +581,7 @@ class LibraryViewModel(
         val noteDraft: String = "",
         val pageToOpen: String? = null,
         val isQuickLookOpen: Boolean = false,
+        val isFetchingPdf: Boolean = false,
     )
 
     private data class Extras(

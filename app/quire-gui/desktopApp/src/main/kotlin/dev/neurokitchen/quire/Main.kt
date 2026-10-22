@@ -22,8 +22,10 @@ import dev.neurokitchen.quire.domain.repository.LibraryRepository
 import dev.neurokitchen.quire.presentation.desktop.DesktopApp
 import dev.neurokitchen.quire.presentation.desktop.DesktopSettings
 import dev.neurokitchen.quire.resources.Res
+import dev.neurokitchen.quire.resources.ic_quire_logo
 import dev.neurokitchen.quire.resources.settings_title
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.core.context.GlobalContext
 
@@ -38,6 +40,7 @@ fun main() {
         Window(
             onCloseRequest = ::exitApplication,
             title = "quire",
+            icon = painterResource(Res.drawable.ic_quire_logo),
             state = rememberWindowState(size = DpSize(1400.dp, 860.dp)),
             onKeyEvent = { keyEvent ->
                 if (keyEvent.type == KeyEventType.KeyDown && keyEvent.isCtrlPressed) {
@@ -70,6 +73,7 @@ fun main() {
             Window(
                 onCloseRequest = { settingsOpen = false },
                 title = stringResource(Res.string.settings_title),
+                icon = painterResource(Res.drawable.ic_quire_logo),
                 state = rememberWindowState(size = DpSize(640.dp, 480.dp)),
             ) {
                 DesktopSettings()

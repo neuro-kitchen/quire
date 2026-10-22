@@ -2,9 +2,11 @@ package dev.neurokitchen.quire.presentation.mobile.screens.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.neurokitchen.quire.data.repository.SamplePreferencesRepository
 import dev.neurokitchen.quire.domain.model.LibraryQuery
 import dev.neurokitchen.quire.domain.model.ReadingStatus
 import dev.neurokitchen.quire.domain.repository.LibraryRepository
+import dev.neurokitchen.quire.domain.repository.PreferencesRepository
 import dev.neurokitchen.quire.presentation.components.reference_card.ReferenceCardState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -17,6 +19,7 @@ import kotlinx.coroutines.launch
 
 class HomeViewModel(
     private val library: LibraryRepository,
+    private val preferences: PreferencesRepository = SamplePreferencesRepository(),
 ) : ViewModel() {
 
     private val actionSheetRef = MutableStateFlow<ReferenceCardState?>(null)
@@ -24,17 +27,55 @@ class HomeViewModel(
 
     val state: StateFlow<HomeUiState> = combine(
         library.references(LibraryQuery()),
+        preferences.preferences,
         actionSheetRef,
         confirmDeleteRef,
-    ) { references, sheetRef, deleteRef ->
+    ) { references, prefs, sheetRef, deleteRef ->
         val cards = references.map { ReferenceCardState.from(it) }
         val reading = cards.filter { it.reading == ReadingStatus.Reading || it.reading == ReadingStatus.Read }
         val recent = cards.sortedByDescending { it.dateAdded }
-        val daysCount = maxOf(reading.size, 5)
+
+        val today = try {
+            java.time.LocalDate.now()
+        } catch (_: Exception) {
+            null
+        }
+
+        val readingDates = prefs.readingDays.mapNotNull {
+            try { java.time.LocalDate.parse(it) } catch (_: Exception) { null }
+        }.toMutableSet()
+
+        if (today != null && reading.isNotEmpty() && readingDates.isEmpty()) {
+            readingDates.add(today)
+            viewModelScope.launch { preferences.recordReadingToday() }
+        }
+
+        val activeDaysOfWeek = mutableSetOf<Int>()
+        var streakCount = 0
+
+        if (today != null) {
+            val dayOfWeekVal = today.dayOfWeek.value // 1 (Mon) .. 7 (Sun)
+            val monday = today.minusDays((dayOfWeekVal - 1).toLong())
+            for (i in 0..6) {
+                val d = monday.plusDays(i.toLong())
+                if (d in readingDates) {
+                    activeDaysOfWeek.add(i)
+                }
+            }
+
+            var checkDate = if (today in readingDates) today else today.minusDays(1)
+            while (checkDate in readingDates) {
+                streakCount++
+                checkDate = checkDate.minusDays(1)
+            }
+        }
+
+        val daysCount = maxOf(readingDates.size, if (reading.isNotEmpty()) 1 else 0)
+
         HomeUiState(
             daysCount = daysCount,
-            streakCount = 5,
-            activeDaysOfWeek = setOf(0, 1, 2, 3, 4),
+            streakCount = streakCount,
+            activeDaysOfWeek = activeDaysOfWeek,
             reading = reading,
             recent = recent,
             totalCount = cards.size,
