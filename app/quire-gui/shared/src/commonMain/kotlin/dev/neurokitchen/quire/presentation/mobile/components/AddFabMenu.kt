@@ -52,33 +52,37 @@ import dev.neurokitchen.quire.resources.add_menu_pdf
 import dev.neurokitchen.quire.resources.add_title
 import dev.neurokitchen.quire.resources.common_close
 import dev.neurokitchen.quire.resources.ic_add
-import dev.neurokitchen.quire.resources.ic_description
-import dev.neurokitchen.quire.resources.ic_draft
 import dev.neurokitchen.quire.resources.ic_link
-import dev.neurokitchen.quire.resources.ic_picture_as_pdf
-import dev.neurokitchen.quire.resources.ic_subject
+import dev.neurokitchen.quire.resources.ic_description
 import org.jetbrains.compose.resources.DrawableResource
-import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
-/** The ways in the Add menu offers, most used first, each opening Add on its tab. */
-private val AddWays: List<Triple<AddTab, StringResource, DrawableResource>> = listOf(
-    Triple(AddTab.Identifier, Res.string.add_menu_identifier, Res.drawable.ic_link),
-    Triple(AddTab.Pdf, Res.string.add_menu_pdf, Res.drawable.ic_picture_as_pdf),
-    Triple(AddTab.File, Res.string.add_menu_bib, Res.drawable.ic_description),
-    Triple(AddTab.Bibtex, Res.string.add_menu_paste, Res.drawable.ic_subject),
-    Triple(AddTab.Manual, Res.string.add_menu_manual, Res.drawable.ic_draft),
+enum class AddFabChoice {
+    DoiOrLink,
+    File,
+}
+
+private data class AddChoiceItem(
+    val choice: AddFabChoice,
+    val label: String,
+    val icon: DrawableResource,
+)
+
+private val AddChoices = listOf(
+    AddChoiceItem(AddFabChoice.DoiOrLink, "Add DOI or Link", Res.drawable.ic_link),
+    AddChoiceItem(AddFabChoice.File, "Add File (PDF / .bib)", Res.drawable.ic_description),
 )
 
 /**
- * Add, by progressive disclosure: one button; tapped, it shows every way in (Material 3
- * Expressive's FAB menu: the ways above it, the button turning into a close). The page behind
- * dims; a tap on it, or Back, closes the menu. [bottom]: the space the navigation bar takes.
+ * Add FAB with progressive disclosure:
+ * Tapped, it offers:
+ * 1. Add DOI or Link (opens direct input dialog)
+ * 2. Add File (prompts for PDF or .bib file)
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun AddFabMenu(onAdd: (AddTab) -> Unit, bottom: Dp, modifier: Modifier = Modifier) {
+fun AddFabMenu(onSelectChoice: (AddFabChoice) -> Unit, bottom: Dp, modifier: Modifier = Modifier) {
     val colors = QuireTheme.colors
     var open by rememberSaveable { mutableStateOf(false) }
     val turn by animateFloatAsState(if (open) 45f else 0f)
@@ -99,12 +103,11 @@ fun AddFabMenu(onAdd: (AddTab) -> Unit, bottom: Dp, modifier: Modifier = Modifie
         ) {
             AnimatedVisibility(visible = open, enter = fadeIn() + scaleIn(transformOrigin = TransformOrigin(1f, 1f)), exit = fadeOut() + scaleOut(transformOrigin = TransformOrigin(1f, 1f))) {
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(Dimens.SpaceXs)) {
-                    AddWays.forEach { (tab, label, icon) ->
-                        // Flat pills in one tonal colour (Expressive's FAB menu items).
+                    AddChoices.forEach { item ->
                         Surface(
                             onClick = {
                                 open = false
-                                onAdd(tab)
+                                onSelectChoice(item.choice)
                             },
                             shape = CircleShape,
                             color = colors.surfaceContainerHigh,
@@ -115,8 +118,8 @@ fun AddFabMenu(onAdd: (AddTab) -> Unit, bottom: Dp, modifier: Modifier = Modifie
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
                             ) {
-                                Icon(painterResource(icon), contentDescription = null, tint = colors.accent, modifier = Modifier.size(20.dp))
-                                Text(stringResource(label), style = MaterialTheme.typography.labelLarge)
+                                Icon(painterResource(item.icon), contentDescription = null, tint = colors.accent, modifier = Modifier.size(20.dp))
+                                Text(item.label, style = MaterialTheme.typography.labelLarge)
                             }
                         }
                     }
