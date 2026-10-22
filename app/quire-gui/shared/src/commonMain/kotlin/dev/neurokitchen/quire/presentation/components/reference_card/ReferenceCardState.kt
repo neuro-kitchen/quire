@@ -19,7 +19,27 @@ data class ReferenceCardState(
     val hasPdf: Boolean,
     val isSelected: Boolean = false,
     val reading: ReadingStatus = ReadingStatus.Unread,
+    val doi: String = "",
 ) {
+    /** Formats a clean standard BibTeX entry from card metadata. */
+    fun toBibtex(): String {
+        val type = when (kind.lowercase()) {
+            "article-journal", "journal" -> "article"
+            "paper-conference", "inproceedings", "conference" -> "inproceedings"
+            "book" -> "book"
+            else -> "article"
+        }
+        val key = citeKey.ifBlank { "ref_${id.replace('-', '_')}" }
+        val lines = mutableListOf<String>()
+        lines += "@$type{$key,"
+        lines += "  title = {${title.replace("{", "\\{").replace("}", "\\}")}},"
+        if (creator.isNotBlank()) lines += "  author = {$creator},"
+        if (year.isNotBlank()) lines += "  year = {$year},"
+        if (doi.isNotBlank()) lines += "  doi = {$doi},"
+        lines += "}"
+        return lines.joinToString("\n")
+    }
+
     companion object {
         fun from(reference: Reference, isSelected: Boolean = false) = ReferenceCardState(
             id = reference.id,
@@ -32,6 +52,7 @@ data class ReferenceCardState(
             hasPdf = reference.hasPdf,
             isSelected = isSelected,
             reading = reference.reading,
+            doi = reference.doi,
         )
 
         fun creatorLabel(reference: Reference): String = reference.creators.let { creators ->

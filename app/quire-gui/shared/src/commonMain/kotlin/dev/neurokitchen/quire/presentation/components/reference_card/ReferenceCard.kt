@@ -1,5 +1,7 @@
 package dev.neurokitchen.quire.presentation.components.reference_card
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -45,6 +47,7 @@ import org.jetbrains.compose.resources.painterResource
  * - Stylized document thumbnail icon container on the left
  * - Clear typographic hierarchy and reading status badge
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ReferenceCard(
     state: ReferenceCardState,
@@ -59,14 +62,19 @@ fun ReferenceCard(
 ) {
     val colors = QuireTheme.colors
     Card(
-        onClick = { onEvent(ReferenceCardEvent.OnClick(state.id)) },
         colors = CardDefaults.cardColors(
             containerColor = if (state.isSelected) colors.accent.copy(alpha = 0.16f) else colors.cardBackground,
         ),
         shape = RoundedCornerShape(20.dp),
         // No stroke border (edges eliminated)
         border = null,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .combinedClickable(
+                onClick = { onEvent(ReferenceCardEvent.OnClick(state.id)) },
+                onLongClick = { onEvent(ReferenceCardEvent.OnLongClick(state)) },
+            ),
     ) {
         Row(
             modifier = Modifier

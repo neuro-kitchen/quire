@@ -241,6 +241,7 @@ fun SearchScreen(
                             when (event) {
                                 is ReferenceCardEvent.OnClick -> onReferenceClick(event.id)
                                 is ReferenceCardEvent.OnOpen -> onOpenReference(event.id, card.title)
+                                else -> Unit
                             }
                         },
                         showCiteKey = false,
