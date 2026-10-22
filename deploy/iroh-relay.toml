@@ -1,0 +1,4 @@
+# iroh-relay settings (its `--config-path`); with `--dev` it serves plain HTTP on port 3340.
+# QUIC address discovery needs TLS, so it is off here; devices still find direct paths.
+enable_quic_addr_discovery = false
+enable_metrics = false

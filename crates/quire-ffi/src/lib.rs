@@ -31,6 +31,7 @@ mod discovery;
 mod exchange;
 mod hub;
 mod libraries;
+mod linking;
 mod pdf;
 mod projects;
 mod query;

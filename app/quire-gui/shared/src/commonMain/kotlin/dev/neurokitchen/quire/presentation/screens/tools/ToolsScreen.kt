@@ -38,6 +38,7 @@ import dev.neurokitchen.quire.presentation.screens.tools.components.DuplicatesSe
 import dev.neurokitchen.quire.presentation.screens.tools.components.ExportSection
 import dev.neurokitchen.quire.presentation.screens.tools.components.ImportSection
 import dev.neurokitchen.quire.presentation.screens.tools.components.LibrariesSection
+import dev.neurokitchen.quire.presentation.screens.tools.components.LinkDialog
 import dev.neurokitchen.quire.presentation.screens.tools.components.SyncSection
 import dev.neurokitchen.quire.resources.Res
 import dev.neurokitchen.quire.resources.ic_content_copy
@@ -46,9 +47,6 @@ import dev.neurokitchen.quire.resources.ic_inventory_2
 import dev.neurokitchen.quire.resources.ic_library_books
 import dev.neurokitchen.quire.resources.ic_subject
 import dev.neurokitchen.quire.resources.ic_sync
-import dev.neurokitchen.quire.resources.tools_confirm
-import dev.neurokitchen.quire.resources.tools_confirm_key_body
-import dev.neurokitchen.quire.resources.tools_confirm_key_title
 import dev.neurokitchen.quire.resources.tools_confirm_merge_body
 import dev.neurokitchen.quire.resources.tools_confirm_merge_title
 import dev.neurokitchen.quire.resources.tools_merge_confirm
@@ -58,6 +56,9 @@ import dev.neurokitchen.quire.resources.tools_section_export
 import dev.neurokitchen.quire.resources.tools_section_import
 import dev.neurokitchen.quire.resources.tools_section_libraries
 import dev.neurokitchen.quire.resources.tools_section_sync
+import dev.neurokitchen.quire.resources.tools_confirm_revoke_body
+import dev.neurokitchen.quire.resources.tools_confirm_revoke_title
+import dev.neurokitchen.quire.resources.tools_revoke
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.painterResource
@@ -110,6 +111,7 @@ fun ToolsScreen(state: ToolsState, onEvent: (ToolsEvent) -> Unit, modifier: Modi
         }
     }
     state.confirm?.let { confirm -> Confirm(confirm, onEvent) }
+    state.sync.linking?.let { LinkDialog(it, onEvent) }
 }
 
 @Composable
@@ -144,18 +146,19 @@ private fun ToolsSection.look(): Pair<DrawableResource, StringResource> = when (
     ToolsSection.Sync -> Res.drawable.ic_sync to Res.string.tools_section_sync
 }
 
+/** Asks before an action that cannot be undone from here (also on the phone's Sync page). */
 @Composable
-private fun Confirm(confirm: ToolsConfirm, onEvent: (ToolsEvent) -> Unit) {
+internal fun Confirm(confirm: ToolsConfirm, onEvent: (ToolsEvent) -> Unit) {
     val (title, body, action) = when (confirm) {
         is ToolsConfirm.Merge -> Triple(
             stringResource(Res.string.tools_confirm_merge_title, confirm.other.title),
             stringResource(Res.string.tools_confirm_merge_body, confirm.keep.title),
             stringResource(Res.string.tools_merge_confirm),
         )
-        is ToolsConfirm.ImportKey -> Triple(
-            stringResource(Res.string.tools_confirm_key_title),
-            stringResource(Res.string.tools_confirm_key_body),
-            stringResource(Res.string.tools_confirm),
+        is ToolsConfirm.RevokeHubDevice -> Triple(
+            stringResource(Res.string.tools_confirm_revoke_title),
+            stringResource(Res.string.tools_confirm_revoke_body, confirm.device.take(12)),
+            stringResource(Res.string.tools_revoke),
         )
     }
     DialogShell(
@@ -165,8 +168,8 @@ private fun Confirm(confirm: ToolsConfirm, onEvent: (ToolsEvent) -> Unit) {
         onDismiss = { onEvent(ToolsEvent.OnConfirm(null)) },
         actions = {
             DialogCancel({ onEvent(ToolsEvent.OnConfirm(null)) })
-            // A merge removes the other reference: the destructive colour.
-            DialogConfirm(action, { onEvent(ToolsEvent.OnConfirmed) }, destructive = confirm is ToolsConfirm.Merge)
+            // A merge removes the other reference, a revoke shuts a device out: the destructive colour.
+            DialogConfirm(action, { onEvent(ToolsEvent.OnConfirmed) }, destructive = true)
         },
     ) {}
 }

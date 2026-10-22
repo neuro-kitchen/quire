@@ -6,6 +6,9 @@
 //! Or through a sync hub (`.knowledge/sync-hub.md`): an always-on store your devices push their
 //! encrypted changes to and pull from, which cannot read them: `quire sync hub add <hub-id> <code>`
 //! once, then `quire sync hub now` on any device.
+//!
+//! A new device gets this person's identity, hub and relay by linking (no key shown): `quire sync
+//! link` on a device that has them shows a code (and QR code); `quire sync join <code>` on the new one.
 
 use clap::{Args, Subcommand};
 use quire_engine::SyncReport;
@@ -36,6 +39,16 @@ enum Action {
     },
     /// Wait for your devices to sync with this one (Ctrl-C stops)
     Serve,
+    /// Link a new device: show a one-time code (and QR code) for it, then allow it (two minutes)
+    Link,
+    /// Join your other device's code (`quire sync link` there, or the app's "Link a device")
+    Join {
+        /// The code (`quire://device?…`)
+        code: String,
+        /// This device's name, shown on the other one (default: the host name)
+        #[arg(long)]
+        name: Option<String>,
+    },
     /// Sync through a hub (self-hosted container or the cloud) that stores your encrypted library
     Hub {
         #[command(subcommand)]
@@ -45,7 +58,8 @@ enum Action {
 
 #[derive(Subcommand, Debug)]
 enum HubAction {
-    /// Use a hub: its ID (`quire-hub id`, or its log) and, the first time, its setup or link code
+    /// Use a hub: the link it prints (`quire://hub?…`), or its ID (`quire-hub id`) and, the first
+    /// time, its setup or link code
     Add { id: String, code: Option<String> },
     /// Sync through the hub now
     Now,
@@ -83,6 +97,8 @@ pub async fn run(context: &Context, args: &SyncArgs) -> anyhow::Result<()> {
         }
         Action::Peer { action } => peer(context, action)?,
         Action::Hub { action } => hub(context, action).await?,
+        Action::Link => link(context).await?,
+        Action::Join { code, name } => join(context, code, name.as_deref()).await?,
         Action::With { peer } => {
             let engine = context.engine().await?;
             output::hint(format!("connecting to {peer}…"));
@@ -151,8 +167,19 @@ async fn hub(context: &Context, action: &HubAction) -> anyhow::Result<()> {
     let file = context.config_file()?;
     match action {
         HubAction::Add { id, code } => {
-            anyhow::ensure!(quire_engine::is_device_id(id), "`{id}` is not a hub ID (`quire-hub id` prints it)");
-            config::set(&file, "hub.id", id.trim())?;
+            // A link carries the ID, our own relay and the code; a code given beside it wins.
+            let (id, code) = if id.trim().starts_with("quire:") {
+                let link = quire_engine::HubLink::parse(id)?;
+                match &link.relay {
+                    Some(relay) => config::set(&file, "sync.relay", relay)?,
+                    None => _ = config::unset(&file, "sync.relay")?,
+                }
+                (link.id, code.clone().or(link.code))
+            } else {
+                (id.trim().to_string(), code.clone())
+            };
+            anyhow::ensure!(quire_engine::is_device_id(&id), "`{id}` is not a hub ID (`quire-hub id` prints it)");
+            config::set(&file, "hub.id", &id)?;
             let engine = context.engine().await?;
             output::hint("connecting to the hub…");
             let report = engine.sync_with_hub(code.as_deref()).await?;
@@ -251,4 +278,58 @@ fn show(report: &SyncReport) {
             format!("{key}: {id} belongs to another reference here (`quire ref duplicates`)"),
         );
     }
+}
+
+/// Offers to link a device: shows the code, then asks before giving it anything.
+async fn link(context: &Context) -> anyhow::Result<()> {
+    let engine = context.engine().await?;
+    let (offer, grant) = engine.link_offer().await?;
+    let code = offer.link().to_uri();
+    println!("On the new device, scan this QR code, or run `quire sync join '{code}'`:");
+    match qrcode::QrCode::new(code.as_bytes()) {
+        Ok(qr) => println!("{}", qr.render::<qrcode::render::unicode::Dense1x2>().quiet_zone(true).build()),
+        Err(error) => output::hint(format!("no QR code: {error}")),
+    }
+    output::hint("valid for two minutes, once");
+    let request = offer.request().await;
+    let request = match request {
+        Ok(request) => request,
+        Err(error) => {
+            offer.close().await;
+            return Err(error.into());
+        }
+    };
+    println!("\n{} asks to join. Check words: {}", style::paint(style::KEY, &request.name), request.words.join(" "));
+    // A security decision: yes only when typed.
+    eprint!("Do the same words show on that device? Allow it to have your identity and hub? [y/N] ");
+    let mut answer = String::new();
+    std::io::stdin().read_line(&mut answer)?;
+    let allowed = answer.trim().eq_ignore_ascii_case("y") || answer.trim().eq_ignore_ascii_case("yes");
+    let outcome = if allowed { request.allow(&grant).await } else { request.refuse().await };
+    offer.close().await;
+    outcome?;
+    if allowed {
+        output::report(Tone::Ok, "linked", "the new device now syncs as you");
+    } else {
+        output::report(Tone::Warn, "refused", "nothing was given");
+    }
+    Ok(())
+}
+
+/// Joins another device's code: shows the check words, waits for the person to allow it there.
+async fn join(context: &Context, code: &str, name: Option<&str>) -> anyhow::Result<()> {
+    let engine = context.engine().await?;
+    let name =
+        name.map(str::to_string).or_else(|| std::env::var("HOSTNAME").ok()).unwrap_or_else(|| "a computer".into());
+    output::hint("connecting to your other device…");
+    let joining = engine.link_join(code, &name).await?;
+    println!("Check words: {}", style::paint(style::KEY, joining.words.join(" ")));
+    output::hint("allow this device on the other one if it shows the same words");
+    let grant = joining.finish().await?;
+    let (user, _) = engine.apply_grant(&grant)?;
+    output::report(Tone::Ok, "linked", format!("this device is now {user}"));
+    if grant.hub.is_some() {
+        output::hint("run `quire sync hub now` to get your library");
+    }
+    Ok(())
 }

@@ -14,6 +14,31 @@ data class HubReport(
     val quota: Long,
 )
 
+/** A `quire://hub?…` link (pasted or scanned): the hub's ID, our own relay, a one-time code. */
+data class HubLink(val id: String, val relay: String?, val code: String?)
+
+/** A device asking to be linked, with the right code: its name and the words both screens show. */
+data class LinkRequest(val name: String, val words: List<String>)
+
+/** This device offering to link another: [uri] shows as a QR code (two minutes, once). */
+interface LinkOffer {
+    val uri: String
+    /** Waits for a device with the right code (others are refused); fails when the code expires. */
+    suspend fun nextRequest(): LinkRequest
+    /** Gives the waiting device this person's user key, hub and relay. */
+    suspend fun allow()
+    suspend fun refuse()
+    suspend fun cancel()
+}
+
+/** This device joining another's code: compare [words], then [finish] waits for the other's decision. */
+interface LinkJoin {
+    val words: List<String>
+    /** The user ID now in use, once allowed (reopen the library then). */
+    suspend fun finish(): String
+    suspend fun cancel()
+}
+
 /** One of this person's devices the hub knows; times in milliseconds since 1970. */
 data class HubDevice(val device: String, val firstSeen: Long, val lastSeen: Long, val revoked: Boolean)
 

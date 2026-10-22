@@ -2,6 +2,8 @@ package dev.neurokitchen.quire.presentation.screens.tools
 
 import androidx.compose.runtime.Immutable
 import dev.neurokitchen.quire.domain.model.AutoExport
+import dev.neurokitchen.quire.domain.model.HubDevice
+import dev.neurokitchen.quire.domain.model.HubReport
 import dev.neurokitchen.quire.domain.model.LibraryEntry
 import dev.neurokitchen.quire.domain.model.ProjectMember
 import dev.neurokitchen.quire.domain.model.SyncReport
@@ -63,13 +65,31 @@ data class SyncState(
     val userId: String? = null,
     /** Other devices: their names (from the settings) and device IDs. */
     val peers: List<PeerState> = emptyList(),
-    /** The user key while shown (secret: hidden again by the user). */
-    val revealedKey: String? = null,
     val lastReport: SyncReport? = null,
     /** The project whose sharing is shown, and who it is shared with. */
     val sharing: String? = null,
     val members: List<ProjectMember> = emptyList(),
+    /** The hub this device syncs through (setting `hub.id`), and our own relay (`sync.relay`). */
+    val hubId: String? = null,
+    val relay: String? = null,
+    val hubReport: HubReport? = null,
+    /** This person's devices the hub knows; `null` until asked for. */
+    val hubDevices: List<HubDevice>? = null,
+    /** The recovery kit while shown (secret: hidden again by the user). */
+    val recoveryKit: String? = null,
+    /** Linking a device, while it goes on. */
+    val linking: LinkingState? = null,
 )
+
+/** Linking a device by QR code (`.tasks/T14-security.md`). */
+sealed interface LinkingState {
+    /** This device shows [uri] as a QR code, waiting for the new device. */
+    data class Showing(val uri: String) : LinkingState
+    /** A device with the right code waits for the person's decision. */
+    data class Asking(val name: String, val words: List<String>) : LinkingState
+    /** This device joins another's code: [words] to compare (empty while connecting). */
+    data class Joining(val words: List<String>) : LinkingState
+}
 
 @Immutable
 data class PeerState(val name: String, val deviceId: String)
@@ -78,6 +98,6 @@ data class PeerState(val name: String, val deviceId: String)
 sealed interface ToolsConfirm {
     /** [other] is removed after its fields, projects, tags, notes, PDFs and highlights move to [keep]. */
     data class Merge(val keep: ReferenceLine, val other: ReferenceLine) : ToolsConfirm
-    /** This device takes another device's user key (its identity for sharing). */
-    data class ImportKey(val key: String) : ToolsConfirm
+    /** The hub refuses [device] of this person from now on. */
+    data class RevokeHubDevice(val device: String) : ToolsConfirm
 }

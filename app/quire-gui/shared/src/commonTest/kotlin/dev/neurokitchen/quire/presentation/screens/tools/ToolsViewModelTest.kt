@@ -3,6 +3,12 @@ package dev.neurokitchen.quire.presentation.screens.tools
 import dev.neurokitchen.quire.data.repository.SampleLibraryRepository
 import dev.neurokitchen.quire.data.repository.SampleSettingsRepository
 import dev.neurokitchen.quire.domain.model.Duplicate
+import dev.neurokitchen.quire.domain.model.HubDevice
+import dev.neurokitchen.quire.domain.model.HubLink
+import dev.neurokitchen.quire.domain.model.LinkJoin
+import dev.neurokitchen.quire.domain.model.LinkOffer
+import dev.neurokitchen.quire.domain.model.LinkRequest
+import dev.neurokitchen.quire.domain.model.HubReport
 import dev.neurokitchen.quire.domain.model.DuplicateGroup
 import dev.neurokitchen.quire.domain.model.ExportSelection
 import dev.neurokitchen.quire.domain.model.LibraryEntry
@@ -70,8 +76,40 @@ class ToolsViewModelTest {
         var userId = "user-1"
         override suspend fun deviceId() = "device-1"
         override suspend fun userId() = userId
-        override suspend fun importUserKey(key: String) = "user-2".also { userId = it }
+        val linking = mutableListOf<String>()
+        override suspend fun linkOffer() = object : LinkOffer {
+            override val uri = "quire://device?id=offer"
+            override suspend fun nextRequest() = LinkRequest("Pixel 9", listOf("dune", "maple", "mint"))
+            override suspend fun allow() {
+                linking += "allow"
+            }
+            override suspend fun refuse() {
+                linking += "refuse"
+            }
+            override suspend fun cancel() {
+                linking += "cancel"
+            }
+        }
+        override suspend fun linkJoin(code: String, name: String) = object : LinkJoin {
+            override val words = listOf("dune", "maple", "mint")
+            override suspend fun finish() = "user-2".also {
+                userId = it
+                linking += "joined $code as $name"
+            }
+            override suspend fun cancel() {
+                linking += "cancel"
+            }
+        }
         override suspend fun syncWith(peer: String) = SyncReport(peer, null, false, 3, 2, 0, 0, 0, 0)
+        val codes = mutableListOf<String?>()
+        val revoked = mutableListOf<String>()
+        override suspend fun syncWithHub(code: String?) = HubReport(code != null, false, 4, 1, 2, 0, 0, 0, 0).also { codes += code }
+        override suspend fun hubDevices() = listOf(HubDevice("device-1", 0, 0, false), HubDevice("phone", 0, 0, "phone" in revoked))
+        override suspend fun parseHubLink(text: String) =
+            if (text.startsWith("quire://hub")) HubLink("hub-2", "http://10.0.0.2:3340", "ABCD-EFGH") else error("not a quire hub link")
+        override suspend fun revokeHubDevice(device: String) {
+            revoked += device
+        }
     }
 
     private class FakeLibraries : LibrariesRepository {
@@ -139,15 +177,80 @@ class ToolsViewModelTest {
         assertTrue(vm.state.first { it.sync.peers.isEmpty() }.sync.peers.isEmpty())
     }
 
+    /** A device asking with the right code is shown with its words; nothing is given until allowed. */
     @Test
-    fun anotherDevicesKeyIsUsedOnlyOnceConfirmed() = runTest {
+    fun aLinkGivesOnlyWhenAllowed() = runTest {
+        val vm = viewModel()
+        vm.onEvent(ToolsEvent.OnLinkDevice)
+        val asking = vm.state.first { it.sync.linking is LinkingState.Asking }.sync.linking as LinkingState.Asking
+        assertEquals("Pixel 9" to listOf("dune", "maple", "mint"), asking.name to asking.words)
+        assertTrue(sync.linking.isEmpty(), "nothing given before the person allows")
+        vm.onEvent(ToolsEvent.OnAllowLink)
+        assertEquals(listOf("allow"), sync.linking)
+        assertNull(vm.state.first { it.notice != null }.sync.linking)
+    }
+
+    @Test
+    fun aRefusedLinkGivesNothing() = runTest {
+        val vm = viewModel()
+        vm.onEvent(ToolsEvent.OnLinkDevice)
+        vm.state.first { it.sync.linking is LinkingState.Asking }
+        vm.onEvent(ToolsEvent.OnRefuseLink)
+        assertEquals(listOf("refuse"), sync.linking)
+    }
+
+    /** Joining takes the other device's identity and reopens the library (its settings changed). */
+    @Test
+    fun joiningTakesTheIdentityAndReopens() = runTest {
         val vm = viewModel()
         vm.onEvent(ToolsEvent.OnSectionSelect(ToolsSection.Sync))
         vm.state.first { it.sync.userId == "user-1" }
-        vm.onEvent(ToolsEvent.OnConfirm(ToolsConfirm.ImportKey("secret ")))
-        assertEquals("user-1", sync.userId)
+        vm.onEvent(ToolsEvent.OnJoinLink(" quire://device?id=offer ", "Laptop"))
+        val state = vm.state.first { it.sync.userId == "user-2" }
+        assertNull(state.sync.linking)
+        assertEquals(listOf("joined quire://device?id=offer as Laptop"), sync.linking)
+    }
+
+    /** The hub's ID and relay are settings (a blank relay unsets it); the code goes with the first sync only. */
+    @Test
+    fun theHubIsSettingsAndSyncsWithTheCodeOnce() = runTest {
+        val vm = viewModel()
+        vm.onEvent(ToolsEvent.OnSectionSelect(ToolsSection.Sync))
+        vm.state.first { it.sync.deviceId != null }
+        vm.onEvent(ToolsEvent.OnSaveHub(" hub-1 ", " http://10.0.0.2:3340 "))
+        val saved = vm.state.first { it.sync.hubId != null }.sync
+        assertEquals("hub-1" to "http://10.0.0.2:3340", saved.hubId to saved.relay)
+        vm.onEvent(ToolsEvent.OnSyncHub(" ABCD-EFGH "))
+        assertTrue(vm.state.first { it.sync.hubReport != null }.sync.hubReport!!.registered)
+        vm.onEvent(ToolsEvent.OnSyncHub(""))
+        assertEquals(listOf("ABCD-EFGH", null), sync.codes)
+        vm.onEvent(ToolsEvent.OnSaveHub("hub-1", ""))
+        vm.state.first { it.sync.relay == null }
+        assertTrue(settings.entries().none { it.key == "sync.relay" })
+    }
+
+    /** A link sets the hub and relay and syncs with its code, in one step; a bad one changes nothing. */
+    @Test
+    fun aHubLinkJoinsInOneStep() = runTest {
+        val vm = viewModel()
+        vm.onEvent(ToolsEvent.OnUseHubLink("https://example.com"))
+        assertTrue(vm.state.first { it.notice != null }.notice is Notice.Failed)
+        assertTrue(settings.entries().none { it.key == "hub.id" })
+        vm.onEvent(ToolsEvent.OnUseHubLink("quire://hub?id=hub-2"))
+        val synced = vm.state.first { it.sync.hubReport != null }.sync
+        assertEquals("hub-2" to "http://10.0.0.2:3340", synced.hubId to synced.relay)
+        assertEquals(listOf<String?>("ABCD-EFGH"), sync.codes)
+    }
+
+    @Test
+    fun aHubDeviceIsRevokedOnlyOnceConfirmed() = runTest {
+        val vm = viewModel()
+        vm.onEvent(ToolsEvent.OnLoadHubDevices)
+        assertEquals(2, vm.state.first { it.sync.hubDevices != null }.sync.hubDevices!!.size)
+        vm.onEvent(ToolsEvent.OnConfirm(ToolsConfirm.RevokeHubDevice("phone")))
+        assertTrue(sync.revoked.isEmpty())
         vm.onEvent(ToolsEvent.OnConfirmed)
-        assertEquals("user-2", vm.state.first { it.sync.userId == "user-2" }.sync.userId)
+        assertTrue(vm.state.first { s -> s.sync.hubDevices.orEmpty().any { it.revoked } }.sync.hubDevices!!.single { it.revoked }.device == "phone")
     }
 
     @Test

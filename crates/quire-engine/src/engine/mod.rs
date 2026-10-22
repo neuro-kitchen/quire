@@ -27,6 +27,7 @@ mod highlights;
 mod hub;
 mod import;
 mod lazy;
+mod linking;
 mod manuscript;
 mod ocr;
 mod pdfs;

@@ -24,6 +24,11 @@ const SECRET: &str = "sync-device-key";
 const USER_SECRET: &str = "sync-user-key";
 
 impl Engine {
+    /// Our own relay (`sync.relay`), if set: the only one sync then uses.
+    pub(super) fn relay(&self) -> Option<&str> {
+        self.config.sync.relay.as_deref().map(str::trim).filter(|r| !r.is_empty())
+    }
+
     /// This device's sync key, created on first use, and where it is kept.
     pub(super) fn sync_key(&self) -> Result<([u8; 32], Store)> {
         self.key(SECRET)
@@ -140,7 +145,7 @@ impl Engine {
     pub async fn sync_with(&self, peer: &str) -> Result<Report> {
         let id = self.peer_id(peer)?;
         let (key, _) = self.sync_key()?;
-        let device = Device::bind(&key).await?;
+        let device = Device::bind(&key, self.relay()).await?;
         let report = device.sync_with(&LibraryReplica(self), &id).await;
         device.close().await;
         self.mark_changed();
@@ -155,7 +160,7 @@ impl Engine {
             return Err(EngineError::Config("no peers yet: `quire sync peer add <name> <device-id>`".into()));
         }
         let (key, _) = self.sync_key()?;
-        let device = Device::bind(&key).await?;
+        let device = Device::bind(&key, self.relay()).await?;
         listening(&device.id());
         device
             .serve(&LibraryReplica(self), &peers, |outcome| {
@@ -173,7 +178,7 @@ impl Engine {
     pub async fn fetch_from_peer(&self, peer: &str, hash: &str) -> Result<bool> {
         let id = self.peer_id(peer)?;
         let (key, _) = self.sync_key()?;
-        let device = Device::bind(&key).await?;
+        let device = Device::bind(&key, self.relay()).await?;
         let report = device.sync_with(&Wanting { inner: LibraryReplica(self), hash: hash.to_string() }, &id).await;
         device.close().await;
         self.mark_changed();

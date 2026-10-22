@@ -73,6 +73,8 @@ import dev.neurokitchen.quire.resources.mobile_settings_libraries_hint
 import dev.neurokitchen.quire.resources.mobile_settings_libraries_empty
 import dev.neurokitchen.quire.resources.mobile_settings_reading
 import dev.neurokitchen.quire.resources.mobile_settings_reading_hint
+import dev.neurokitchen.quire.resources.mobile_settings_sync
+import dev.neurokitchen.quire.resources.mobile_settings_sync_hint
 import dev.neurokitchen.quire.resources.mobile_settings_reader_font
 import dev.neurokitchen.quire.resources.mobile_settings_reader_size
 import dev.neurokitchen.quire.resources.mobile_settings_reader_theme
@@ -102,6 +104,7 @@ fun SettingsTab(onOpen: (MobileSettingsPage) -> Unit) {
             Group {
                 PageRow(Res.string.mobile_settings_account, Res.string.mobile_settings_account_hint) { onOpen(MobileSettingsPage.Account) }
                 PageRow(Res.string.mobile_settings_libraries, Res.string.mobile_settings_libraries_hint) { onOpen(MobileSettingsPage.Libraries) }
+                PageRow(Res.string.mobile_settings_sync, Res.string.mobile_settings_sync_hint) { onOpen(MobileSettingsPage.Sync) }
             }
         }
         item { Spacer(Modifier.size(Dimens.SpaceMd)) }
@@ -118,6 +121,8 @@ fun SettingsPageScreen(
     onBack: () -> Unit,
     viewModel: SettingsViewModel = koinViewModel(),
 ) {
+    // Sync is the Tools tab's, not a settings section: its own screen.
+    if (page == MobileSettingsPage.Sync) return SyncPageScreen(onBack)
     val section = when (page) {
         MobileSettingsPage.Account -> SettingsSection.General
         MobileSettingsPage.Libraries -> SettingsSection.Libraries
@@ -139,6 +144,7 @@ fun SettingsPageScreen(
                 MobileSettingsPage.Reading -> item { ReadingPage(state, onEvent) }
                 MobileSettingsPage.Account -> item { FieldsPage(state, onEvent, emptyNote = null) }
                 MobileSettingsPage.Libraries -> item { FieldsPage(state, onEvent, emptyNote = stringResource(Res.string.mobile_settings_libraries_empty)) }
+                MobileSettingsPage.Sync -> Unit
                 MobileSettingsPage.About -> item {
                     Group {
                         Column(Modifier.fillMaxWidth().padding(Dimens.SpaceMd)) {
@@ -321,5 +327,6 @@ private fun MobileSettingsPage.title() = when (this) {
     MobileSettingsPage.Reading -> Res.string.mobile_settings_reading
     MobileSettingsPage.Account -> Res.string.mobile_settings_account
     MobileSettingsPage.Libraries -> Res.string.mobile_settings_libraries
+    MobileSettingsPage.Sync -> Res.string.mobile_settings_sync
     MobileSettingsPage.About -> Res.string.mobile_settings_about
 }

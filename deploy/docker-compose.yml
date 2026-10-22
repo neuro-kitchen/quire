@@ -19,7 +19,9 @@ services:
     environment:
       # Storage limit per account in megabytes (0: none).
       QUIRE_HUB_QUOTA_MB: ${QUIRE_HUB_QUOTA_MB:-0}
-      # Your own iroh relay (optional; default: the public relays).
+      # Your own iroh relay (optional; default: n0's public relays and address lookup). With the
+      # `relay` service below: http://<this machine's LAN address>:3340, and the same URL as
+      # `sync.relay` in every app. Then nothing goes to n0.
       QUIRE_HUB_RELAY: ${QUIRE_HUB_RELAY:-}
       # Sessions served at once.
       QUIRE_HUB_MAX_SESSIONS: ${QUIRE_HUB_MAX_SESSIONS:-64}
@@ -31,7 +33,21 @@ services:
       start_period: 30s
     # Devices on the same network connect directly when the hub shares the host's network;
     # without it they still connect (through hole punching or a relay).
+    # Rootless Podman's bridge network cannot be reached from the host, so devices would fall
+    # back to a relay even on the same machine (seen: ~1 MB/s through a public relay).
     # network_mode: host
+
+  # Your own iroh relay, instead of n0's: `podman compose --profile relay up -d`. Plain HTTP on
+  # port 3340, for a home network (open to anyone who reaches that port); on the internet run it
+  # with TLS, as `cloud/docker-compose.yml` does.
+  relay:
+    image: docker.io/n0computer/iroh-relay:v1.3.0
+    profiles: ["relay"]
+    restart: unless-stopped
+    command: ["--dev", "--config-path", "/etc/iroh-relay.toml"]
+    volumes:
+      - ./iroh-relay.toml:/etc/iroh-relay.toml:ro,Z
+    network_mode: host
 
 volumes:
   quire-hub-data:

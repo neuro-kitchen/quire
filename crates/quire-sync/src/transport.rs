@@ -1,12 +1,13 @@
 //! Devices on the network with iroh (QUIC): each has a key pair kept by the engine; its public
 //! key (`EndpointId`) is how other devices dial it, through n0's address lookup and relays when
-//! no direct path exists (`presets::N0`). The connection is authenticated by those keys and
-//! encrypted end to end; a device serves only the peers the user added.
+//! no direct path exists (`presets::N0`), or through one relay of the user's own and nothing of
+//! n0's (setting `sync.relay`). The connection is authenticated by those keys and encrypted end to
+//! end; a device serves only the peers the user added.
 
 use std::str::FromStr;
 
 use iroh::endpoint::presets;
-use iroh::{Endpoint, EndpointId, SecretKey};
+use iroh::{Endpoint, EndpointAddr, EndpointId, RelayMode, RelayUrl, SecretKey};
 
 use crate::error::{Result, SyncError};
 use crate::hub::protocol::DeviceInfo;
@@ -47,21 +48,65 @@ pub fn is_device_id(text: &str) -> bool {
 /// This device on the network.
 pub struct Device {
     endpoint: Endpoint,
+    /// Our own relay, if any: the only one used, and where peers are dialed (no address lookup).
+    relay: Option<RelayUrl>,
+}
+
+/// `text` as a relay URL (`http://host:3340` for a relay in dev mode, `https://…` otherwise).
+pub fn parse_relay(text: &str) -> Result<RelayUrl> {
+    text.trim().parse().map_err(|e| SyncError::Network(format!("relay `{text}`: {e}")))
+}
+
+/// An endpoint with `key` speaking `alpns`, online; `relay`: our own relay, used instead of n0's
+/// relays and address lookup (nothing then goes to n0).
+pub(crate) async fn bind_endpoint(key: SecretKey, relay: Option<&RelayUrl>, alpns: Vec<Vec<u8>>) -> Result<Endpoint> {
+    let builder = match relay {
+        Some(url) => Endpoint::builder(presets::Minimal).relay_mode(RelayMode::custom([url.clone()])),
+        None => Endpoint::builder(presets::N0),
+    };
+    let endpoint = builder.secret_key(key).alpns(alpns).bind().await.map_err(|e| SyncError::Network(e.to_string()))?;
+    // Reachable once connected to a relay (its address is then published for peers to find).
+    if tokio::time::timeout(ONLINE_WAIT, endpoint.online()).await.is_err() {
+        let what = relay.map_or("the internet".to_string(), |url| format!("the relay {url}"));
+        return Err(SyncError::Network(format!("no connection to {what} (no relay reachable)")));
+    }
+    Ok(endpoint)
+}
+
+/// A connection from `endpoint` to `peer` speaking `alpn`; with our own `relay`, the peer is dialled
+/// there (it is the peer's home relay too, and a direct path is found from there), else found
+/// through n0's address lookup.
+pub(crate) async fn dial(
+    endpoint: &Endpoint,
+    relay: Option<&RelayUrl>,
+    peer: EndpointId,
+    alpn: &[u8],
+) -> Result<iroh::endpoint::Connection> {
+    let addr = match relay {
+        Some(url) => EndpointAddr::new(peer).with_relay_url(url.clone()),
+        None => EndpointAddr::new(peer),
+    };
+    // A peer that just came online may not have published its address yet: ask again for a
+    // while (seen live: ~10 s after `sync serve` started, none was found yet).
+    let started = std::time::Instant::now();
+    loop {
+        match endpoint.connect(addr.clone(), alpn).await {
+            Ok(connection) => return Ok(connection),
+            Err(error) if started.elapsed() < ADDRESS_WAIT && is_not_found(&error.to_string()) => {
+                tracing::debug!(%error, "no address for the peer yet");
+                tokio::time::sleep(ADDRESS_RETRY).await;
+            }
+            Err(error) => return Err(SyncError::Network(error.to_string())),
+        }
+    }
 }
 
 impl Device {
-    pub async fn bind(secret: &[u8; 32]) -> Result<Self> {
-        let endpoint = Endpoint::builder(presets::N0)
-            .secret_key(SecretKey::from_bytes(secret))
-            .alpns(vec![ALPN.to_vec()])
-            .bind()
-            .await
-            .map_err(|e| SyncError::Network(e.to_string()))?;
-        // Reachable once connected to a relay (its address is then published for peers to find).
-        if tokio::time::timeout(ONLINE_WAIT, endpoint.online()).await.is_err() {
-            return Err(SyncError::Network("no connection to the internet (no relay reachable)".into()));
-        }
-        Ok(Self { endpoint })
+    /// Binds this device; `relay`: our own relay's URL (see [`bind_endpoint`]).
+    pub async fn bind(secret: &[u8; 32], relay: Option<&str>) -> Result<Self> {
+        let relay = relay.map(parse_relay).transpose()?;
+        let endpoint = bind_endpoint(SecretKey::from_bytes(secret), relay.as_ref(), vec![ALPN.to_vec()]).await?;
+        Ok(Self { endpoint, relay })
     }
 
     pub fn id(&self) -> String {
@@ -71,19 +116,7 @@ impl Device {
     /// A connection to `peer` (a device or hub ID) speaking `alpn`.
     async fn connect(&self, peer: &str, alpn: &[u8]) -> Result<(EndpointId, iroh::endpoint::Connection)> {
         let id = EndpointId::from_str(peer.trim()).map_err(|e| SyncError::Network(format!("`{peer}`: {e}")))?;
-        // A peer that just came online may not have published its address yet: ask again for a
-        // while (seen live: ~10 s after `sync serve` started, none was found yet).
-        let started = std::time::Instant::now();
-        loop {
-            match self.endpoint.connect(id, alpn).await {
-                Ok(connection) => return Ok((id, connection)),
-                Err(error) if started.elapsed() < ADDRESS_WAIT && is_not_found(&error.to_string()) => {
-                    tracing::debug!(%error, "no address for the peer yet");
-                    tokio::time::sleep(ADDRESS_RETRY).await;
-                }
-                Err(error) => return Err(SyncError::Network(error.to_string())),
-            }
-        }
+        Ok((id, dial(&self.endpoint, self.relay.as_ref(), id, alpn).await?))
     }
 
     /// Syncs `replica` through the hub `hub` (its ID).

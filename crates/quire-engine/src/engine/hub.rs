@@ -26,7 +26,7 @@ impl Engine {
     pub async fn sync_with_hub(&self, code: Option<&str>) -> Result<HubReport> {
         let hub = self.hub_id()?;
         let (key, _) = self.sync_key()?;
-        let device = Device::bind(&key).await?;
+        let device = Device::bind(&key, self.relay()).await?;
         let options = SyncOptions { code: code.map(str::to_string), ..SyncOptions::default() };
         let report = device.sync_with_hub(&LibraryReplica(self), &hub, &options).await;
         device.close().await;
@@ -52,7 +52,7 @@ impl Engine {
     pub async fn fetch_from_hub(&self, hash: &str) -> Result<bool> {
         let hub = self.hub_id()?;
         let (key, _) = self.sync_key()?;
-        let device = Device::bind(&key).await?;
+        let device = Device::bind(&key, self.relay()).await?;
         let found = device.fetch_from_hub(&LibraryReplica(self), &hub, hash).await;
         device.close().await;
         Ok(found?)
@@ -62,7 +62,7 @@ impl Engine {
     pub async fn hub_devices(&self) -> Result<Vec<DeviceInfo>> {
         let hub = self.hub_id()?;
         let (key, _) = self.sync_key()?;
-        let device = Device::bind(&key).await?;
+        let device = Device::bind(&key, self.relay()).await?;
         let devices = device.hub_devices(&LibraryReplica(self), &hub).await;
         device.close().await;
         Ok(devices?)
@@ -72,7 +72,7 @@ impl Engine {
     pub async fn hub_revoke(&self, device: &str) -> Result<()> {
         let hub = self.hub_id()?;
         let (key, _) = self.sync_key()?;
-        let me = Device::bind(&key).await?;
+        let me = Device::bind(&key, self.relay()).await?;
         let revoked = me.hub_revoke(&LibraryReplica(self), &hub, device).await;
         me.close().await;
         Ok(revoked?)

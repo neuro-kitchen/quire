@@ -1,6 +1,7 @@
 package dev.neurokitchen.quire
 
 import android.app.Application
+import android.content.pm.ApplicationInfo
 import dev.neurokitchen.quire.data.engine.androidEngineModule
 import dev.neurokitchen.quire.data.repository.SampleLibraryRepository
 import dev.neurokitchen.quire.di.initKoin
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.get
 import org.koin.android.ext.koin.androidContext
+import java.io.File
 
 class QuireApplication : Application() {
     override fun onCreate() {
@@ -21,7 +23,15 @@ class QuireApplication : Application() {
         seedSamplePapersIfEmpty()
     }
 
+    /**
+     * Sample papers for UI work, only when asked: a debuggable build with the marker file
+     * (`adb shell run-as dev.neurokitchen.quire touch files/seed-samples`). Never by default: they
+     * would land in the real library and sync to the person's other devices, and a new device must
+     * start empty to join a library through the hub.
+     */
     private fun seedSamplePapersIfEmpty() {
+        val debuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+        if (!debuggable || !File(filesDir, "seed-samples").exists()) return
         val library = get<LibraryRepository>()
         CoroutineScope(Dispatchers.IO).launch {
             val existing = runCatching { library.references(LibraryQuery()).first() }.getOrDefault(emptyList())

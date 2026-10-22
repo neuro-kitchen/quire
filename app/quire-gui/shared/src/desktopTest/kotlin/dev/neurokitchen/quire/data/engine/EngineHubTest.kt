@@ -27,7 +27,7 @@ class EngineHubTest {
             val pdf = dir.resolve("paper.pdf").also { Files.write(it, tinyPdf(listOf("The hippocampus as a spatial map"))) }
             attachments.attachPdf("okeefe1971", pdf.toString(), strict = false)
 
-            assertTrue(sync.exportUserKey() in sync.recoveryKit())
+            assertTrue(session.library().exportUserKey() in sync.recoveryKit())
             assertTrue(attachments.keepOffline("okeefe1971"))
             val opened = attachments.openPdf("okeefe1971")
             assertEquals(PdfSource.Here, opened.source)
