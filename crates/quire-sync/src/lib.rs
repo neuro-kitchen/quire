@@ -10,11 +10,15 @@
 //! - [`identity`]: people's keys and the certificates of their devices.
 //! - [`seal`]: encryption on the device before anything reaches a hub.
 //! - [`hub`]: sync through a hub (an always-on store that cannot read the data).
+//! - [`link`]: `quire://` links (and QR codes) that set a device up in one step.
+//! - [`pairing`]: linking a new device to one of the person's, by QR code (no key shown).
 //! - [`error`]: the errors ([`SyncError`]).
 
 pub mod error;
 pub mod hub;
 pub mod identity;
+pub mod link;
+pub mod pairing;
 pub mod protocol;
 pub mod seal;
 pub mod session;

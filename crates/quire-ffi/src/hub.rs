@@ -1,7 +1,7 @@
 //! Sync through the hub (`.knowledge/sync-hub.md`) and lazy PDFs. The hub's ID is a setting
 //! (`hub.id`, through the config functions); after changing settings the app reopens the library.
 
-use crate::{QuireLibrary, Result, query};
+use crate::{QuireError, QuireLibrary, Result, query};
 
 /// What a hub sync did.
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
@@ -42,6 +42,21 @@ pub struct OpenedPdfRecord {
     pub hash: String,
     pub source: String,
     pub detail: Option<String>,
+}
+
+/// A `quire://hub?…` link read (`.tasks/T14-security.md`): the hub, our own relay, a one-time code.
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct HubLinkRecord {
+    pub id: String,
+    pub relay: Option<String>,
+    pub code: Option<String>,
+}
+
+/// Reads a hub link (pasted or scanned); fails with what is wrong with it.
+#[uniffi::export]
+pub fn parse_hub_link(text: String) -> Result<HubLinkRecord> {
+    let link = quire_engine::HubLink::parse(&text).map_err(|e| QuireError::Invalid(e.to_string()))?;
+    Ok(HubLinkRecord { id: link.id, relay: link.relay, code: link.code })
 }
 
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]

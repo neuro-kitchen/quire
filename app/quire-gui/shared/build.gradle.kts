@@ -115,6 +115,8 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            // QR codes to link a device (`.tasks/T14-security.md`).
+            implementation(libs.qrose)
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
             implementation(libs.compose.ui)
@@ -143,6 +145,8 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(libs.compose.uiTooling)
+            // Scanning a device's QR code: Google's scanner, no camera permission for the app.
+            implementation(libs.play.services.code.scanner)
             // The system file picker (activity results).
             implementation(libs.androidx.activity.compose)
             // JNA for Android (with its native dispatch library per ABI), for the engine's API.

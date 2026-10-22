@@ -29,7 +29,10 @@ pub enum SyncError {
 
     /// The hub does not know this person yet: register with a code (the hub's setup code, an
     /// invitation, or the cloud account's link code).
-    #[error("the sync hub does not know you yet: add it with its setup or link code")]
+    #[error(
+        "the sync hub does not know you yet: if another of your devices uses it, give this device that device's \
+         user key; otherwise add the hub with its setup or link code"
+    )]
     NotRegistered,
 
     /// The hub refused a request (`code`: `hub::protocol::ErrorCode`).
@@ -38,6 +41,10 @@ pub enum SyncError {
 
     #[error("network: {0}")]
     Network(String),
+
+    /// Linking a device failed (an expired or wrong code, a refusal): the message says which.
+    #[error("{0}")]
+    Link(String),
 
     /// The library copy failed (database, files).
     #[error("{0}")]

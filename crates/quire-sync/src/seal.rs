@@ -172,7 +172,7 @@ fn random_nonce() -> Result<[u8; NONCE]> {
     random()
 }
 
-fn random<const N: usize>() -> Result<[u8; N]> {
+pub(crate) fn random<const N: usize>() -> Result<[u8; N]> {
     let mut bytes = [0; N];
     getrandom::fill(&mut bytes).map_err(|e| SyncError::Protocol(format!("no randomness: {e}")))?;
     Ok(bytes)

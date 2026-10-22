@@ -18,6 +18,7 @@ default = ["tui"]
 tui = ["dep:quire-tui"]
 
 [dependencies]
+qrcode.workspace = true
 quire-engine.workspace = true
 quire-connector.workspace = true
 quire-tui = { workspace = true, optional = true }

@@ -70,7 +70,8 @@ class EngineExchangeLibrariesSyncTest {
             assertTrue(sync.deviceId().isNotBlank())
             val me = sync.userId()
             assertEquals(64, me.length)
-            assertEquals(me, sync.importUserKey(sync.exportUserKey()))
+            // The key itself never reaches the app's screens (devices link by QR code); the engine still has it.
+            assertEquals(me, session.library().importUserKey(session.library().exportUserKey()))
             EngineLibraryRepository(session).createProject("Lab")
             val colleague = "b".repeat(64)
             assertEquals("editor", sync.shareProject("lab", colleague, "Ana", "editor").role)

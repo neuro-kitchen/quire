@@ -57,6 +57,8 @@ pub use quire_model::{
 };
 pub use quire_model::{ProjectMember, Role as MemberRole, UserId};
 pub use quire_sync::hub::{HubReport, SyncOptions as HubOptions};
+pub use quire_sync::link::HubLink;
+pub use quire_sync::pairing::{Grant as LinkGrant, Join as LinkJoin, Offer as LinkOffer, Request as LinkRequest};
 pub use quire_sync::transport::is_device_id;
 pub use quire_sync::{Report as SyncReport, Side as SyncSide};
 pub use secrets::Store as SecretStore;

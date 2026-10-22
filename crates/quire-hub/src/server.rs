@@ -57,16 +57,22 @@ pub struct HubServer {
 }
 
 impl HubServer {
-    /// Binds the hub's endpoint; `relay`: our own relay's URL instead of n0's public ones.
+    /// Binds the hub's endpoint; `relay`: our own relay's URL instead of n0's relays and address
+    /// lookup (nothing then goes to n0; devices dial the hub at that relay).
     pub async fn bind(key: &[u8; 32], relay: Option<&str>) -> Result<Self, String> {
-        let mut builder = Endpoint::builder(presets::N0)
+        let builder = match relay {
+            Some(relay) => {
+                let url = quire_sync::transport::parse_relay(relay).map_err(|e| e.to_string())?;
+                Endpoint::builder(presets::Minimal).relay_mode(RelayMode::custom([url]))
+            }
+            None => Endpoint::builder(presets::N0),
+        };
+        let endpoint = builder
             .secret_key(SecretKey::from_bytes(key))
-            .alpns(vec![quire_sync::hub::ALPN.to_vec()]);
-        if let Some(relay) = relay {
-            let url = relay.parse().map_err(|e| format!("relay `{relay}`: {e}"))?;
-            builder = builder.relay_mode(RelayMode::custom([url]));
-        }
-        let endpoint = builder.bind().await.map_err(|e| e.to_string())?;
+            .alpns(vec![quire_sync::hub::ALPN.to_vec()])
+            .bind()
+            .await
+            .map_err(|e| e.to_string())?;
         if tokio::time::timeout(ONLINE_WAIT, endpoint.online()).await.is_err() {
             tracing::warn!("no relay reachable: only devices that reach this hub directly can sync");
         }
