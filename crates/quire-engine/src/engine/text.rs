@@ -45,8 +45,8 @@ pub struct PaperText {
 }
 
 /// Version of the stored full texts: raised when the converters change, so texts are fetched
-/// and converted again. 3: figure images (arXiv).
-const FORMAT: u32 = 3;
+/// and converted again. 3: figure images (arXiv). 4: figure images (Europe PMC).
+const FORMAT: u32 = 4;
 /// How long "no full text online" is believed before asking again (papers get HTML versions
 /// and open-access copies later).
 const RETRY_AFTER: Duration = Duration::from_secs(30 * 24 * 3600);
