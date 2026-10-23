@@ -20,6 +20,8 @@ data class ReferenceCardState(
     val isSelected: Boolean = false,
     val reading: ReadingStatus = ReadingStatus.Unread,
     val doi: String = "",
+    val venue: String = "",
+    val projects: List<String> = emptyList(),
 ) {
     /** Formats a clean standard BibTeX entry from card metadata. */
     fun toBibtex(): String {
@@ -53,6 +55,8 @@ data class ReferenceCardState(
             isSelected = isSelected,
             reading = reference.reading,
             doi = reference.doi,
+            venue = reference.containerTitle,
+            projects = reference.projects,
         )
 
         fun creatorLabel(reference: Reference): String = reference.creators.let { creators ->

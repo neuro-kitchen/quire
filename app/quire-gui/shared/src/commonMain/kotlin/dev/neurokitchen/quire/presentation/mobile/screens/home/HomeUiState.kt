@@ -4,11 +4,25 @@ import androidx.compose.runtime.Immutable
 import dev.neurokitchen.quire.presentation.components.reference_card.ReferenceCardState
 
 @Immutable
+data class HomeProjectSummary(
+    val path: String,
+    val name: String,
+    val count: Int,
+)
+
+@Immutable
 data class HomeUiState(
     val daysCount: Int = 0,
     val streakCount: Int = 0,
     val activeDaysOfWeek: Set<Int> = emptySet(),
+    val todayIndex: Int = -1,
+    val readingCount: Int = 0,
+    val unreadCount: Int = 0,
+    val readCount: Int = 0,
+    val unfiledCount: Int = 0,
+    val isUpNextFallback: Boolean = false,
     val reading: List<ReferenceCardState> = emptyList(),
+    val projects: List<HomeProjectSummary> = emptyList(),
     val recent: List<ReferenceCardState> = emptyList(),
     val totalCount: Int = 0,
     val isLoading: Boolean = true,

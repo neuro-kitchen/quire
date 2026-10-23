@@ -691,4 +691,19 @@
         <item quantity="one">%1$d other change</item>
         <item quantity="other">%1$d other changes</item>
     </plurals>
+    <string name="home_add_paper">Add paper</string>
+    <string name="home_days_read">Days Read</string>
+    <string name="home_days_count">%1$d days</string>
+    <string name="home_streak_badge">🔥 %1$d day streak</string>
+    <string name="home_continue_sub">Pick up where you left off</string>
+    <string name="home_up_next">Up next</string>
+    <string name="home_up_next_sub">Ready in your reading queue</string>
+    <string name="home_in_progress">IN PROGRESS</string>
+    <string name="home_queued">UP NEXT</string>
+    <string name="home_resume">Resume</string>
+    <string name="home_start_reading">Start reading</string>
+    <string name="home_projects_title">Projects &amp; shelves</string>
+    <string name="home_projects_sub">Jump into a collection</string>
+    <string name="home_recent_sub">Latest additions to your library</string>
+    <string name="home_status_completed">Completed</string>
 </resources>

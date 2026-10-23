@@ -37,29 +37,57 @@ class HomeViewModel(
 
     val state: StateFlow<HomeUiState> = combine(
         library.references(LibraryQuery()),
+        library.projects().catch { emit(emptyList()) },
         preferences.preferences,
         actionSheetRef,
         confirmDeleteRef,
-    ) { references, prefs, sheetRef, deleteRef ->
-        val cards = references.map { ReferenceCardState.from(it) }
-        val reading = cards.filter { it.reading == ReadingStatus.Reading || it.reading == ReadingStatus.Read }
+    ) { references, projects, prefs, sheetRef, deleteRef ->
+        val projectNames = projects.associate { it.path to it.name }
+        val cards = references.map { ref ->
+            ReferenceCardState.from(ref).copy(
+                projects = ref.projects.map { path -> projectNames[path] ?: path },
+            )
+        }
+
+        val readingCount = cards.count { it.reading == ReadingStatus.Reading }
+        val unreadCount = cards.count { it.reading == ReadingStatus.Unread }
+        val readCount = cards.count { it.reading == ReadingStatus.Read }
+        val unfiledCount = references.count { it.projects.isEmpty() }
+
+        val inProgress = cards.filter { it.reading == ReadingStatus.Reading }
         val recent = cards.sortedByDescending { it.dateAdded }
+        val upNextFallback = if (inProgress.isEmpty()) {
+            recent.filter { it.reading == ReadingStatus.Unread }.take(2)
+        } else {
+            emptyList()
+        }
+        val spotlightCards = if (inProgress.isNotEmpty()) inProgress else upNextFallback
+
+        val projectSummaries = projects.map { p ->
+            HomeProjectSummary(
+                path = p.path,
+                name = p.name,
+                count = p.referenceCount,
+            )
+        }
 
         // Common code runs on every platform (iOS too): kotlinx-datetime, not java.time.
         val today = runCatching { Clock.System.todayIn(TimeZone.currentSystemDefault()) }.getOrNull()
 
         val readingDates = prefs.readingDays.mapNotNull { runCatching { LocalDate.parse(it) }.getOrNull() }.toMutableSet()
 
-        if (today != null && reading.isNotEmpty() && readingDates.isEmpty()) {
+        if (today != null && (readingCount + readCount > 0) && readingDates.isEmpty()) {
             readingDates.add(today)
             viewModelScope.launch { preferences.recordReadingToday() }
         }
 
         val activeDaysOfWeek = mutableSetOf<Int>()
         var streakCount = 0
+        var todayIndex = -1
 
         if (today != null) {
             val dayOfWeekVal = today.dayOfWeek.isoDayNumber // 1 (Mon) .. 7 (Sun)
+            todayIndex = dayOfWeekVal - 1
             val monday = today.minus(dayOfWeekVal - 1, DateTimeUnit.DAY)
             for (i in 0..6) {
                 val d = monday.plus(i, DateTimeUnit.DAY)
@@ -75,13 +103,20 @@ class HomeViewModel(
             }
         }
 
-        val daysCount = maxOf(readingDates.size, if (reading.isNotEmpty()) 1 else 0)
+        val daysCount = maxOf(readingDates.size, if (readingCount + readCount > 0) 1 else 0)
 
         HomeUiState(
             daysCount = daysCount,
             streakCount = streakCount,
             activeDaysOfWeek = activeDaysOfWeek,
-            reading = reading,
+            todayIndex = todayIndex,
+            readingCount = readingCount,
+            unreadCount = unreadCount,
+            readCount = readCount,
+            unfiledCount = unfiledCount,
+            isUpNextFallback = inProgress.isEmpty() && upNextFallback.isNotEmpty(),
+            reading = spotlightCards,
+            projects = projectSummaries,
             recent = recent,
             totalCount = cards.size,
             isLoading = false,
