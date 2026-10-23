@@ -19,6 +19,7 @@ import dev.neurokitchen.quire.domain.repository.SearchRepository
 import dev.neurokitchen.quire.domain.repository.SettingsRepository
 import dev.neurokitchen.quire.domain.repository.NotificationsRepository
 import dev.neurokitchen.quire.domain.repository.SyncRepository
+import dev.neurokitchen.quire.presentation.mobile.MobileAppViewModel
 import dev.neurokitchen.quire.presentation.mobile.screens.home.HomeViewModel
 import dev.neurokitchen.quire.presentation.mobile.screens.library.MobileLibraryViewModel
 import dev.neurokitchen.quire.presentation.desktop.DesktopViewModel
@@ -62,6 +63,7 @@ val sampleDataModule = module {
 
 val viewModelModule = module {
     viewModelOf(::LibraryViewModel)
+    viewModelOf(::MobileAppViewModel)
     viewModelOf(::HomeViewModel)
     viewModelOf(::MobileLibraryViewModel)
     viewModelOf(::SettingsViewModel)
