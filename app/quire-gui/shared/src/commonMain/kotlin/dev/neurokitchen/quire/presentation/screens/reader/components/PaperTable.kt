@@ -43,7 +43,7 @@ fun PaperTable(
     SelectionContainer {
         Box(
             modifier
-                .border(1.dp, lineColor, shape)
+                .then(if (lineColor == Color.Transparent) Modifier else Modifier.border(1.dp, lineColor, shape))
                 .horizontalScroll(rememberScrollState()),
         ) {
             TableGrid(rows, columns, maxColumnWidth) { row, column ->

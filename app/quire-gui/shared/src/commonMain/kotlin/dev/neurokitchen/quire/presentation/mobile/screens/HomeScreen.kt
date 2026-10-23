@@ -79,11 +79,14 @@ import dev.neurokitchen.quire.resources.home_status_completed
 import dev.neurokitchen.quire.resources.home_streak_badge_plural
 import dev.neurokitchen.quire.resources.home_up_next
 import dev.neurokitchen.quire.resources.home_up_next_sub
+import dev.neurokitchen.quire.presentation.screens.notifications.NotificationsViewModel
 import dev.neurokitchen.quire.resources.ic_description
 import dev.neurokitchen.quire.resources.ic_folder
 import dev.neurokitchen.quire.resources.ic_library_books
+import dev.neurokitchen.quire.resources.ic_notifications
 import dev.neurokitchen.quire.resources.library_unfiled
 import dev.neurokitchen.quire.resources.mobile_items
+import dev.neurokitchen.quire.resources.notifications
 import dev.neurokitchen.quire.resources.reading_reading
 import dev.neurokitchen.quire.resources.reading_unread
 import org.jetbrains.compose.resources.painterResource
@@ -96,7 +99,7 @@ private const val HOME_SECTION_SIZE = 5
 
 /**
  * Home: what a phone opens to.
- * - Top bar with Quire brand mark and total paper count
+ * - Top bar with Quire brand mark, total paper count, and Notifications icon button
  * - Layered Hero Bento: Reading habit tracker (with today ring) + 3-tile Library Pulse (Reading / Unread / Completed)
  * - Horizontal Spotlight Carousel for Continue Reading (or Up Next queue)
  * - Quick-jump Projects & Shelves strip
@@ -107,9 +110,11 @@ fun HomeTab(
     onOpenDetails: (String) -> Unit,
     onOpenReader: (String, String) -> Unit,
     onOpenShelf: (ShelfKey) -> Unit,
+    onOpenNotifications: () -> Unit = {},
     viewModel: HomeViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val notifications by koinViewModel<NotificationsViewModel>().state.collectAsStateWithLifecycle()
     val colors = QuireTheme.colors
     val all = ShelfKey(ShelfKey.Kind.All)
     val clipboardManager = LocalClipboardManager.current
@@ -154,6 +159,47 @@ fun HomeTab(
                 LargeTitle(
                     title = "Quire",
                     subtitle = pluralStringResource(Res.plurals.mobile_items, state.totalCount, state.totalCount),
+                    icon = {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(colors.cardBackground)
+                                .clickable(
+                                    onClickLabel = stringResource(Res.string.notifications),
+                                    onClick = onOpenNotifications,
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                painter = painterResource(Res.drawable.ic_notifications),
+                                contentDescription = stringResource(Res.string.notifications),
+                                tint = colors.fillPrimary,
+                                modifier = Modifier.size(21.dp),
+                            )
+                            if (notifications.unread > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(top = 5.dp, end = 5.dp)
+                                        .clip(CircleShape)
+                                        .background(colors.accent)
+                                        .padding(horizontal = 5.dp, vertical = 1.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        text = if (notifications.unread > 99) "99+" else notifications.unread.toString(),
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 10.sp,
+                                            lineHeight = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                        ),
+                                        color = colors.onAccent,
+                                    )
+                                }
+                            }
+                        }
+                    },
                 )
             }
             item {

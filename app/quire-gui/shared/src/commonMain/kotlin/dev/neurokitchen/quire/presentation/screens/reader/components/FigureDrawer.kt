@@ -231,82 +231,139 @@ fun FigureDrawer(
     } else {
         RoundedCornerShape(topEnd = Dimens.RadiusBase, bottomEnd = Dimens.RadiusBase)
     }
+    val isMobileSheet = !showDockToggle
 
     Column(
         modifier = modifier
             .fillMaxHeight()
-            .background(colors.sidepane)
-            .border(1.dp, colors.border, borderShape),
+            .background(if (isMobileSheet) colors.background else colors.sidepane)
+            .then(if (isMobileSheet) Modifier else Modifier.border(1.dp, colors.border, borderShape)),
     ) {
         // Drawer Header
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        if (isMobileSheet) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Dimens.SpaceLg, vertical = Dimens.SpaceXs),
+            ) {
                 Text(
                     text = stringResource(if (extraTab != null) Res.string.reader_figures_tables else Res.string.figures_figures_tables),
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        fontSize = 11.sp,
-                    ),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
                     color = colors.fillPrimary,
                 )
             }
-
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                // Dock Toggle button (VS Code style movable dock)
-                if (showDockToggle) Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .height(24.dp)
-                        .clip(RoundedCornerShape(Dimens.RadiusSmall))
-                        .background(colors.fillQuarternary.copy(alpha = 0.6f))
-                        .clickable(onClick = onToggleDockSide)
-                        .padding(horizontal = 7.dp),
-                ) {
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = if (dockSide == FigureDockSide.Right) "← Dock Left" else "Dock Right →",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Medium),
-                        color = colors.fillSecondary,
+                        text = stringResource(if (extraTab != null) Res.string.reader_figures_tables else Res.string.figures_figures_tables),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            fontSize = 11.sp,
+                        ),
+                        color = colors.fillPrimary,
                     )
                 }
 
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(24.dp)
-                        .clip(CircleShape)
-                        .background(colors.fillQuarternary.copy(alpha = 0.6f))
-                        .clickable(onClick = onClose),
-                ) {
-                    Icon(
-                        painterResource(Res.drawable.ic_close),
-                        contentDescription = stringResource(Res.string.figures_close_drawer),
-                        tint = colors.fillSecondary,
-                        modifier = Modifier.size(14.dp),
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // Dock Toggle button (VS Code style movable dock)
+                    if (showDockToggle) Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .height(24.dp)
+                            .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                            .background(colors.fillQuarternary)
+                            .clickable(onClick = onToggleDockSide)
+                            .padding(horizontal = 7.dp),
+                    ) {
+                        Text(
+                            text = if (dockSide == FigureDockSide.Right) "← Dock Left" else "Dock Right →",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Medium),
+                            color = colors.fillSecondary,
+                        )
+                    }
+
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(colors.fillQuarternary)
+                            .clickable(onClick = onClose),
+                    ) {
+                        Icon(
+                            painterResource(Res.drawable.ic_close),
+                            contentDescription = stringResource(Res.string.figures_close_drawer),
+                            tint = colors.fillSecondary,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
                 }
             }
         }
 
-        // Subtabs: Figures / Tables
+        // Subtabs: Segmented pill bar on mobile, compact chips on desktop
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = Dimens.SpaceMin),
-            horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
+                .padding(
+                    horizontal = if (isMobileSheet) Dimens.SpaceLg else 14.dp,
+                    vertical = Dimens.SpaceXs,
+                )
+                .then(
+                    if (isMobileSheet) {
+                        Modifier
+                            .clip(RoundedCornerShape(Dimens.RadiusFull))
+                            .background(colors.surfaceContainer)
+                            .padding(4.dp)
+                    } else {
+                        Modifier
+                    },
+                ),
+            horizontalArrangement = Arrangement.spacedBy(if (isMobileSheet) 4.dp else Dimens.SpaceXs),
         ) {
-            DrawerTabChip("Figures (${shownFigures.size})", selected = selectedTab == 0) { selectedTab = 0 }
-            DrawerTabChip("Tables (${tables.size})", selected = selectedTab == 1) { selectedTab = 1 }
-            extraTab?.let { DrawerTabChip(it.label, selected = selectedTab == 2) { selectedTab = 2 } }
+            val tabModifier = if (isMobileSheet) Modifier.weight(1f) else Modifier
+            DrawerTabChip(
+                label = "Figures (${shownFigures.size})",
+                selected = selectedTab == 0,
+                isMobileSheet = isMobileSheet,
+                modifier = tabModifier,
+            ) { selectedTab = 0 }
+            DrawerTabChip(
+                label = "Tables (${tables.size})",
+                selected = selectedTab == 1,
+                isMobileSheet = isMobileSheet,
+                modifier = tabModifier,
+            ) { selectedTab = 1 }
+            extraTab?.let {
+                DrawerTabChip(
+                    label = it.label,
+                    selected = selectedTab == 2,
+                    isMobileSheet = isMobileSheet,
+                    modifier = tabModifier,
+                ) { selectedTab = 2 }
+            }
         }
 
-        HorizontalDivider(color = colors.border.copy(alpha = 0.4f), modifier = Modifier.padding(top = Dimens.SpaceXs))
+        if (!isMobileSheet) {
+            HorizontalDivider(color = colors.border.copy(alpha = 0.4f), modifier = Modifier.padding(top = Dimens.SpaceXs))
+        }
+
+        val listPadding = if (isMobileSheet) {
+            PaddingValues(horizontal = Dimens.SpaceLg, vertical = Dimens.SpaceSm)
+        } else {
+            PaddingValues(12.dp)
+        }
 
         // Content List
         if (selectedTab == 0) {
@@ -319,7 +376,7 @@ fun FigureDrawer(
                 )
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(12.dp),
+                    contentPadding = listPadding,
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
@@ -342,8 +399,8 @@ fun FigureDrawer(
                 )
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = listPadding,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     itemsIndexed(tables) { _, tbl ->
@@ -427,11 +484,10 @@ private fun FigureCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(Dimens.RadiusBase))
-            .background(colors.background)
-            .border(1.dp, colors.border.copy(alpha = 0.5f), RoundedCornerShape(Dimens.RadiusBase))
+            .clip(RoundedCornerShape(Dimens.RadiusLarge))
+            .background(colors.cardBackground)
             .clickable(onClick = onEnlarge)
-            .padding(10.dp),
+            .padding(14.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -440,30 +496,40 @@ private fun FigureCard(
         ) {
             Text(
                 text = figure.title,
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
-                color = colors.accent,
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                color = colors.fillPrimary,
             )
             OpenBeside(openLabel, onPin)
         }
 
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(10.dp))
 
         if (image != null) {
-            Image(
-                bitmap = image!!,
-                contentDescription = figure.title,
+            Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 180.dp)
-                    .clip(RoundedCornerShape(Dimens.RadiusSmall)),
-            )
+                    .clip(RoundedCornerShape(Dimens.RadiusBase))
+                    .background(Color.White)
+                    .padding(10.dp),
+            ) {
+                Image(
+                    bitmap = image!!,
+                    contentDescription = figure.title,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 220.dp)
+                        .clip(RoundedCornerShape(Dimens.RadiusSmall)),
+                )
+            }
         } else {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(90.dp)
-                    .background(colors.fillQuarternary.copy(alpha = 0.4f)),
+                    .height(96.dp)
+                    .clip(RoundedCornerShape(Dimens.RadiusBase))
+                    .background(colors.background.copy(alpha = 0.6f)),
             ) {
                 Text(
                     stringResource(Res.string.figures_figure_preview),
@@ -474,12 +540,12 @@ private fun FigureCard(
         }
 
         if (figure.caption.isNotBlank()) {
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(10.dp))
             Text(
                 text = figure.caption,
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 15.sp),
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 19.sp),
                 color = colors.fillSecondary,
-                maxLines = 3,
+                maxLines = 4,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -492,42 +558,59 @@ private fun TableCard(table: ExtractedTable, onPin: () -> Unit, openLabel: Strin
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(Dimens.RadiusBase))
-            .background(colors.background)
-            .border(1.dp, colors.border.copy(alpha = 0.5f), RoundedCornerShape(Dimens.RadiusBase))
-            .padding(10.dp),
+            .clip(RoundedCornerShape(Dimens.RadiusLarge))
+            .background(colors.cardBackground)
+            .padding(14.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(
-                text = table.title,
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
-                color = colors.accent,
-                modifier = Modifier.weight(1f, fill = false),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(
+                    text = table.title,
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = colors.fillPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(Dimens.RadiusFull))
+                        .background(colors.fillQuinary)
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                ) {
+                    Text(
+                        text = stringResource(Res.string.reader_rows, table.rows.size),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = colors.fillSecondary,
+                    )
+                }
+            }
             Spacer(Modifier.width(Dimens.SpaceXs))
-            Text(
-                text = stringResource(Res.string.reader_rows, table.rows.size),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                color = colors.fillTertiary,
-            )
-            Spacer(Modifier.weight(1f))
             OpenBeside(openLabel, onPin)
         }
-        Spacer(Modifier.height(Dimens.SpaceXs))
-        PaperTable(
-            rows = table.rows,
-            textStyle = MaterialTheme.typography.bodySmall,
-            textColor = colors.fillPrimary,
-            lineColor = colors.border.copy(alpha = 0.5f),
-            stripeColor = colors.sidepane.copy(alpha = 0.6f),
-            maxColumnWidth = 220.dp,
-        )
+        Spacer(Modifier.height(10.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Dimens.RadiusBase))
+                .background(colors.background),
+        ) {
+            PaperTable(
+                rows = table.rows,
+                textStyle = MaterialTheme.typography.bodySmall,
+                textColor = colors.fillPrimary,
+                lineColor = Color.Transparent,
+                stripeColor = colors.stripe,
+                maxColumnWidth = 220.dp,
+            )
+        }
     }
 }
 
@@ -535,23 +618,43 @@ private fun TableCard(table: ExtractedTable, onPin: () -> Unit, openLabel: Strin
 private fun DrawerTabChip(
     label: String,
     selected: Boolean,
+    isMobileSheet: Boolean = false,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val colors = QuireTheme.colors
     Box(
-        modifier = Modifier
+        contentAlignment = Alignment.Center,
+        modifier = modifier
             .clip(RoundedCornerShape(Dimens.RadiusFull))
-            .background(if (selected) colors.accent else colors.fillQuarternary.copy(alpha = 0.5f))
+            .background(
+                when {
+                    selected -> colors.accent
+                    isMobileSheet -> Color.Transparent
+                    else -> colors.fillQuarternary
+                },
+            )
             .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 3.dp),
+            .padding(
+                horizontal = if (isMobileSheet) 8.dp else 10.dp,
+                vertical = if (isMobileSheet) 8.dp else 3.dp,
+            ),
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall.copy(
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                fontSize = 11.sp,
-            ),
+            style = if (isMobileSheet) {
+                MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                )
+            } else {
+                MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    fontSize = 11.sp,
+                )
+            },
             color = if (selected) colors.onAccent else colors.fillSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -608,7 +711,19 @@ internal suspend fun figureImage(
 /** Opens the figure or table: in a pane beside the text or PDF (desktop), full screen (phone). */
 @Composable
 private fun OpenBeside(label: String, onClick: () -> Unit) {
-    TextButton(onClick = onClick, contentPadding = PaddingValues(horizontal = Dimens.SpaceXs), modifier = Modifier.height(32.dp)) {
-        Text(label, style = MaterialTheme.typography.labelMedium)
+    val colors = QuireTheme.colors
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .clip(RoundedCornerShape(Dimens.RadiusFull))
+            .background(colors.accent.copy(alpha = 0.14f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 5.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = colors.accent,
+        )
     }
 }

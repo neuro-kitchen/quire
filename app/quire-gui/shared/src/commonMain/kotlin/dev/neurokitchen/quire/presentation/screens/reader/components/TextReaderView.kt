@@ -122,6 +122,7 @@ fun TextReaderView(
     contentPadding: PaddingValues = PaddingValues(),
     /** A block to bring to the top (the phone's progress slider); `null`: none. */
     jumpToBlock: Int? = null,
+    onJumped: () -> Unit = {},
 ) {
     val tab = tabs.getOrNull(selectedTab) ?: return
     // Item 0 of the list is the tabs row (empty when the tabs sit above it): block items start at 1.
@@ -133,8 +134,14 @@ fun TextReaderView(
     // Consecutive table rows show as one table: list items are not blocks one to one.
     val items = remember(tab) { readerItems(tab.blocks) }
     val itemOfBlock = remember(items, tab) { itemOfBlock(items, tab.blocks.size) }
-    val firstVisibleBlock by remember(items, list) {
-        derivedStateOf { (items.getOrNull((list.firstVisibleItemIndex - 1).coerceAtLeast(0))?.first ?: 0) + 1 }
+    val firstVisibleBlock by remember(items, list, tab.blocks.size) {
+        derivedStateOf {
+            if (!list.canScrollForward && (list.firstVisibleItemIndex > 0 || list.firstVisibleItemScrollOffset > 0)) {
+                tab.blocks.size.coerceAtLeast(1)
+            } else {
+                (items.getOrNull((list.firstVisibleItemIndex - 1).coerceAtLeast(0))?.first ?: 0) + 1
+            }
+        }
     }
     LaunchedEffect(firstVisibleBlock, tab.blocks.size) {
         onProgressChange(firstVisibleBlock, tab.blocks.size)
@@ -163,9 +170,19 @@ fun TextReaderView(
         }
     }
 
-    LaunchedEffect(jumpToBlock) { if (jumpToBlock != null) list.scrollToItem(itemOfBlock.getOrElse(jumpToBlock) { 0 } + 1) }
+    LaunchedEffect(jumpToBlock) {
+        if (jumpToBlock != null) {
+            list.scrollToItem(itemOfBlock.getOrElse(jumpToBlock) { 0 } + 1)
+            onJumped()
+        }
+    }
     val layoutDirection = LocalLayoutDirection.current
     val focusManager = LocalFocusManager.current
+    LaunchedEffect(list.isScrollInProgress) {
+        if (list.isScrollInProgress && localSelection == null) {
+            focusManager.clearFocus()
+        }
+    }
 
     Column(modifier.fillMaxSize().background(themeColors.background)) {
         val tabRow: @Composable () -> Unit = {
@@ -184,11 +201,20 @@ fun TextReaderView(
             }
         }
         // Under bars drawn over the text (the phone), the tabs scroll with it as a tab row; otherwise
-        // they stay at the top as chips.
+        // they stay at the top as chips. On the phone, Figures and Tables live in the bottom sheet.
         val tabsInList = contentPadding.calculateTopPadding() > 0.dp
+        val phoneTabIndices = remember(tabs, tabsInList) {
+            if (tabsInList) {
+                tabs.indices
+                    .filter { tabs[it].kind != PaperTabKind.Figures && tabs[it].kind != PaperTabKind.Tables }
+                    .ifEmpty { tabs.indices.toList() }
+            } else {
+                tabs.indices.toList()
+            }
+        }
         if (!tabsInList) tabRow()
         val phoneTabs: @Composable () -> Unit = {
-            PaperTabRow(tabs, selectedTab, themeColors.text, onTabClick)
+            PaperTabRow(tabs, phoneTabIndices, selectedTab, themeColors.text, onTabClick)
         }
         // Swiping sideways turns to the next or previous tab: the text follows the finger, and
         // the new tab comes in from the side it was pulled from.
@@ -203,13 +229,14 @@ fun TextReaderView(
                 .pointerInput(Unit) {
                     detectTapGestures { onTapPage() }
                 }
-                .pointerInput(selectedTab, tabs.size, tabsInList) {
+                .pointerInput(selectedTab, phoneTabIndices, tabsInList) {
                     if (!tabsInList) return@pointerInput
+                    val currentPos = phoneTabIndices.indexOf(selectedTab).takeIf { it >= 0 } ?: 0
                     detectHorizontalDragGestures(
                         onDragEnd = {
                             val next = when {
-                                pull.value < -width / 4f && selectedTab < tabs.lastIndex -> selectedTab + 1
-                                pull.value > width / 4f && selectedTab > 0 -> selectedTab - 1
+                                pull.value < -width / 4f && currentPos < phoneTabIndices.lastIndex -> phoneTabIndices[currentPos + 1]
+                                pull.value > width / 4f && currentPos > 0 -> phoneTabIndices[currentPos - 1]
                                 else -> null
                             }
                             scope.launch {
@@ -227,8 +254,8 @@ fun TextReaderView(
                     ) { change, amount ->
                         change.consume()
                         // No tab past the first or the last: the pull resists.
-                        val atEnd = (pull.value + amount > 0 && selectedTab == 0) ||
-                            (pull.value + amount < 0 && selectedTab == tabs.lastIndex)
+                        val atEnd = (pull.value + amount > 0 && currentPos == 0) ||
+                            (pull.value + amount < 0 && currentPos == phoneTabIndices.lastIndex)
                         scope.launch { pull.snapTo(pull.value + if (atEnd) amount / 4 else amount) }
                     }
                 },
@@ -342,16 +369,22 @@ private fun SelectableBlock(
         value = value,
         visualTransformation = { TransformedText(text, OffsetMapping.Identity) },
         onValueChange = { next ->
-            value = value.copy(selection = next.selection)
             val range = next.selection
-            onSelection(
-                if (range.collapsed) null
-                else text.text.substring(range.min, range.max) to text.text.substring(0, range.min),
-            )
+            if (range.collapsed) {
+                // Ignore collapsed cursor movements from simple taps/scrolling so BasicTextField
+                // does not trigger BringIntoView scroll jumps on the parent LazyColumn at the end.
+                if (!value.selection.collapsed) {
+                    value = value.copy(selection = androidx.compose.ui.text.TextRange.Zero)
+                    onSelection(null)
+                }
+            } else {
+                value = value.copy(selection = range)
+                onSelection(text.text.substring(range.min, range.max) to text.text.substring(0, range.min))
+            }
         },
         readOnly = true,
         textStyle = style(block.kind, readerFont, fontSizeSp).copy(color = textColor),
-        cursorBrush = SolidColor(colors.accent),
+        cursorBrush = SolidColor(Color.Transparent),
         modifier = Modifier.fillMaxWidth().padding(start = if (block.kind == BlockKind.ListItem) Dimens.SpaceMd else 0.dp),
     )
 }
@@ -480,27 +513,35 @@ private fun TabChip(text: String, selected: Boolean, textColor: Color, onClick: 
  * scrolling to keep it in view (Material's scrollable tab row, in the reader theme's colours).
  */
 @Composable
-private fun PaperTabRow(tabs: List<PaperTab>, selected: Int, textColor: Color, onSelect: (Int) -> Unit) {
+private fun PaperTabRow(
+    tabs: List<PaperTab>,
+    visibleIndices: List<Int>,
+    selected: Int,
+    textColor: Color,
+    onSelect: (Int) -> Unit,
+) {
     val colors = QuireTheme.colors
+    val selectedVisiblePos = visibleIndices.indexOf(selected).coerceAtLeast(0)
     PrimaryScrollableTabRow(
-        selectedTabIndex = selected,
+        selectedTabIndex = selectedVisiblePos,
         containerColor = Color.Transparent,
         contentColor = textColor,
         edgePadding = 0.dp,
         minTabWidth = 0.dp,
         indicator = {
             TabRowDefaults.PrimaryIndicator(
-                Modifier.tabIndicatorOffset(selected, matchContentSize = true),
+                Modifier.tabIndicatorOffset(selectedVisiblePos, matchContentSize = true),
                 width = Dp.Unspecified,
                 color = colors.accent,
             )
         },
         divider = { HorizontalDivider(color = textColor.copy(alpha = 0.12f)) },
     ) {
-        tabs.forEachIndexed { index, t ->
+        visibleIndices.forEach { originalIndex ->
+            val t = tabs[originalIndex]
             Tab(
-                selected = index == selected,
-                onClick = { onSelect(index) },
+                selected = originalIndex == selected,
+                onClick = { onSelect(originalIndex) },
                 selectedContentColor = colors.accent,
                 unselectedContentColor = textColor.copy(alpha = 0.65f),
                 text = {

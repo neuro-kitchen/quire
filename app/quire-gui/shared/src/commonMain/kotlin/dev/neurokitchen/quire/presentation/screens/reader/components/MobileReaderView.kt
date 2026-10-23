@@ -71,12 +71,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -185,6 +190,7 @@ fun MobileReaderView(
                     onTapPage = toggleChrome,
                     contentPadding = padding,
                     jumpToPage = jump,
+                    onJumped = { jump = null },
                     onPinchZoom = { onEvent(ReaderEvent.OnSetZoom(it)) },
                     selectAfterLongPress = true,
                 )
@@ -213,6 +219,7 @@ fun MobileReaderView(
                     onTapPage = toggleChrome,
                     contentPadding = padding,
                     jumpToBlock = jump,
+                    onJumped = { jump = null },
                 )
             }
         }
@@ -474,8 +481,8 @@ private fun BottomControls(
                 }
                 // Three fixed places, so the middle action stays centred however wide the pills are.
                 Box(Modifier.fillMaxWidth().padding(vertical = Dimens.SpaceMin)) {
-                    if (onToggleMode != null) {
-                        Box(Modifier.align(Alignment.CenterStart)) { ModeToggle(isPdf, onToggleMode) }
+                    Box(Modifier.align(Alignment.CenterStart)) {
+                        ModeToggle(isPdf = isPdf, onClick = onToggleMode)
                     }
                     Box(Modifier.align(Alignment.Center)) {
                         ToolbarAction(Res.drawable.ic_inventory_2, stringResource(Res.string.reader_figures_tables), highlights, onFigures)
@@ -570,15 +577,39 @@ private fun ToolbarAction(icon: org.jetbrains.compose.resources.DrawableResource
 
 /**
  * PDF ⇄ reading mode: a pill naming the mode it switches to ("Read mode" on the PDF, "PDF" on the
- * text), so what a tap does is plain.
+ * text), or greyed out showing "Read mode" when the PDF is missing so the current mode is clear.
  */
 @Composable
-private fun ModeToggle(isPdf: Boolean, onClick: () -> Unit) = VibrantPill(
-    icon = if (isPdf) Res.drawable.ic_subject else Res.drawable.ic_picture_as_pdf,
-    label = stringResource(if (isPdf) Res.string.reader_to_text else Res.string.reader_to_pdf),
-    count = null,
-    onClick = onClick,
-)
+private fun ModeToggle(isPdf: Boolean, onClick: (() -> Unit)?) {
+    if (onClick != null) {
+        VibrantPill(
+            icon = if (isPdf) Res.drawable.ic_subject else Res.drawable.ic_picture_as_pdf,
+            label = stringResource(if (isPdf) Res.string.reader_to_text else Res.string.reader_to_pdf),
+            count = null,
+            onClick = onClick,
+        )
+    } else {
+        val colors = QuireTheme.colors
+        val label = stringResource(Res.string.reader_to_text)
+        Row(
+            Modifier
+                .heightIn(min = 48.dp)
+                .clip(CircleShape)
+                .background(colors.fillQuarternary)
+                .padding(horizontal = Dimens.SpaceMd),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
+        ) {
+            Icon(
+                painterResource(Res.drawable.ic_subject),
+                contentDescription = null,
+                tint = colors.fillTertiary,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(label, style = MaterialTheme.typography.labelLarge, color = colors.fillTertiary)
+        }
+    }
+}
 
 /** A toolbar's main action, vibrant (Material 3 Expressive): the accent, an icon and a word. */
 @Composable
@@ -611,12 +642,33 @@ private fun VibrantPill(icon: org.jetbrains.compose.resources.DrawableResource, 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PanelSheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    // Consume leftover upward scroll/fling at the bottom of the sheet's inner list so pushing
+    // upwards at the end does not pull/bounce the ModalBottomSheet against its expanded anchor.
+    val consumeUpwardOverscroll = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource,
+            ): Offset = if (available.y < 0f) Offset(0f, available.y) else Offset.Zero
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity =
+                if (available.y < 0f) Velocity(0f, available.y) else Velocity.Zero
+        }
+    }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = QuireTheme.colors.sidepane,
+        containerColor = QuireTheme.colors.background,
     ) {
-        Box(Modifier.fillMaxWidth().fillMaxHeight(0.85f)) { content() }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.85f)
+                .nestedScroll(consumeUpwardOverscroll),
+        ) {
+            content()
+        }
     }
 }
 

@@ -120,6 +120,7 @@ fun PdfPagesView(
     contentPadding: PaddingValues = PaddingValues(),
     /** A page to bring to the top (the phone's page slider); `null`: none. */
     jumpToPage: Int? = null,
+    onJumped: () -> Unit = {},
     /** A pinch ended at this zoom; `null`: pinching does nothing (the desktop zooms with keys). */
     onPinchZoom: ((Float) -> Unit)? = null,
     /**
@@ -135,10 +136,23 @@ fun PdfPagesView(
     LaunchedEffect(focusedPage) { if (focusedPage != null) list.animateScrollToItem(focusedPage) }
     val current = matches.getOrNull(currentMatch)
     LaunchedEffect(current) { if (current != null) list.animateScrollToItem(current.page) }
-    LaunchedEffect(jumpToPage) { if (jumpToPage != null) list.scrollToItem(jumpToPage) }
+    LaunchedEffect(jumpToPage) {
+        if (jumpToPage != null) {
+            list.scrollToItem(jumpToPage)
+            onJumped()
+        }
+    }
 
     var selection by remember { mutableStateOf<ActivePdfSelection?>(null) }
-    val firstVisiblePage by remember { derivedStateOf { list.firstVisibleItemIndex + 1 } }
+    val firstVisiblePage by remember(pages.size) {
+        derivedStateOf {
+            if (!list.canScrollForward && (list.firstVisibleItemIndex > 0 || list.firstVisibleItemScrollOffset > 0)) {
+                pages.size.coerceAtLeast(1)
+            } else {
+                list.firstVisibleItemIndex + 1
+            }
+        }
+    }
     val themeColors = readerColors(readerTheme)
 
     LaunchedEffect(firstVisiblePage, pages.size) {

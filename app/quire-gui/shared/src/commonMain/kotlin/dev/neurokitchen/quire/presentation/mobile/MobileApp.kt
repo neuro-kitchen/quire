@@ -207,6 +207,9 @@ fun MobileApp(
                                 onOpenDetails = openDetails,
                                 onOpenReader = openReader,
                                 onOpenShelf = openShelf,
+                                onOpenNotifications = {
+                                    navigation.open { Route.SettingsPage(it, dev.neurokitchen.quire.presentation.mobile.navigation.MobileSettingsPage.Notifications) }
+                                },
                             )
                             Tab.Library -> LibraryTab(
                                 onOpenDetails = openDetails,
