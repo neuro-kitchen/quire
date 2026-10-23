@@ -34,11 +34,12 @@ services:
       BACKUP_BUCKET: ${BACKUP_BUCKET}
       BACKUP_FORCE_PATH_STYLE: ${BACKUP_FORCE_PATH_STYLE:-false}
 
-  # The sealed files, copied to the same storage every 10 minutes (they never change once written).
+  # The sealed files, synced to the same storage every 10 minutes (`rclone sync` purges deleted
+  # accounts' file directories from object storage so GDPR account erasure leaves no orphan blobs).
   files-backup:
     image: docker.io/rclone/rclone:1.75.1
     restart: unless-stopped
-    entrypoint: ["/bin/sh", "-c", "while true; do rclone copy /data/files backup:$${BACKUP_BUCKET}/files --immutable; sleep 600; done"]
+    entrypoint: ["/bin/sh", "-c", "while true; do rclone sync /data/files backup:$${BACKUP_BUCKET}/files; sleep 600; done"]
     volumes:
       - hub-data:/data:ro
     environment:

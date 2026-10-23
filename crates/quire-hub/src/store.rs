@@ -194,6 +194,8 @@ impl Store {
         // Safe with WAL (fsync when the WAL is checkpointed); Litestream recommends it.
         conn.pragma_update(None, "synchronous", "NORMAL")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
+        // Overwrite deleted SQLite pages with zeroes so deleted account data leaves no residue in WAL/DB pages.
+        conn.pragma_update(None, "secure_delete", "ON")?;
         conn.busy_timeout(Duration::from_secs(5))?;
         conn.execute_batch(SCHEMA)?;
         migrate(&conn)?;
@@ -792,6 +794,9 @@ impl Store {
             }
             tx.execute("DELETE FROM account WHERE id = ?1", [account])?;
             tx.commit()?;
+            // Checkpoint and truncate the WAL so zeroed pages are flushed to the main DB file and
+            // replicated cleanly to object-storage backups without retaining stale WAL frames.
+            let _ = c.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
             Ok(())
         })?;
         let dir = self.files.join(account.to_string());

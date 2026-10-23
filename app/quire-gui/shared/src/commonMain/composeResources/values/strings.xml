@@ -593,8 +593,8 @@
     <string name="mobile_sync_manual_hub">Set up by ID and relay…</string>
     <string name="mobile_sync_manual_hub_hint">Configure Hub ID, custom relay URL, and setup code by hand</string>
     <string name="mobile_settings_libraries_empty">One library on this device. Libraries made on the desktop show here once synced.</string>
-    <string name="mobile_settings_about">About</string>
-    <string name="mobile_settings_about_hint">Version and licence</string>
+    <string name="mobile_settings_about">About &amp; Legal</string>
+    <string name="mobile_settings_about_hint">Terms, privacy, backups, and open-source licences</string>
     <string name="mobile_settings_trash_hint">View and restore deleted references</string>
     <string name="library_new_collection">New collection</string>
     <string name="notice_direct_download_failed_opening_page">Direct download unavailable; opening paper page</string>

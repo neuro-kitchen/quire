@@ -33,6 +33,7 @@ enum class SettingsSection(val tables: Set<String>) {
     Export(setOf("export")),
     Shortcuts(emptySet()),
     ConfigFile(emptySet()),
+    About(emptySet()),
 }
 
 /** One key's row: what it is, what is saved, what is being typed. */

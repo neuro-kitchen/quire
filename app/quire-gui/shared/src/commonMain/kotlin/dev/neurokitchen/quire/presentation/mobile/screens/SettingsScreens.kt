@@ -49,6 +49,7 @@ import dev.neurokitchen.quire.resources.Res
 import dev.neurokitchen.quire.resources.destination_settings
 import dev.neurokitchen.quire.resources.ic_auto_fix_high
 import dev.neurokitchen.quire.resources.ic_delete
+import dev.neurokitchen.quire.resources.ic_info
 import dev.neurokitchen.quire.resources.ic_library_books
 import dev.neurokitchen.quire.resources.ic_notifications
 import dev.neurokitchen.quire.resources.ic_person
@@ -57,6 +58,7 @@ import dev.neurokitchen.quire.resources.ic_quire_logo
 import dev.neurokitchen.quire.resources.ic_sync
 import dev.neurokitchen.quire.resources.library_trash
 import dev.neurokitchen.quire.resources.mobile_settings_about
+import dev.neurokitchen.quire.resources.mobile_settings_about_hint
 import dev.neurokitchen.quire.resources.mobile_settings_account
 import dev.neurokitchen.quire.resources.mobile_settings_account_hint
 import dev.neurokitchen.quire.resources.mobile_settings_libraries
@@ -185,7 +187,18 @@ fun SettingsTab(
             )
         }
         item {
-            SettingsBrandFooter(version = state.version)
+            WhatsAppSettingsRow(
+                icon = Res.drawable.ic_info,
+                title = stringResource(Res.string.mobile_settings_about),
+                subtitle = stringResource(Res.string.mobile_settings_about_hint),
+                onClick = { onOpen(MobileSettingsPage.About) },
+            )
+        }
+        item {
+            SettingsBrandFooter(
+                version = state.version,
+                onClick = { onOpen(MobileSettingsPage.About) },
+            )
         }
     }
 }
@@ -345,11 +358,15 @@ internal fun WhatsAppSectionTitle(title: String) {
 }
 
 @Composable
-internal fun SettingsBrandFooter(version: String) {
+internal fun SettingsBrandFooter(
+    version: String,
+    onClick: (() -> Unit)? = null,
+) {
     val colors = QuireTheme.colors
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(vertical = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -424,7 +441,7 @@ fun SettingsPageScreen(
                 }
                 MobileSettingsPage.Libraries, MobileSettingsPage.Sync, MobileSettingsPage.Notifications, MobileSettingsPage.Trash -> Unit
                 MobileSettingsPage.About -> item {
-                    SettingsBrandFooter(version = state.version)
+                    AboutAndLegalPage(version = state.version)
                 }
             }
         }

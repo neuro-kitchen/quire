@@ -95,7 +95,7 @@ Rust 1.99 stable (`rust-version = "1.99"`).
 `quire` is taken on crates.io (a YAML parser) and reserved on PyPI; it is fine for local use and prefixed crate
 names (`quire-core`, ...). Choose a distinct published name before any release.
 
-## License & Trademarks
+## License, Trademarks & Legal
 - **Source code:** [GNU Affero General Public License v3.0 or later](LICENSE) (`AGPL-3.0-or-later`). You may use,
   change and self-host quire freely; if you distribute modified versions or offer it to others as a
   network service, you must make the complete source available under the same license.
@@ -103,5 +103,7 @@ names (`quire-core`, ...). Choose a distinct published name before any release.
   **"NeuroKitchen"** names, logos (`assets/brand/`), icons, and package identifiers
   (`dev.neurokitchen.quire`) are reserved trademarks and are not licensed for public binary or
   app-store redistribution without rebranding. See [TRADEMARK.md](TRADEMARK.md).
+- **Terms of Service & Privacy Policy:** Use of official binaries and the hosted sync hub is governed by
+  [TERMS.md](TERMS.md) and [PRIVACY.md](PRIVACY.md).
 - **Contributions:** External contributions are accepted under the inbound grant in
   [CONTRIBUTING.md](CONTRIBUTING.md).

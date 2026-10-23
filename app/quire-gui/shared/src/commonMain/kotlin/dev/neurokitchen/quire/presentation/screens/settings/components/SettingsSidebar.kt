@@ -61,6 +61,7 @@ fun SettingsSidebar(
                 SettingsSection.Export -> Res.drawable.ic_link
                 SettingsSection.Shortcuts -> Res.drawable.ic_info
                 SettingsSection.ConfigFile -> Res.drawable.ic_folder
+                SettingsSection.About -> Res.drawable.ic_info
             }
 
             Row(
@@ -102,4 +103,5 @@ val SettingsSection.displayTitle: String
         SettingsSection.Export -> "CiteKey & Export"
         SettingsSection.Shortcuts -> "Shortcuts"
         SettingsSection.ConfigFile -> "Configuration (TOML)"
+        SettingsSection.About -> "About & Legal"
     }
