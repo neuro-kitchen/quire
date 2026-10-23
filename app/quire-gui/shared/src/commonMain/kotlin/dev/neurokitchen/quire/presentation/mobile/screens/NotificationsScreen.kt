@@ -1,5 +1,6 @@
 package dev.neurokitchen.quire.presentation.mobile.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -11,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.chrisbanes.haze.hazeSource
 import dev.neurokitchen.quire.presentation.designsystem.Dimens
+import dev.neurokitchen.quire.presentation.designsystem.QuireTheme
 import dev.neurokitchen.quire.presentation.mobile.components.LocalMobileChrome
 import dev.neurokitchen.quire.presentation.mobile.components.MobileTopBar
 import dev.neurokitchen.quire.presentation.mobile.components.mobileContentPadding
@@ -31,7 +33,7 @@ fun NotificationsPageScreen(onBack: () -> Unit, viewModel: NotificationsViewMode
     }
     val state by viewModel.state.collectAsStateWithLifecycle()
     val chrome = LocalMobileChrome.current
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().background(QuireTheme.colors.background)) {
         LazyColumn(Modifier.fillMaxSize().hazeSource(chrome.haze), contentPadding = mobileContentPadding()) {
             item { NotificationsList(state.items.orEmpty(), Modifier.padding(horizontal = Dimens.SpaceMd)) }
         }
