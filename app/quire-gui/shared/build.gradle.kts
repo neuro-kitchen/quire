@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.androidMultiplatformLibrary)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.kotlinSerialization)
 }
 
 // ── The Rust engine ────────────────────────────────────────────────────────────────────────────
@@ -26,6 +27,27 @@ val (jnaOs, libraryFile) = when {
     else -> "linux" to "libquire_ffi.so"
 }
 val nativeLibrary = repoRoot.file("target/$rustProfile/$libraryFile")
+
+// rustls-platform-verifier's Kotlin component must have the version of its Rust crate
+// (`rustls-platform-verifier-android` in Cargo.lock), or the app crashes when it checks a
+// certificate: read from the lock file (the crate's own Gradle recipe).
+abstract class RustlsVersion : ValueSource<String, RustlsVersion.Params> {
+    interface Params : ValueSourceParameters {
+        val lockFile: RegularFileProperty
+    }
+
+    override fun obtain(): String {
+        val lines = parameters.lockFile.get().asFile.readLines()
+        val at = lines.indexOfFirst { it.trim() == "name = \"rustls-platform-verifier-android\"" }
+        return lines.drop(at + 1).firstOrNull { it.trimStart().startsWith("version = ") }
+            ?.substringAfter('"')?.substringBefore('"')?.takeIf { at >= 0 && it.isNotEmpty() }
+            ?: error("rustls-platform-verifier-android not found in Cargo.lock")
+    }
+}
+
+val rustlsPlatformVerifierVersion = providers.of(RustlsVersion::class.java) {
+    parameters.lockFile.set(repoRoot.file("Cargo.lock"))
+}
 
 val cargoBuildFfi by tasks.registering(Exec::class) {
     description = "Builds the engine's native library (quire-ffi)."
@@ -55,7 +77,7 @@ val copyNativeLibrary by tasks.registering(Copy::class) {
     into(nativeResourcesDir.map { it.dir("$jnaOs-$hostArch") })
 }
 
-tasks.matching { it.name == "compileKotlinDesktop" }.configureEach { dependsOn(generateUniffiKotlin) }
+tasks.matching { it.name == "compileKotlinDesktop" || it.name.startsWith("compileAndroidMain") || it.name == "compileEngineMainKotlinMetadata" }.configureEach { dependsOn(generateUniffiKotlin) }
 tasks.matching { it.name == "desktopProcessResources" }.configureEach { dependsOn(copyNativeLibrary) }
 // Tests open throwaway libraries: no system keyring.
 tasks.matching { it.name == "desktopTest" }.configureEach {
@@ -93,9 +115,15 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            // QR codes to link a device (`.tasks/T14-security.md`).
+            implementation(libs.qrose)
+            // Dates in common code: java.time does not exist on iOS.
+            implementation(libs.kotlinx.datetime)
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
             implementation(libs.compose.ui)
+            // Back closing in-screen surfaces (the Add menu).
+            implementation(libs.compose.ui.backhandler)
             implementation(libs.compose.material3)
             implementation(libs.compose.material3.navigationSuite)
             implementation(libs.compose.components.resources)
@@ -105,6 +133,12 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
             api(libs.koin.core)
             implementation(libs.koin.compose.viewmodel)
+            implementation(libs.navigation3.ui)
+            implementation(libs.lifecycle.viewmodel.navigation3)
+            implementation(libs.kotlinx.serialization.core)
+            implementation(libs.haze)
+            implementation(libs.haze.blur)
+            implementation(libs.haze.blur.materials)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -113,10 +147,29 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(libs.compose.uiTooling)
+            // Scanning a device's QR code: Google's scanner, no camera permission for the app.
+            implementation(libs.play.services.code.scanner)
+            // The system file picker (activity results).
+            implementation(libs.androidx.activity.compose)
+            // JNA for Android (with its native dispatch library per ABI), for the engine's API.
+            implementation("${libs.jna.get().module}:${libs.versions.jna.get()}@aar")
+            // The Kotlin half of the engine's certificate verifier (rustls-platform-verifier):
+            // its version is the one in Cargo.lock (see below).
+            implementation("org.rustls:rustls-platform-verifier:${rustlsPlatformVerifierVersion.get()}")
         }
-        getByName("desktopMain") {
-            // The engine's Kotlin API, generated from quire-ffi (see the Rust engine section below).
+        // The engine's Kotlin API (generated from quire-ffi, see the Rust engine section above) and
+        // the repositories over it: plain JVM code, shared by the desktop and Android.
+        val engineMain by creating {
+            dependsOn(commonMain.get())
             kotlin.srcDir(uniffiKotlinDir)
+            dependencies {
+                // Each platform brings its own JNA: the jar on the desktop, the AAR on Android.
+                compileOnly(libs.jna)
+            }
+        }
+        androidMain.get().dependsOn(engineMain)
+        getByName("desktopMain") {
+            dependsOn(engineMain)
             resources.srcDir(nativeResourcesDir)
             dependencies {
                 implementation(libs.kotlinx.coroutines.swing)

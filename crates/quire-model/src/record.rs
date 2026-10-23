@@ -64,9 +64,11 @@ impl Timestamp {
     }
 
     /// The UTC calendar day, e.g. for "new since" queries and showing when something happened.
+    /// A stamp outside the years 1–9999 (from a broken or hostile device) gives the nearest day.
     pub fn date(self) -> Date {
-        let (year, month, day) = civil_from_days(self.0.div_euclid(MILLIS_PER_DAY));
-        Date::new(year, Some(month), Some(day)).expect("a valid calendar day")
+        let days = self.0.div_euclid(MILLIS_PER_DAY).clamp(FIRST_DAY, LAST_DAY);
+        let (year, month, day) = civil_from_days(days);
+        Date::new(year, Some(month), Some(day)).expect("a day between 0001-01-01 and 9999-12-31")
     }
 
     /// `days` whole days earlier.
@@ -76,6 +78,9 @@ impl Timestamp {
 }
 
 const MILLIS_PER_DAY: i64 = 86_400_000;
+/// 0001-01-01 and 9999-12-31, in days since 1970-01-01: the days a [`Date`] can hold.
+const FIRST_DAY: i64 = -719_162;
+const LAST_DAY: i64 = 2_932_896;
 
 /// Year, month, day of the day `days` after 1970-01-01 (Howard Hinnant's `civil_from_days`,
 /// https://howardhinnant.github.io/date_algorithms.html).
@@ -160,6 +165,18 @@ mod tests {
         assert_eq!(day(951_782_400_000), (2000, Some(2), Some(29)));
         assert_eq!(day(1_792_454_400_000), (2026, Some(10), Some(20)));
         assert_eq!(Timestamp::from_millis(MILLIS_PER_DAY).days_before(1), Timestamp::from_millis(0));
+    }
+
+    /// A stamp from another device can be anything; turning it into a day must not panic.
+    #[test]
+    fn absurd_stamps_give_the_nearest_valid_day() {
+        let day = |millis| {
+            let d = Timestamp::from_millis(millis).date();
+            (d.get_year(), d.month(), d.day())
+        };
+        assert_eq!(day(i64::MIN), (1, Some(1), Some(1)));
+        assert_eq!(day(i64::MAX), (9999, Some(12), Some(31)));
+        assert_eq!(day(-62_200_000_000_000), (1, Some(1), Some(1)), "before year 1");
     }
 
     #[test]

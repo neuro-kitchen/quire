@@ -50,9 +50,9 @@ pub async fn run(context: &Context, args: &GraphArgs, kind: GraphKind) -> anyhow
         GraphKind::Citing => "is cited by",
         GraphKind::Related => "is related to",
     };
-    output::hint(format!("{} {what} {} works (OpenAlex)", reference.cite_key, entries.len()));
+    output::hint(format!("{} {what} {} (OpenAlex)", reference.cite_key, output::count(entries.len(), "work", "works")));
     for entry in &entries {
-        anstream::println!("{}", line(entry));
+        crate::out!("{}", line(entry));
     }
     if !args.add {
         let missing = entries.iter().filter(|e| e.in_library.is_none() && e.work.doi.is_some()).count();

@@ -1,9 +1,8 @@
 package dev.neurokitchen.quire.presentation.screens.library.components
 
+import dev.neurokitchen.quire.resources.toolbar_toggle_inspector_ctrl_i
 import dev.neurokitchen.quire.resources.add_title
-import dev.neurokitchen.quire.resources.pick_pdf
 import dev.neurokitchen.quire.resources.search_save
-import dev.neurokitchen.quire.presentation.platform.pickFile
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.background
@@ -36,7 +35,6 @@ import dev.neurokitchen.quire.presentation.designsystem.components.CompactTextFi
 import dev.neurokitchen.quire.presentation.designsystem.components.ToolbarIconButton
 import dev.neurokitchen.quire.resources.Res
 import dev.neurokitchen.quire.resources.ic_add
-import dev.neurokitchen.quire.resources.ic_attach_file
 import dev.neurokitchen.quire.resources.ic_info
 import dev.neurokitchen.quire.resources.ic_search
 import dev.neurokitchen.quire.resources.ic_sticky_note_2
@@ -63,63 +61,59 @@ fun ItemsToolbar(
     isInspectorCollapsed: Boolean = false,
     /** Saves the search as typed; offered while there is one. */
     onSaveSearch: (() -> Unit)? = null,
-    /** Adds a paper from a PDF the user picks. */
-    onImportPdf: ((String) -> Unit)? = null,
 ) {
     val colors = QuireTheme.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceXs),
         modifier = modifier
             .fillMaxWidth()
             .height(Dimens.ToolbarHeight)
             .background(colors.toolbar)
             .padding(horizontal = Dimens.SpaceSm),
     ) {
-        // Unified Primary Add Reference button
+        // One Add button: the dialog has every way in (identifiers, PDFs, files, BibTeX, typed in).
+
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .height(30.dp)
                 .clip(RoundedCornerShape(Dimens.RadiusBase))
-                .background(colors.accent)
-                .clickable(onClick = onAddReference)
-                .padding(horizontal = 10.dp),
+                .background(colors.accent),
         ) {
-            Icon(
-                painterResource(Res.drawable.ic_add),
-                contentDescription = null,
-                tint = colors.onAccent,
-                modifier = Modifier.size(16.dp),
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text = stringResource(Res.string.add_title),
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = colors.onAccent,
-            )
-            Spacer(Modifier.width(6.dp))
-            Box(
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(colors.onAccent.copy(alpha = 0.2f))
-                    .padding(horizontal = 4.dp, vertical = 1.dp),
+                    .clickable(onClick = onAddReference)
+                    .padding(horizontal = 10.dp, vertical = Dimens.SpaceMin),
             ) {
+                Icon(
+                    painterResource(Res.drawable.ic_add),
+                    contentDescription = null,
+                    tint = colors.onAccent,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(6.dp))
                 Text(
-                    text = "Ctrl+N",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                    text = stringResource(Res.string.add_title),
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                     color = colors.onAccent,
                 )
+                Spacer(Modifier.width(6.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(colors.onAccent.copy(alpha = 0.2f))
+                        .padding(horizontal = Dimens.SpaceMin, vertical = 1.dp),
+                ) {
+                    Text(
+                        text = "Ctrl+N",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                        color = colors.onAccent,
+                    )
+                }
             }
         }
-
-        ToolbarIconButton(Res.drawable.ic_sticky_note_2, stringResource(Res.string.library_new_note), onClick = {})
-        val pickTitle = stringResource(Res.string.pick_pdf)
-        ToolbarIconButton(
-            Res.drawable.ic_attach_file,
-            stringResource(Res.string.library_add_attachment),
-            onClick = { pickFile(pickTitle, listOf("pdf"))?.let { onImportPdf?.invoke(it) } },
-        )
 
         Spacer(Modifier.weight(1f))
 
@@ -141,7 +135,7 @@ fun ItemsToolbar(
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
                         .background(colors.fillQuarternary)
-                        .padding(horizontal = 4.dp, vertical = 1.dp),
+                        .padding(horizontal = Dimens.SpaceMin, vertical = 1.dp),
                 ) {
                     Text(
                         text = "Ctrl+F",
@@ -164,7 +158,7 @@ fun ItemsToolbar(
             ) {
                 Icon(
                     painterResource(Res.drawable.ic_info),
-                    contentDescription = "Toggle Inspector (Ctrl+I)",
+                    contentDescription = stringResource(Res.string.toolbar_toggle_inspector_ctrl_i),
                     tint = if (!isInspectorCollapsed) colors.accent else colors.fillSecondary,
                     modifier = Modifier.size(16.dp),
                 )

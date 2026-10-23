@@ -274,13 +274,18 @@ fn date(value: &str) -> Option<Date> {
     if let (Some(Some(year)), Some(month), Some(day)) = (parts.next(), parts.next(), parts.next())
         && year > 0
     {
-        let month = month.filter(|m| (1..=12).contains(m)).map(|m| m as u8);
-        let day = day.filter(|d| *d > 0 && month.is_some()).map(|d| d as u8);
+        // `u8::try_from`, not `as u8`: a day past 255 would wrap (257 → 1).
+        let month = month.and_then(|m| u8::try_from(m).ok()).filter(|m| (1..=12).contains(m));
+        let day = day.and_then(|d| u8::try_from(d).ok()).filter(|d| *d > 0 && month.is_some());
         if let Ok(date) = Date::new(year, month, day) {
             return Some(date);
         }
     }
-    value.split(|c: char| !c.is_ascii_digit()).find(|w| w.len() == 4).and_then(|y| y.parse().ok()).map(Date::year)
+    // A year in the text; `0000` (Zotero's unknown date) is none (`Date::year(0)` panicked).
+    value
+        .split(|c: char| !c.is_ascii_digit())
+        .filter(|w| w.len() == 4)
+        .find_map(|y| Date::new(y.parse().ok()?, None, None).ok())
 }
 
 fn add_identifier(data: &mut ReferenceData, text: &str) {
@@ -357,6 +362,16 @@ mod tests {
     use quire_model::Name;
 
     use super::*;
+
+    /// Zotero writes `0000-00-00` for an unknown date: that once panicked (`Date::year(0)`); and a
+    /// day past 255 wrapped around.
+    #[test]
+    fn odd_stored_dates() {
+        assert_eq!(date("0000-00-00 n.d."), None);
+        assert_eq!(date("0000-00-00 Spring 2019").map(|d| d.to_string()).as_deref(), Some("2019"));
+        assert_eq!(date("2019-06-257 2019").map(|d| d.to_string()).as_deref(), Some("2019-06"));
+        assert_eq!(date("2019-06-12 June 12, 2019").map(|d| d.to_string()).as_deref(), Some("2019-06-12"));
+    }
 
     fn item(item_type: &str, fields: &[(&str, &str)]) -> ZoteroItem {
         ZoteroItem {

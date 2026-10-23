@@ -88,6 +88,7 @@ pub async fn run(context: &Context, args: &FolderArgs) -> anyhow::Result<()> {
                 recursive: *recursive,
                 profile: profile.clone(),
                 format: format.as_deref().map(str::parse).transpose()?,
+                ..ExportRequest::default()
             };
             // Check the project and profile exist before writing the file.
             engine.export(&request).await?;
@@ -98,20 +99,24 @@ pub async fn run(context: &Context, args: &FolderArgs) -> anyhow::Result<()> {
                 output::report(
                     Tone::Ok,
                     "written",
-                    format!("{count} references to {} (kept updated)", written.display()),
+                    format!(
+                        "{} to {} (kept updated)",
+                        output::count(count, "reference", "references"),
+                        written.display()
+                    ),
                 );
             }
         }
         Action::Check(args) => return check::run(context, args).await,
         Action::Show => match &context.folder {
             Some(folder) => {
-                anstream::println!(
+                crate::out!(
                     "{}",
                     style::paint(style::DIM, folder.folder.join(quire_engine::folder::FILE_NAME).display())
                 );
                 let show = |label: &str, value: Option<String>| {
                     if let Some(value) = value {
-                        anstream::println!("{}{value}", style::paint(style::LABEL, format!("{label:<12}")));
+                        crate::out!("{}{value}", style::paint(style::LABEL, format!("{label:<12}")));
                     }
                 };
                 show("library", folder.library.clone());

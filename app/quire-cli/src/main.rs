@@ -129,7 +129,7 @@ async fn main() -> ExitCode {
     match result {
         Ok(code) => code,
         Err(error) => {
-            anstream::eprintln!("{} {error:#}", style::paint(style::ERROR, "error:"));
+            crate::err!("{} {error:#}", style::paint(style::ERROR, "error:"));
             ExitCode::FAILURE
         }
     }
@@ -154,7 +154,7 @@ async fn run(context: &Context, command: &Command) -> anyhow::Result<ExitCode> {
         Command::Search(args) => commands::search::run(context.engine().await?, args).await.and(done),
         Command::Saved(args) => commands::saved::run(context.engine().await?, args).await.and(done),
         Command::Alert(args) => commands::alert::run(context.engine().await?, args).await,
-        Command::User(args) => commands::user::run(context.engine().await?, args).and(done),
+        Command::User(args) => commands::user::run(context.engine().await?, args).await.and(done),
         Command::Sync(args) => commands::sync::run(context, args).await.and(done),
         Command::Highlight(args) => commands::highlight::run(context.engine().await?, args).await.and(done),
         Command::Project(args) => commands::project::run(context.engine().await?, args).await.and(done),

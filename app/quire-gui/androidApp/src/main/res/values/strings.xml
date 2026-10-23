@@ -1,3 +1,4 @@
 <resources>
-    <string name="app_name">quire</string>
+    <string name="app_name">Quire</string>
+    <string name="share_label">Add to Quire</string>
 </resources>

@@ -51,7 +51,9 @@ pub(super) fn date(value: &Value) -> Option<Date> {
         };
         let part = |i: usize| first.get(i).and_then(text).and_then(|t| t.parse::<u16>().ok());
         let (year, month, day) = (part(0)?, part(1), part(2));
-        return Date::new(year, month.map(|m| m as u8), day.map(|d| d as u8)).ok();
+        // `as u8` would wrap (257 → 1): a month or day past 255 is no date at all.
+        let small = |n: Option<u16>| n.map(u8::try_from).transpose().ok();
+        return Date::new(year, small(month)?, small(day)?).ok();
     }
     ["raw", "literal"].iter().find_map(|key| object.get(*key).and_then(text)).and_then(|t| t.parse().ok())
 }

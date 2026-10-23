@@ -61,17 +61,18 @@ pub(crate) async fn projects(engine: &Engine) -> Result<Vec<ProjectRecord>> {
         .collect())
 }
 
-/// The projects each reference is in (references in none are left out).
-// One query per project; a bulk store query can replace it if libraries with many projects get slow.
+/// The projects each reference is in (references in none are left out), from one store query.
 async fn memberships(engine: &Engine) -> Result<HashMap<ReferenceId, Vec<String>>> {
-    let mut out: HashMap<ReferenceId, Vec<String>> = HashMap::new();
-    for summary in engine.project_summaries().await? {
-        let path = summary.path.to_string();
-        for reference in engine.list(Some(&summary.path), false, false).await? {
-            out.entry(reference.id).or_default().push(path.clone());
-        }
-    }
-    Ok(out)
+    Ok(engine
+        .memberships()
+        .await?
+        .into_iter()
+        .map(|(id, paths)| {
+            let mut paths: Vec<String> = paths.iter().map(ToString::to_string).collect();
+            paths.sort();
+            (id, paths)
+        })
+        .collect())
 }
 
 async fn records(

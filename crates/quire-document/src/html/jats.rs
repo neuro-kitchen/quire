@@ -2,18 +2,25 @@
 //! has the format).
 //! Sections nest with their `<title>`; `<disp-formula>`, `<fig>`, `<table-wrap>` and lists can sit
 //! inside a `<p>`, which is then cut around them, or all sit in a `<floats-group>` after the body.
+//! A figure's image (`<graphic xlink:href>`, a file name) is served by PMC under the article's
+//! numeric ID: [`PMC_FIGURES`]`<id>/bin/<file>`, which redirects to NCBI's image CDN.
 
 use roxmltree::{Document, Node};
 
 use super::mathml;
 use super::{Writer, tex_from_tex_math};
-use crate::paper_markdown::normalize_label;
+use crate::paper_markdown::{image_paragraph, normalize_label};
+
+/// Where PMC serves an article's files (checked 2026-10-22; `europepmc.org/articles/…/bin/` is 403).
+const PMC_FIGURES: &str = "https://pmc.ncbi.nlm.nih.gov/articles/instance/";
+const XLINK: &str = "http://www.w3.org/1999/xlink";
 
 /// The article's body and reference list as reader Markdown.
 pub fn to_markdown(xml: &str) -> Result<String, roxmltree::Error> {
     let doc = Document::parse_with_options(xml, roxmltree::ParsingOptions { allow_dtd: true, ..Default::default() })?;
     let mut out = Writer::default();
     let article = doc.root_element();
+    out.base = figure_base(article);
     if let Some(body) = article.children().find(|n| n.has_tag_name("body")) {
         blocks(body, 1, &mut out);
     }
@@ -109,7 +116,38 @@ fn caption(node: Node, default: &str) -> String {
 }
 
 fn figure(node: Node, out: &mut Writer) {
+    if let Some(url) = figure_image(node, out.base.as_ref()) {
+        out.paragraph(&image_paragraph(url.as_str()));
+    }
     out.paragraph(&caption(node, "Figure"));
+}
+
+/// The folder of the article's files: by its `pmcaid`, else the digits of its `pmcid`.
+fn figure_base(article: Node) -> Option<url::Url> {
+    let ids: Vec<Node> = article
+        .descendants()
+        .filter(|n| n.has_tag_name("article-id") && n.ancestors().any(|a| a.has_tag_name("article-meta")))
+        .collect();
+    let id_of = |kind: &str| {
+        ids.iter().find(|n| n.attribute("pub-id-type") == Some(kind)).map(|n| text(*n).trim().trim_start_matches("PMC").to_string())
+    };
+    let id = id_of("pmcaid").or_else(|| id_of("pmcid")).filter(|id| !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()))?;
+    url::Url::parse(&format!("{PMC_FIGURES}{id}/bin/")).ok()
+}
+
+/// The figure's full image (not its `thumb`); a file name without an extension is a JPEG.
+fn figure_image(node: Node, base: Option<&url::Url>) -> Option<url::Url> {
+    let graphic = node
+        .descendants()
+        .filter(|n| n.has_tag_name("graphic"))
+        .find(|n| n.attribute("content-type") != Some("thumb"))?;
+    let file = graphic.attribute((XLINK, "href"))?.trim();
+    // A bare file name only: never a path or another site.
+    if file.is_empty() || file.contains(['/', '\\', '?', '#', ':']) || file.starts_with('.') {
+        return None;
+    }
+    let file = if file.contains('.') { file.to_string() } else { format!("{file}.jpg") };
+    base?.join(&file).ok()
 }
 
 fn table(node: Node, out: &mut Writer) {
@@ -186,6 +224,28 @@ mod tests {
             <back><ref-list><title>References</title><ref id="r1"><label>1</label><mixed-citation><surname>Gennarelli</surname> TA. <article-title>Diffuse axonal injury</article-title>. <year>1982</year>.</mixed-citation></ref></ref-list></back></article>"#;
         let md = to_markdown(xml).unwrap();
         insta::assert_snapshot!(md);
+    }
+
+    /// Europe PMC's JATS names each figure's image; PMC serves it by the article's numeric ID.
+    #[test]
+    fn figure_images() {
+        let xml = r#"<article xmlns:xlink="http://www.w3.org/1999/xlink"><front><article-meta>
+            <article-id pub-id-type="pmcid">PMC11529260</article-id><article-id pub-id-type="pmcaid">11529260</article-id>
+            </article-meta></front><body><sec><title>Results</title><p>Text.</p>
+            <fig id="f1"><label>Fig. 1</label><caption><p>Schematic.</p></caption>
+              <graphic content-type="image" xlink:href="12974_2024_3271_Fig1_HTML.jpg"/>
+              <graphic content-type="thumb" xlink:href="12974_2024_3271_Fig1_HTML.gif"/></fig>
+            <fig id="f2"><label>Fig. 2</label><caption><p>Old style.</p></caption><graphic xlink:href="nihms-1-f0002"/></fig>
+            <fig id="f3"><label>Fig. 3</label><caption><p>Elsewhere.</p></caption><graphic xlink:href="https://evil.example/x.jpg"/></fig>
+            </sec></body></article>"#;
+        let md = to_markdown(xml).unwrap();
+        let base = "https://pmc.ncbi.nlm.nih.gov/articles/instance/11529260/bin/";
+        assert!(md.contains(&format!("![Figure]({base}12974_2024_3271_Fig1_HTML.jpg)\n\nFigure 1: Schematic.")), "{md}");
+        assert!(md.contains(&format!("![Figure]({base}nihms-1-f0002.jpg)\n\nFigure 2: Old style.")), "{md}");
+        assert!(!md.contains("evil.example") && !md.contains(".gif"), "{md}");
+        // Without an article ID there is nowhere to fetch from: captions only.
+        let bare = to_markdown(&xml.replace("pmcaid", "x").replace("pmcid", "y")).unwrap();
+        assert!(!bare.contains("![Figure]"), "{bare}");
     }
 
     #[test]

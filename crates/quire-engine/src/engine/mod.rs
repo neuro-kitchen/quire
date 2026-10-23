@@ -18,13 +18,17 @@
 //! - [`tags`]: tags, notes and related references.
 
 mod abstracts;
+pub mod activity;
 mod alerts;
 pub mod backup;
 mod duplicates;
 mod exports;
 mod graph;
 mod highlights;
+mod hub;
 mod import;
+mod lazy;
+mod linking;
 mod manuscript;
 mod ocr;
 mod pdfs;
@@ -51,6 +55,7 @@ pub use duplicates::DuplicateGroup;
 pub use exports::{AutoExportInfo, AutoExportOutcome, DEFAULT_PROFILE, ExportRequest, write_if_changed};
 pub use graph::{GraphEntry, GraphKind};
 pub use import::ZoteroImport;
+pub use lazy::{Eviction, OpenedPdf, PdfSource};
 pub use manuscript::{ManuscriptCheck, UnknownKey, Use as CiteUse, suggest_keys};
 pub use ocr::OcrOutcome;
 pub use pdfs::{Attached, PdfOutcome, PdfStatus};

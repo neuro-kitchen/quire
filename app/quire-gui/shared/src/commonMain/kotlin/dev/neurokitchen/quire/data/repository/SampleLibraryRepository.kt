@@ -56,6 +56,28 @@ class SampleLibraryRepository(
         return AddOutcome(isNew = true, reference = reference)
     }
 
+    override suspend fun addByIdentifier(input: String, projectPath: String?): AddOutcome {
+        val trimmed = input.trim()
+        val isDoi = trimmed.startsWith("10.") || trimmed.contains("doi.org/")
+        val cleanDoi = if (trimmed.contains("doi.org/")) trimmed.substringAfter("doi.org/").trim() else trimmed
+        val citeKey = if (isDoi) "doi_" + cleanDoi.replace("/", "_").replace(".", "_").takeLast(10) else "ref_${references.value.size + 1}"
+        val title = if (isDoi) "Paper (DOI: $cleanDoi)" else "Paper ($trimmed)"
+        val newRef = Reference(
+            id = (references.value.size + 1).toString(),
+            citeKey = citeKey,
+            kind = "article-journal",
+            title = title,
+            creators = listOf(person("Author", "A.")),
+            year = 2024,
+            doi = if (isDoi) cleanDoi else "",
+            projects = if (projectPath != null) listOf(projectPath) else emptyList(),
+            hasPdf = false,
+            dateAdded = "2026-10-22",
+        )
+        references.value = listOf(newRef) + references.value
+        return AddOutcome(isNew = true, reference = newRef)
+    }
+
     override suspend fun updateReference(reference: Reference) {
         references.value = references.value.map { if (it.id == reference.id) reference else it }
     }
@@ -272,6 +294,137 @@ class SampleLibraryRepository(
                 doi = "10.1002/j.1538-7305.1948.tb01338.x",
                 abstract = "The foundation of information theory: entropy, channel capacity, and noiseless coding theorems.",
                 tags = listOf("information-theory", "mathematics", "classic"), projects = listOf("thesis"), hasPdf = true, reading = ReadingStatus.Read, dateAdded = "2026-10-20",
+            ),
+            Reference(
+                "16", "touvron2023", "preprint",
+                "LLaMA: Open and Efficient Foundation Language Models",
+                listOf(person("Touvron", "H."), person("Lavril", "T."), person("Izacard", "G."), person("Martinet", "X."), person("Lample", "G.")), 2023,
+                containerTitle = "arXiv:2302.13971",
+                doi = "10.48550/arXiv.2302.13971",
+                abstract = "A collection of foundation language models ranging from 7B to 65B parameters trained exclusively on publicly available datasets.",
+                tags = listOf("deep-learning", "transformers", "nlp"), projects = listOf("deep-learning"), hasPdf = true, reading = ReadingStatus.Reading, dateAdded = "2026-10-21",
+            ),
+            Reference(
+                "17", "mnih2015", "article-journal",
+                "Human-level control through deep reinforcement learning",
+                listOf(person("Mnih", "V."), person("Kavukcuoglu", "K."), person("Silver", "D."), person("Hassabis", "D.")), 2015,
+                containerTitle = "Nature", volume = "518", issue = "7540", pages = "529–533",
+                doi = "10.1038/nature14236",
+                abstract = "Reinforcement learning combined with deep neural networks mastering Atari 2600 games directly from raw pixel inputs.",
+                tags = listOf("reinforcement-learning", "deep-learning"), projects = listOf("deep-learning"), hasPdf = true, reading = ReadingStatus.Read, dateAdded = "2026-10-21",
+            ),
+            Reference(
+                "18", "silver2016", "article-journal",
+                "Mastering the game of Go with deep neural networks and tree search",
+                listOf(person("Silver", "D."), person("Huang", "A."), person("Maddison", "C. J."), person("Hassabis", "D.")), 2016,
+                containerTitle = "Nature", volume = "529", issue = "7587", pages = "484–489",
+                doi = "10.1038/nature16961",
+                abstract = "AlphaGo combines value networks to evaluate board positions with policy networks to select moves.",
+                tags = listOf("reinforcement-learning", "go", "game-ai"), projects = listOf("deep-learning"), hasPdf = true, reading = ReadingStatus.Read, dateAdded = "2026-10-21",
+            ),
+            Reference(
+                "19", "goodfellow2014", "paper-conference",
+                "Generative Adversarial Nets",
+                listOf(person("Goodfellow", "I."), person("Pouget-Abadie", "J."), person("Mirza", "M."), person("Xu", "B."), person("Bengio", "Y.")), 2014,
+                containerTitle = "Advances in Neural Information Processing Systems 27", pages = "2672–2680",
+                abstract = "A framework for estimating generative models via an adversarial process with generator and discriminator networks.",
+                tags = listOf("generative-ai", "gan", "deep-learning"), projects = listOf("deep-learning"), hasPdf = true, reading = ReadingStatus.Read, dateAdded = "2026-10-21",
+            ),
+            Reference(
+                "20", "devlin2018", "paper-conference",
+                "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+                listOf(person("Devlin", "J."), person("Chang", "M.-W."), person("Lee", "K."), person("Toutanova", "K.")), 2018,
+                containerTitle = "Proceedings of NAACL-HLT 2019", pages = "4171–4186",
+                doi = "10.18653/v1/N19-1423",
+                abstract = "Pre-trained bidirectional representations conditioned on both left and right context in all transformer layers.",
+                tags = listOf("nlp", "transformers", "bert"), projects = listOf("deep-learning"), hasPdf = true, reading = ReadingStatus.Read, dateAdded = "2026-10-21",
+            ),
+            Reference(
+                "21", "brown2020", "paper-conference",
+                "Language Models are Few-Shot Learners",
+                listOf(person("Brown", "T. B."), person("Mann", "B."), person("Ryder", "N."), person("Subbiah", "M."), person("Amodei", "D.")), 2020,
+                containerTitle = "Advances in Neural Information Processing Systems 33", pages = "1877–1901",
+                abstract = "Scaling language models greatly improves task-agnostic few-shot performance (GPT-3).",
+                tags = listOf("nlp", "gpt", "scaling-laws"), projects = listOf("deep-learning", "reading-group"), hasPdf = true, reading = ReadingStatus.Reading, dateAdded = "2026-10-22",
+            ),
+            Reference(
+                "22", "rumelhart1986", "article-journal",
+                "Learning representations by back-propagating errors",
+                listOf(person("Rumelhart", "D. E."), person("Hinton", "G. E."), person("Williams", "R. J.")), 1986,
+                containerTitle = "Nature", volume = "323", issue = "6088", pages = "533–536",
+                doi = "10.1038/323533a0",
+                abstract = "A procedure for learning representations by adjusting the weights of connectionist networks through backpropagation.",
+                tags = listOf("backpropagation", "neural-networks", "classic"), projects = listOf("thesis"), hasPdf = true, reading = ReadingStatus.Read, dateAdded = "2026-10-22",
+            ),
+            Reference(
+                "23", "turing1950", "article-journal",
+                "Computing Machinery and Intelligence",
+                listOf(person("Turing", "A. M.")), 1950,
+                containerTitle = "Mind", volume = "LIX", issue = "236", pages = "433–460",
+                doi = "10.1093/mind/LIX.236.433",
+                abstract = "The imitation game and philosophical foundations for whether machines can think.",
+                tags = listOf("philosophy", "ai", "foundational"), projects = listOf("thesis"), reading = ReadingStatus.Read, dateAdded = "2026-10-22",
+            ),
+            Reference(
+                "24", "moser2008", "article-journal",
+                "Place cells, grid cells, and the brain's spatial representation system",
+                listOf(person("Moser", "E. I."), person("Kropff", "E."), person("Moser", "M.-B.")), 2008,
+                containerTitle = "Annual Review of Neuroscience", volume = "31", pages = "69–89",
+                doi = "10.1146/annurev.neuro.31.061307.090723",
+                abstract = "A synthesis of how place cells in the hippocampus and grid cells in the medial entorhinal cortex map space.",
+                tags = listOf("navigation", "grid cells", "hippocampus"), projects = listOf("thesis/chapter-2"), hasPdf = true, reading = ReadingStatus.Reading, dateAdded = "2026-10-22",
+            ),
+            Reference(
+                "25", "collingridge1983", "article-journal",
+                "Excitatory amino acids in synaptic transmission in the Schaffer collateral-commissural pathway of the rat hippocampus",
+                listOf(person("Collingridge", "G. L."), person("Kehl", "S. J."), person("McLennan", "H.")), 1983,
+                containerTitle = "The Journal of Physiology", volume = "334", issue = "1", pages = "33–46",
+                doi = "10.1113/jphysiol.1983.sp014478",
+                abstract = "Demonstration of NMDA receptor involvement in the induction of hippocampal long-term potentiation (LTP).",
+                tags = listOf("ltp", "synaptic-plasticity", "nmda"), projects = listOf("thesis"), hasPdf = true, reading = ReadingStatus.Unread, dateAdded = "2026-10-22",
+            ),
+            Reference(
+                "26", "bliss1973", "article-journal",
+                "Long-lasting potentiation of synaptic transmission in the dentate area of the anaesthetized rabbit",
+                listOf(person("Bliss", "T. V. P."), person("Lømo", "T.")), 1973,
+                containerTitle = "The Journal of Physiology", volume = "232", issue = "2", pages = "331–356",
+                doi = "10.1113/jphysiol.1973.sp010273",
+                abstract = "The original discovery of long-term potentiation (LTP), providing the first experimental evidence for Hebbian plasticity.",
+                tags = listOf("ltp", "memory", "synaptic-transmission"), projects = listOf("thesis"), hasPdf = true, reading = ReadingStatus.Read, dateAdded = "2026-10-22",
+            ),
+            Reference(
+                "27", "lamport1978", "article-journal",
+                "Time, Clocks, and the Ordering of Events in a Distributed System",
+                listOf(person("Lamport", "L.")), 1978,
+                containerTitle = "Communications of the ACM", volume = "21", issue = "7", pages = "558–565",
+                doi = "10.1145/359545.359563",
+                abstract = "Logical clocks and partial ordering of events in distributed systems without a shared global clock.",
+                tags = listOf("distributed-systems", "clocks", "classic"), projects = listOf("reading-group"), hasPdf = true, reading = ReadingStatus.Read, dateAdded = "2026-10-22",
+            ),
+            Reference(
+                "28", "dean2004", "paper-conference",
+                "MapReduce: Simplified Data Processing on Large Clusters",
+                listOf(person("Dean", "J."), person("Ghemawat", "S.")), 2004,
+                containerTitle = "6th USENIX Symposium on Operating Systems Design and Implementation (OSDI '04)", pages = "137–150",
+                abstract = "A programming model and associated implementation for processing and generating large datasets automatically parallelized across clusters.",
+                tags = listOf("distributed-systems", "big-data", "systems"), projects = listOf("reading-group"), hasPdf = true, reading = ReadingStatus.Read, dateAdded = "2026-10-22",
+            ),
+            Reference(
+                "29", "ongaro2014", "paper-conference",
+                "In Search of an Understandable Consensus Algorithm",
+                listOf(person("Ongaro", "D."), person("Ousterhout", "J.")), 2014,
+                containerTitle = "2014 USENIX Annual Technical Conference (USENIX ATC 14)", pages = "305–319",
+                abstract = "The Raft consensus algorithm, designed to be more understandable than Paxos while providing equivalent safety and fault tolerance.",
+                tags = listOf("consensus", "raft", "distributed-systems"), projects = listOf("reading-group"), hasPdf = true, reading = ReadingStatus.Reading, dateAdded = "2026-10-22",
+            ),
+            Reference(
+                "30", "roelfsema2014", "article-journal",
+                "Basic mechanisms of cognitive reflection and attentional selection in primate visual cortex",
+                listOf(person("Roelfsema", "P. R."), person("Treue", "S.")), 2014,
+                containerTitle = "Neuron", volume = "83", issue = "6", pages = "1363–1381",
+                doi = "10.1016/j.neuron.2014.09.006",
+                abstract = "Attention modulates visual processing across scales, from single neurons to receptive field remapping and neural synchrony.",
+                tags = listOf("vision", "attention", "neuroscience"), projects = listOf("thesis"), reading = ReadingStatus.Unread, dateAdded = "2026-10-22",
             ),
         )
     }

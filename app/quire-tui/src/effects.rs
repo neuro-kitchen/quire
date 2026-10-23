@@ -196,7 +196,7 @@ async fn export(engine: &Engine, scope: &Scope, path: &str) -> anyhow::Result<Ac
         Scope::Project(path) => Some(path.clone()),
         _ => None,
     };
-    let request = ExportRequest { project, recursive: true, profile: None, format: Some(format) };
+    let request = ExportRequest { project, recursive: true, format: Some(format), ..ExportRequest::default() };
     let (text, count) = engine.export(&request).await?;
     let target = quire_engine::paths::expand_home(Path::new(path));
     std::fs::write(&target, text).map_err(|e| anyhow::anyhow!("{}: {e}", target.display()))?;

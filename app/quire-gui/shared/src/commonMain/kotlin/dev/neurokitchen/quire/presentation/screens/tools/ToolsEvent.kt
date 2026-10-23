@@ -1,5 +1,7 @@
 package dev.neurokitchen.quire.presentation.screens.tools
 
+import dev.neurokitchen.quire.presentation.components.notice.Notice
+
 sealed interface ToolsEvent {
     data class OnSectionSelect(val section: ToolsSection) : ToolsEvent
     data object OnDismissNotice : ToolsEvent
@@ -14,12 +16,9 @@ sealed interface ToolsEvent {
     /** Online (Crossref): retraction and correction notices of references with a DOI. */
     data object OnCheckRetractions : ToolsEvent
 
-    data class OnExportChange(val form: ExportForm) : ToolsEvent
-    data object OnExportPreview : ToolsEvent
-    /** Writes the export to `path` once. */
-    data class OnExportSave(val path: String) : ToolsEvent
-    /** Writes the export to `path` now and after every change. */
-    data class OnKeepUpdated(val path: String) : ToolsEvent
+    data class OnShowExport(val open: Boolean) : ToolsEvent
+    /** The export dialog saved: closes it and reports what it did. */
+    data class OnExportDone(val notice: Notice) : ToolsEvent
     data class OnStopAutoExport(val path: String) : ToolsEvent
     data object OnRunAutoExports : ToolsEvent
 
@@ -36,12 +35,27 @@ sealed interface ToolsEvent {
     data class OnSetDefaultLibrary(val name: String) : ToolsEvent
     data class OnBackup(val path: String) : ToolsEvent
 
-    data object OnRevealKey : ToolsEvent
-    data object OnHideKey : ToolsEvent
+    /** Shows a code (QR) for a new device, then asks before giving it anything. */
+    data object OnLinkDevice : ToolsEvent
+    data object OnAllowLink : ToolsEvent
+    data object OnRefuseLink : ToolsEvent
+    data object OnCancelLink : ToolsEvent
+    /** Joins another device's code (scanned or pasted); [name]: this device's, shown there. */
+    data class OnJoinLink(val code: String, val name: String) : ToolsEvent
     data class OnAddPeer(val name: String, val deviceId: String) : ToolsEvent
     data class OnRemovePeer(val name: String) : ToolsEvent
     data class OnSyncWith(val peer: String) : ToolsEvent
     data class OnSharingSelect(val projectPath: String?) : ToolsEvent
     data class OnShare(val userId: String, val name: String, val role: String) : ToolsEvent
     data class OnUnshare(val userId: String) : ToolsEvent
+
+    /** Joins the hub of a `quire://hub?…` link: saves its ID and relay, then syncs with its code. */
+    data class OnUseHubLink(val link: String) : ToolsEvent
+    /** Saves the hub's ID and our own relay (blank: none, n0's relays) and reopens the library. */
+    data class OnSaveHub(val hubId: String, val relay: String) : ToolsEvent
+    /** Syncs through the hub; [code] (the setup code or an invitation) registers this person once. */
+    data class OnSyncHub(val code: String) : ToolsEvent
+    data object OnLoadHubDevices : ToolsEvent
+    data object OnRevealRecoveryKit : ToolsEvent
+    data object OnHideRecoveryKit : ToolsEvent
 }

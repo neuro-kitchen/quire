@@ -64,6 +64,12 @@ impl Engine {
         if !present.is_empty() {
             return Ok(PdfOutcome::Present(Box::new(reference), present));
         }
+        self.download_pdf(reference).await
+    }
+
+    /// Finds the PDF of `reference` (open access, Unpaywall, the publisher) and attaches it if it is
+    /// this paper's; a failed attempt is recorded (a blocked site as an issue, for the browser).
+    pub(super) async fn download_pdf(&self, reference: Reference) -> Result<PdfOutcome> {
         let found = match self.fetcher.find_pdf(&reference.data).await {
             Ok(found) => found,
             Err(error) => {
@@ -273,6 +279,28 @@ impl Engine {
         std::fs::write(&temporary, format!("{header}{markdown}")).map_err(EngineError::file(&temporary))?;
         std::fs::rename(&temporary, &cache).map_err(EngineError::file(&cache))?;
         Ok((reference, markdown, false))
+    }
+
+    /// Converts again every stored reader text made by an older converter (after an update), one
+    /// paper at a time, so opening a paper does not wait for it; papers never opened (no stored
+    /// text) are left alone. A paper that fails is skipped. Returns how many were rebuilt.
+    pub async fn rebuild_stale_texts(&self) -> Result<usize> {
+        let header = format!("<!-- quire reader text: {} -->\n", pdf::READER_CONVERTER);
+        let mut rebuilt = 0;
+        for id in self.references_with_pdfs().await? {
+            let (_, pdfs) = self.pdfs_of(&id.to_string()).await?;
+            let Some((attachment, _)) = pdfs.first() else { continue };
+            let cache = self.files().path(&attachment.hash, "md");
+            let Ok(stored) = std::fs::read_to_string(&cache) else { continue };
+            if stored.starts_with(&header) {
+                continue;
+            }
+            match self.paper_text(&id.to_string()).await {
+                Ok(_) => rebuilt += 1,
+                Err(error) => tracing::debug!(%error, "rebuilding a stale reader text"),
+            }
+        }
+        Ok(rebuilt)
     }
 
     /// Re-checks every PDF of `references` against its reference (identifier, else title); changes

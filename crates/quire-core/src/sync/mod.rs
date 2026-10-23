@@ -60,6 +60,25 @@ impl Row {
         }
     }
 
+    /// What the row is, in one word (for what a sync brought: "2 notes, 1 highlight").
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::Reference(_) => "reference",
+            Self::Project(_) => "project",
+            Self::Membership(_) => "membership",
+            Self::Tag(_) => "tag",
+            Self::Tagging(_) => "tagging",
+            Self::Note(_) => "note",
+            Self::Highlight(_) => "highlight",
+            Self::Relation(_) => "relation",
+            Self::Attachment(_) => "attachment",
+            Self::Distinct(_) => "distinct",
+            Self::Reading(_) => "reading",
+            Self::SavedSearch(_) => "saved_search",
+            Self::Member(_) => "member",
+        }
+    }
+
     /// The user's own records: they go to the user's devices only, never to collaborators.
     pub fn is_personal(&self) -> bool {
         matches!(self, Self::Reading(_) | Self::SavedSearch(_))
@@ -123,13 +142,25 @@ pub struct MergeSummary {
     /// Rows older than (or the same as) what was here.
     pub kept: usize,
     /// Rows refused: stamped more than a day ahead of this device's clock (the sender's clock is
-    /// wrong; taking them would let them win over every later change).
+    /// wrong; taking them would let them win over every later change), or not valid (an
+    /// attachment whose hash is not a content hash).
     pub refused: usize,
     /// References given another cite key (theirs was taken here by another paper).
     pub renamed: Vec<(String, String)>,
     /// Identifiers left off an incoming reference (another reference here has them): possible
     /// duplicates to merge.
     pub dropped_identifiers: Vec<(String, String)>,
+}
+
+/// Several deliveries' summaries as one (a hub session merges per delivery).
+impl std::ops::AddAssign for MergeSummary {
+    fn add_assign(&mut self, other: Self) {
+        self.applied += other.applied;
+        self.kept += other.kept;
+        self.refused += other.refused;
+        self.renamed.extend(other.renamed);
+        self.dropped_identifiers.extend(other.dropped_identifiers);
+    }
 }
 
 #[cfg(test)]

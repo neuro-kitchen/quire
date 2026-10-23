@@ -1,28 +1,52 @@
 package dev.neurokitchen.quire.presentation.screens.reader.components
 
+import androidx.compose.ui.unit.Dp
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.Tab
+import androidx.compose.material3.PrimaryScrollableTabRow
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Animatable
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.ui.platform.LocalLayoutDirection
 import dev.neurokitchen.quire.presentation.screens.reader.TextMatch
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -34,6 +58,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -91,44 +116,182 @@ fun TextReaderView(
     /** Find matches in this tab, and the one to bring into view. */
     findMatches: List<TextMatch> = emptyList(),
     currentFind: Int = 0,
+    onProgressChange: (currentBlock: Int, totalBlocks: Int) -> Unit = { _, _ -> },
+    onTapPage: () -> Unit = {},
+    /** Room for bars drawn over the text (the phone's frosted bars): the text scrolls under them. */
+    contentPadding: PaddingValues = PaddingValues(),
+    /** A block to bring to the top (the phone's progress slider); `null`: none. */
+    jumpToBlock: Int? = null,
+    onJumped: () -> Unit = {},
 ) {
     val tab = tabs.getOrNull(selectedTab) ?: return
+    // Item 0 of the list is the tabs row (empty when the tabs sit above it): block items start at 1.
     val list = rememberLazyListState()
     val focusedQuote = highlights.firstOrNull { it.id == focused }?.quote
     val themeColors = readerColors(readerTheme)
     var localSelection by remember(selectedTab) { mutableStateOf<Pair<String, String>?>(null) }
 
+    // Consecutive table rows show as one table: list items are not blocks one to one.
+    val items = remember(tab) { readerItems(tab.blocks) }
+    val itemOfBlock = remember(items, tab) { itemOfBlock(items, tab.blocks.size) }
+    val firstVisibleBlock by remember(items, list, tab.blocks.size) {
+        derivedStateOf {
+            if (!list.canScrollForward && (list.firstVisibleItemIndex > 0 || list.firstVisibleItemScrollOffset > 0)) {
+                tab.blocks.size.coerceAtLeast(1)
+            } else {
+                (items.getOrNull((list.firstVisibleItemIndex - 1).coerceAtLeast(0))?.first ?: 0) + 1
+            }
+        }
+    }
+    LaunchedEffect(firstVisibleBlock, tab.blocks.size) {
+        onProgressChange(firstVisibleBlock, tab.blocks.size)
+    }
+
     val current = findMatches.getOrNull(currentFind)
-    LaunchedEffect(current) { if (current != null) list.animateScrollToItem(current.block) }
+    LaunchedEffect(current) { if (current != null) list.animateScrollToItem(itemOfBlock[current.block] + 1) }
 
     LaunchedEffect(focusedQuote, selectedTab) {
-        val index = focusedQuote?.let { q -> tab.blocks.indexOfFirst { q in it.text } } ?: -1
-        if (index >= 0) list.animateScrollToItem(index)
+        val index = focusedQuote?.let { q ->
+            val clean = q.replace(Regex("\\s+"), " ").trim().lowercase()
+            tab.blocks.indexOfFirst { block ->
+                val blockText = block.text.replace(Regex("\\s+"), " ").lowercase()
+                clean in blockText || blockText in clean
+            }
+        } ?: -1
+        if (index >= 0) list.animateScrollToItem(itemOfBlock[index] + 1)
+    }
+
+    // Another tab: from its top (the tabs row is item 0, so it shows again).
+    var lastTab by remember { mutableStateOf(selectedTab) }
+    LaunchedEffect(selectedTab) {
+        if (selectedTab != lastTab) {
+            lastTab = selectedTab
+            list.scrollToItem(0)
+        }
+    }
+
+    LaunchedEffect(jumpToBlock) {
+        if (jumpToBlock != null) {
+            list.scrollToItem(itemOfBlock.getOrElse(jumpToBlock) { 0 } + 1)
+            onJumped()
+        }
+    }
+    val layoutDirection = LocalLayoutDirection.current
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(list.isScrollInProgress) {
+        if (list.isScrollInProgress && localSelection == null) {
+            focusManager.clearFocus()
+        }
     }
 
     Column(modifier.fillMaxSize().background(themeColors.background)) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .background(themeColors.surface)
-                .padding(Dimens.SpaceXs),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            tabs.forEachIndexed { index, t ->
-                val label = stringResource(t.kind.label) + (t.count?.let { " ($it)" } ?: "")
-                TabChip(label, selected = index == selectedTab) { onTabClick(index) }
+        val tabRow: @Composable () -> Unit = {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .background(themeColors.surface)
+                    .padding(Dimens.SpaceXs),
+                horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceMin),
+            ) {
+                tabs.forEachIndexed { index, t ->
+                    val label = stringResource(t.kind.label) + (t.count?.let { " ($it)" } ?: "")
+                    TabChip(label, selected = index == selectedTab, textColor = themeColors.text) { onTabClick(index) }
+                }
             }
         }
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        // Under bars drawn over the text (the phone), the tabs scroll with it as a tab row; otherwise
+        // they stay at the top as chips. On the phone, Figures and Tables live in the bottom sheet.
+        val tabsInList = contentPadding.calculateTopPadding() > 0.dp
+        val phoneTabIndices = remember(tabs, tabsInList) {
+            if (tabsInList) {
+                tabs.indices
+                    .filter { tabs[it].kind != PaperTabKind.Figures && tabs[it].kind != PaperTabKind.Tables }
+                    .ifEmpty { tabs.indices.toList() }
+            } else {
+                tabs.indices.toList()
+            }
+        }
+        if (!tabsInList) tabRow()
+        val phoneTabs: @Composable () -> Unit = {
+            PaperTabRow(tabs, phoneTabIndices, selectedTab, themeColors.text, onTabClick)
+        }
+        // Swiping sideways turns to the next or previous tab: the text follows the finger, and
+        // the new tab comes in from the side it was pulled from.
+        val scope = rememberCoroutineScope()
+        val pull = remember { Animatable(0f) }
+        var width by remember { mutableStateOf(1) }
+
+        Box(
+            Modifier
+                .fillMaxSize()
+                .onSizeChanged { width = it.width.coerceAtLeast(1) }
+                .pointerInput(Unit) {
+                    detectTapGestures { onTapPage() }
+                }
+                .pointerInput(selectedTab, phoneTabIndices, tabsInList) {
+                    if (!tabsInList) return@pointerInput
+                    val currentPos = phoneTabIndices.indexOf(selectedTab).takeIf { it >= 0 } ?: 0
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            val next = when {
+                                pull.value < -width / 4f && currentPos < phoneTabIndices.lastIndex -> phoneTabIndices[currentPos + 1]
+                                pull.value > width / 4f && currentPos > 0 -> phoneTabIndices[currentPos - 1]
+                                else -> null
+                            }
+                            scope.launch {
+                                if (next == null) {
+                                    pull.animateTo(0f)
+                                } else {
+                                    val from = if (next > selectedTab) width.toFloat() else -width.toFloat()
+                                    onTabClick(next)
+                                    pull.snapTo(from / 3)
+                                    pull.animateTo(0f, tween(220))
+                                }
+                            }
+                        },
+                        onDragCancel = { scope.launch { pull.animateTo(0f) } },
+                    ) { change, amount ->
+                        change.consume()
+                        // No tab past the first or the last: the pull resists.
+                        val atEnd = (pull.value + amount > 0 && currentPos == 0) ||
+                            (pull.value + amount < 0 && currentPos == phoneTabIndices.lastIndex)
+                        scope.launch { pull.snapTo(pull.value + if (atEnd) amount / 4 else amount) }
+                    }
+                },
+            contentAlignment = Alignment.TopCenter,
+        ) {
             LazyColumn(
                 state = list,
                 verticalArrangement = Arrangement.spacedBy(Dimens.SpaceSm),
-                contentPadding = PaddingValues(vertical = Dimens.SpaceMd, horizontal = Dimens.SpaceLg),
-                modifier = Modifier.widthIn(max = ReadingWidth).fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = Dimens.SpaceLg + contentPadding.calculateStartPadding(layoutDirection),
+                    end = Dimens.SpaceLg + contentPadding.calculateEndPadding(layoutDirection),
+                    top = Dimens.SpaceMd + contentPadding.calculateTopPadding(),
+                    bottom = Dimens.SpaceMd + contentPadding.calculateBottomPadding(),
+                ),
+                modifier = Modifier
+                    .widthIn(max = ReadingWidth)
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        translationX = pull.value
+                        alpha = 1f - (abs(pull.value) / width).coerceAtMost(1f) * 0.6f
+                    },
             ) {
-                itemsIndexed(tab.blocks) { blockIndex, block ->
+                // Item 0: the tabs when they scroll with the text (jumps count it).
+                item { if (tabsInList) phoneTabs() }
+                items(items) { item ->
+                    val blockIndex = item.first
+                    val block = tab.blocks[blockIndex]
                     when (val kind = block.kind) {
                         is BlockKind.Image -> Figure(kind.url, loadFigure)
+                        BlockKind.TableRow -> PaperTable(
+                            rows = tab.blocks.subList(item.first, item.last + 1).map { row -> row.words.map { it.text } },
+                            textStyle = style(BlockKind.Paragraph, readerFont, (fontSizeSp * 0.9f).toInt()),
+                            textColor = themeColors.text,
+                            lineColor = themeColors.text.copy(alpha = 0.18f),
+                            stripeColor = themeColors.text.copy(alpha = 0.04f),
+                        )
                         else -> SelectableBlock(
                             block = block,
                             highlights = highlights,
@@ -153,24 +316,32 @@ fun TextReaderView(
                     onHighlight = { colorName ->
                         onHighlight(sel.first, sel.second, colorName)
                         localSelection = null
+                        // Ends the selection (and the system's text toolbar with it).
+                        focusManager.clearFocus()
                         onSelection(null)
                     },
                     onAddNote = {
                         onAddNote(sel.first)
                         localSelection = null
+                        // Ends the selection (and the system's text toolbar with it).
+                        focusManager.clearFocus()
                         onSelection(null)
                     },
                     onCopy = {
                         localSelection = null
+                        // Ends the selection (and the system's text toolbar with it).
+                        focusManager.clearFocus()
                         onSelection(null)
                     },
                     onCopyCitation = {
                         localSelection = null
+                        // Ends the selection (and the system's text toolbar with it).
+                        focusManager.clearFocus()
                         onSelection(null)
                     },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = Dimens.SpaceLg),
+                        .padding(bottom = Dimens.SpaceLg + contentPadding.calculateBottomPadding()),
                 )
             }
         }
@@ -198,16 +369,22 @@ private fun SelectableBlock(
         value = value,
         visualTransformation = { TransformedText(text, OffsetMapping.Identity) },
         onValueChange = { next ->
-            value = value.copy(selection = next.selection)
             val range = next.selection
-            onSelection(
-                if (range.collapsed) null
-                else text.text.substring(range.min, range.max) to text.text.substring(0, range.min),
-            )
+            if (range.collapsed) {
+                // Ignore collapsed cursor movements from simple taps/scrolling so BasicTextField
+                // does not trigger BringIntoView scroll jumps on the parent LazyColumn at the end.
+                if (!value.selection.collapsed) {
+                    value = value.copy(selection = androidx.compose.ui.text.TextRange.Zero)
+                    onSelection(null)
+                }
+            } else {
+                value = value.copy(selection = range)
+                onSelection(text.text.substring(range.min, range.max) to text.text.substring(0, range.min))
+            }
         },
         readOnly = true,
         textStyle = style(block.kind, readerFont, fontSizeSp).copy(color = textColor),
-        cursorBrush = SolidColor(colors.accent),
+        cursorBrush = SolidColor(Color.Transparent),
         modifier = Modifier.fillMaxWidth().padding(start = if (block.kind == BlockKind.ListItem) Dimens.SpaceMd else 0.dp),
     )
 }
@@ -245,8 +422,10 @@ private fun annotate(
 ): AnnotatedString = buildAnnotatedString {
     val prefix = if (block.kind == BlockKind.ListItem) "• " else ""
     append(prefix)
+    val wordRanges = mutableListOf<Pair<Int, Int>>()
     block.words.forEachIndexed { i, word ->
         if (i > 0) append(' ')
+        val start = length
         val style = SpanStyle(
             fontWeight = if (word.bold) FontWeight.Bold else null,
             fontStyle = if (word.italic) FontStyle.Italic else null,
@@ -255,6 +434,7 @@ private fun annotate(
         pushStyle(style)
         append(word.text)
         pop()
+        wordRanges.add(start to length)
     }
     val text = prefix + block.words.joinToString(" ") { it.text }
     for (highlight in highlights) {
@@ -265,10 +445,36 @@ private fun annotate(
             "red" -> colors.highlightRed
             else -> colors.highlightYellow
         }
-        var from = text.indexOf(highlight.quote)
-        while (from >= 0) {
-            addStyle(SpanStyle(background = hlColor.copy(alpha = 0.45f)), from, from + highlight.quote.length)
-            from = text.indexOf(highlight.quote, from + highlight.quote.length)
+        val cleanQuote = highlight.quote.replace(Regex("\\s+"), " ").trim()
+        if (cleanQuote.isEmpty()) continue
+
+        // 1. Exact or whitespace-normalized substring matching
+        var from = text.indexOf(cleanQuote, ignoreCase = true)
+        if (from >= 0) {
+            while (from >= 0) {
+                addStyle(SpanStyle(background = hlColor.copy(alpha = 0.45f)), from, from + cleanQuote.length)
+                from = text.indexOf(cleanQuote, from + cleanQuote.length, ignoreCase = true)
+            }
+        } else {
+            // 2. Tokenized word sequence matching (resilient to hyphenation and PDF text extraction line breaks)
+            val quoteTokens = cleanQuote.split(" ").map { it.trim().trim { c -> !c.isLetterOrDigit() }.lowercase() }.filter { it.isNotEmpty() }
+            if (quoteTokens.isNotEmpty() && block.words.isNotEmpty() && block.words.size >= quoteTokens.size) {
+                val blockTokens = block.words.map { it.text.trim().trim { c -> !c.isLetterOrDigit() }.lowercase() }
+                for (i in 0..blockTokens.size - quoteTokens.size) {
+                    var matches = true
+                    for (j in quoteTokens.indices) {
+                        if (blockTokens[i + j] != quoteTokens[j]) {
+                            matches = false
+                            break
+                        }
+                    }
+                    if (matches) {
+                        val startPos = wordRanges[i].first
+                        val endPos = wordRanges[i + quoteTokens.size - 1].second
+                        addStyle(SpanStyle(background = hlColor.copy(alpha = 0.45f)), startPos, endPos)
+                    }
+                }
+            }
         }
     }
     // Find matches: offsets in the block's text, after the list marker.
@@ -287,18 +493,66 @@ private fun Figure(url: String, loadFigure: suspend (String) -> String?) {
 }
 
 @Composable
-private fun TabChip(text: String, selected: Boolean, onClick: () -> Unit) {
+/** A text tab's chip, in the page's colours ([textColor]: the reader theme's, not the app's). */
+private fun TabChip(text: String, selected: Boolean, textColor: Color, onClick: () -> Unit) {
     val colors = QuireTheme.colors
     Text(
         text,
         style = MaterialTheme.typography.bodyMedium,
-        color = if (selected) colors.onAccent else colors.fillPrimary,
+        color = if (selected) colors.onAccent else textColor,
         modifier = Modifier
             .clip(RoundedCornerShape(Dimens.RadiusLarge))
-            .background(if (selected) colors.accent else colors.fillQuinary)
+            .background(if (selected) colors.accent else textColor.copy(alpha = 0.08f))
             .clickable(onClick = onClick)
-            .padding(horizontal = Dimens.SpaceXs, vertical = 4.dp),
+            .padding(horizontal = Dimens.SpaceXs, vertical = Dimens.SpaceMin),
     )
+}
+
+/**
+ * The phone's tabs: text tabs on the page, the selected one in the accent and underlined, the row
+ * scrolling to keep it in view (Material's scrollable tab row, in the reader theme's colours).
+ */
+@Composable
+private fun PaperTabRow(
+    tabs: List<PaperTab>,
+    visibleIndices: List<Int>,
+    selected: Int,
+    textColor: Color,
+    onSelect: (Int) -> Unit,
+) {
+    val colors = QuireTheme.colors
+    val selectedVisiblePos = visibleIndices.indexOf(selected).coerceAtLeast(0)
+    PrimaryScrollableTabRow(
+        selectedTabIndex = selectedVisiblePos,
+        containerColor = Color.Transparent,
+        contentColor = textColor,
+        edgePadding = 0.dp,
+        minTabWidth = 0.dp,
+        indicator = {
+            TabRowDefaults.PrimaryIndicator(
+                Modifier.tabIndicatorOffset(selectedVisiblePos, matchContentSize = true),
+                width = Dp.Unspecified,
+                color = colors.accent,
+            )
+        },
+        divider = { HorizontalDivider(color = textColor.copy(alpha = 0.12f)) },
+    ) {
+        visibleIndices.forEach { originalIndex ->
+            val t = tabs[originalIndex]
+            Tab(
+                selected = originalIndex == selected,
+                onClick = { onSelect(originalIndex) },
+                selectedContentColor = colors.accent,
+                unselectedContentColor = textColor.copy(alpha = 0.65f),
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.SpaceMin)) {
+                        Text(stringResource(t.kind.label), style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                        t.count?.let { Text("$it", style = MaterialTheme.typography.labelSmall, color = textColor.copy(alpha = 0.5f)) }
+                    }
+                },
+            )
+        }
+    }
 }
 
 private val PaperTabKind.label: StringResource
@@ -312,3 +566,28 @@ private val PaperTabKind.label: StringResource
         PaperTabKind.References -> Res.string.tab_references
     }
 
+
+/** A list item of the reader: one block, or the table rows from [first] to [last] as one table. */
+internal data class ReaderItem(val first: Int, val last: Int = first)
+
+/** The blocks as list items: each run of table rows becomes one item. */
+internal fun readerItems(blocks: List<TextBlock>): List<ReaderItem> {
+    val items = mutableListOf<ReaderItem>()
+    var i = 0
+    while (i < blocks.size) {
+        var end = i
+        if (blocks[i].kind == BlockKind.TableRow) {
+            while (end + 1 < blocks.size && blocks[end + 1].kind == BlockKind.TableRow) end++
+        }
+        items += ReaderItem(i, end)
+        i = end + 1
+    }
+    return items
+}
+
+/** For each block, the list item showing it. */
+internal fun itemOfBlock(items: List<ReaderItem>, blocks: Int): IntArray {
+    val out = IntArray(blocks)
+    items.forEachIndexed { index, item -> for (b in item.first..item.last) out[b] = index }
+    return out
+}

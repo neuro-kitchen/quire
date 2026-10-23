@@ -17,6 +17,9 @@ pub(super) const MAX_LEN: usize = 100;
 pub struct CiteKey(String);
 
 impl CiteKey {
+    /// Longest key accepted, in bytes.
+    pub const MAX_LEN: usize = MAX_LEN;
+
     pub fn parse(input: &str) -> Result<Self> {
         let invalid = |reason| ModelError::InvalidCiteKey { input: input.into(), reason };
         if input.is_empty() || input.len() > MAX_LEN {

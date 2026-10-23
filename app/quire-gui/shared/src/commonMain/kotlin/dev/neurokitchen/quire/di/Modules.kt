@@ -1,8 +1,10 @@
 package dev.neurokitchen.quire.di
 
+import dev.neurokitchen.quire.presentation.screens.notifications.NotificationsViewModel
 import dev.neurokitchen.quire.presentation.screens.tools.ToolsViewModel
 import dev.neurokitchen.quire.data.repository.SampleLibraryRepository
 import dev.neurokitchen.quire.data.repository.SamplePdfRepository
+import dev.neurokitchen.quire.data.repository.SamplePreferencesRepository
 import dev.neurokitchen.quire.data.repository.SampleReaderRepository
 import dev.neurokitchen.quire.data.repository.SampleSettingsRepository
 import dev.neurokitchen.quire.domain.repository.AttachmentRepository
@@ -11,10 +13,15 @@ import dev.neurokitchen.quire.domain.repository.ExchangeRepository
 import dev.neurokitchen.quire.domain.repository.LibrariesRepository
 import dev.neurokitchen.quire.domain.repository.LibraryRepository
 import dev.neurokitchen.quire.domain.repository.PdfRepository
+import dev.neurokitchen.quire.domain.repository.PreferencesRepository
 import dev.neurokitchen.quire.domain.repository.ReaderRepository
 import dev.neurokitchen.quire.domain.repository.SearchRepository
 import dev.neurokitchen.quire.domain.repository.SettingsRepository
+import dev.neurokitchen.quire.domain.repository.NotificationsRepository
 import dev.neurokitchen.quire.domain.repository.SyncRepository
+import dev.neurokitchen.quire.presentation.mobile.MobileAppViewModel
+import dev.neurokitchen.quire.presentation.mobile.screens.home.HomeViewModel
+import dev.neurokitchen.quire.presentation.mobile.screens.library.MobileLibraryViewModel
 import dev.neurokitchen.quire.presentation.desktop.DesktopViewModel
 import dev.neurokitchen.quire.presentation.screens.library.LibraryViewModel
 import dev.neurokitchen.quire.presentation.screens.reader.ReaderViewModel
@@ -22,6 +29,9 @@ import dev.neurokitchen.quire.presentation.screens.settings.SettingsViewModel
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.module.dsl.viewModelOf
+import dev.neurokitchen.quire.presentation.components.cite.CiteViewModel
+import dev.neurokitchen.quire.presentation.components.export_dialog.ExportDialogViewModel
+import dev.neurokitchen.quire.presentation.components.export_dialog.ExportTarget
 import org.koin.dsl.module
 
 /** Sample data: tests, previews, and platforms without the engine bridge yet (Android, iOS). */
@@ -40,6 +50,7 @@ val sampleDataModule = module {
         )
     }
     single<PdfRepository> { SamplePdfRepository() }
+    single<PreferencesRepository> { SamplePreferencesRepository() }
     // No engine on these platforms yet: every call answers "needs the engine".
     single<AttachmentRepository> { object : AttachmentRepository {} }
     single<SearchRepository> { object : SearchRepository {} }
@@ -47,15 +58,23 @@ val sampleDataModule = module {
     single<ExchangeRepository> { object : ExchangeRepository {} }
     single<LibrariesRepository> { object : LibrariesRepository {} }
     single<SyncRepository> { object : SyncRepository {} }
+    single<NotificationsRepository> { object : NotificationsRepository {} }
 }
 
 val viewModelModule = module {
     viewModelOf(::LibraryViewModel)
+    viewModelOf(::MobileAppViewModel)
+    viewModelOf(::HomeViewModel)
+    viewModelOf(::MobileLibraryViewModel)
     viewModelOf(::SettingsViewModel)
     viewModelOf(::DesktopViewModel)
     viewModelOf(::ToolsViewModel)
+    viewModelOf(::NotificationsViewModel)
+    viewModelOf(::CiteViewModel)
     // One per open paper: its reference ID and title come as parameters.
-    viewModel { (id: String, title: String) -> ReaderViewModel(id, title, get(), get()) }
+    viewModel { (id: String, title: String) -> ReaderViewModel(id, title, get(), get(), preferences = getOrNull()) }
+    // One per export dialog: what it exports comes as a parameter.
+    viewModel { (target: ExportTarget) -> ExportDialogViewModel(target, get()) }
 }
 
 /** Everything the app needs, with `data` supplying the repositories. */

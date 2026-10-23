@@ -11,7 +11,7 @@ pub mod keys;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 pub use edit::{set, unset};
 pub use keys::{KEYS, KeySpec, ValueKind};
@@ -37,6 +37,18 @@ pub struct Config {
     /// Devices this one syncs with, by name (`[peers.<name>]`).
     #[serde(default)]
     pub peers: BTreeMap<String, PeerEntry>,
+    /// The sync hub this device syncs through (`[hub]`).
+    #[serde(default)]
+    pub hub: HubEntry,
+    /// How this device reaches its peers and hub (`[sync]`).
+    #[serde(default)]
+    pub sync: SyncSettings,
+    /// This device (`[device]`).
+    #[serde(default)]
+    pub device: DeviceSettings,
+    /// How this device keeps PDF files (`[files]`): all, or as they are opened.
+    #[serde(default)]
+    pub files: FilesSettings,
     /// The file as read, for `get` and `list`.
     #[serde(skip)]
     raw: toml::Table,
@@ -69,6 +81,46 @@ pub struct PeerEntry {
     pub id: String,
 }
 
+/// The sync hub (`.knowledge/sync-hub.md`): an always-on store of this person's devices' sealed
+/// data, which cannot read it.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub struct HubEntry {
+    /// Its ID (`quire-hub id`, or printed when the hub starts).
+    pub id: Option<String>,
+}
+
+/// This device.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub struct DeviceSettings {
+    /// Its name on the person's other devices (sent to the hub sealed: it cannot read it).
+    pub name: Option<String>,
+}
+
+/// How this device reaches its peers and the hub.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub struct SyncSettings {
+    /// Our own iroh relay's URL: used instead of n0's relays and address lookup (unset: n0's).
+    pub relay: Option<String>,
+}
+
+/// How this device keeps PDF files (`.knowledge/sync-hub.md`, lazy PDFs).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub struct FilesSettings {
+    /// `all` (default: download every PDF at sync) or `on-open` (only when opened, and those kept
+    /// offline).
+    pub download: Option<String>,
+    /// Space for PDFs in megabytes; past it, files the hub holds are removed here, least recently
+    /// opened first, never one kept offline (0 or unset: no limit).
+    pub cache_mb: Option<u32>,
+}
+
+impl FilesSettings {
+    /// Whether PDFs are downloaded only when opened.
+    pub fn on_open(&self) -> bool {
+        self.download.as_deref() == Some("on-open")
+    }
+}
+
 /// Getting PDFs by hand in the user's own browser (`pdf get --browser`), where they log in with
 /// the publisher themselves; quire never handles a login.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
@@ -89,8 +141,9 @@ pub struct ReaderSettings {
     pub ocr_language: Option<String>,
 }
 
-/// How to write an export (Better BibTeX's export options).
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+/// How to write an export (Better BibTeX's export options). Also the options the app's export
+/// dialog chooses, stored with a file it keeps updated.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default)]
 pub struct ExportProfile {
     /// `biblatex` (default), `bibtex`, `csl-json`, `hayagriva`.
@@ -103,6 +156,8 @@ pub struct ExportProfile {
     pub months: Option<String>,
     /// .bib preprints: `online` (default, for Biber) or `article` (for Typst).
     pub preprints: Option<String>,
+    /// The file's encoding: `utf-8` (default), `utf-8-bom`, `windows-1252` (.bib).
+    pub encoding: Option<String>,
 }
 
 impl Config {

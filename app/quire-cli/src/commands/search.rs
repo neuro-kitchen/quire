@@ -50,13 +50,13 @@ pub fn print_hits(hits: &[(Reference, SearchHit)], query: &str) {
         let year = reference.data.issued.map(|d| d.get_year().to_string()).unwrap_or_default();
         let title = reference.data.title().unwrap_or("(no title)");
         let place = if hit.in_text { "  (in the paper's text)" } else { "" };
-        anstream::println!(
+        crate::out!(
             "{}  {year}  {title}{}",
             style::paint(style::KEY, &reference.cite_key),
             style::paint(style::DIM, place)
         );
         if !hit.snippet.trim().is_empty() {
-            anstream::println!("    {}", style::paint(style::DIM, hit.snippet.replace('\n', " ")));
+            crate::out!("    {}", style::paint(style::DIM, hit.snippet.replace('\n', " ")));
         }
     }
     match hits.len() {

@@ -1,6 +1,7 @@
 package dev.neurokitchen.quire.presentation.desktop
 
 import androidx.compose.runtime.Immutable
+import dev.neurokitchen.quire.domain.model.Reference
 import dev.neurokitchen.quire.presentation.designsystem.AppTheme
 
 /** The main window's tabs: the library (always first) and the papers open in the reader. */
@@ -10,6 +11,9 @@ data class DesktopState(
     /** `null`: the library tab. */
     val selected: String? = null,
     val appTheme: AppTheme = AppTheme.Obsidian,
+    val isCommandPaletteOpen: Boolean = false,
+    val isCitationGraphOpen: Boolean = false,
+    val allReferences: List<Reference> = emptyList(),
 )
 
 @Immutable
@@ -25,4 +29,6 @@ sealed interface DesktopEvent {
     data class OnSelectTab(val id: String?) : DesktopEvent
     data class OnCloseTab(val id: String) : DesktopEvent
     data class OnSetAppTheme(val theme: AppTheme) : DesktopEvent
+    data class OnToggleCommandPalette(val open: Boolean) : DesktopEvent
+    data class OnToggleCitationGraph(val open: Boolean) : DesktopEvent
 }

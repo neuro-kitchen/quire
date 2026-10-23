@@ -49,6 +49,7 @@ pub fn config_keys() -> Vec<ConfigKey> {
                 ValueKind::DeviceId => ("device", vec![], None, None),
                 ValueKind::Bool => ("bool", vec![], None, None),
                 ValueKind::List => ("list", vec![], None, None),
+                ValueKind::Url => ("url", vec![], None, None),
                 ValueKind::Choice(words) => ("choice", words.iter().map(|w| w.to_string()).collect(), None, None),
                 ValueKind::Number(min, max) => ("number", vec![], Some(min), Some(max)),
             };

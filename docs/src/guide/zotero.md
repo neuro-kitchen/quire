@@ -10,7 +10,8 @@ quire reads a copy of `zotero.sqlite`, so Zotero may stay open. From "My Library
 libraries; nothing in the trash) it takes:
 
 - **items** as references: type, fields, authors and editors, date, DOI, and the PMID, PMCID or
-  arXiv ID written in *Extra*. The *Citation Key* (Zotero 7, or Better BibTeX's line in *Extra*)
+  arXiv ID written in *Extra*. A date Zotero keeps as unknown (`0000-00-00`) is left empty; one it
+  could not parse falls back to the year written in it. The *Citation Key* (Zotero 7, or Better BibTeX's line in *Extra*)
   is kept when it is free.
 - **collections** as projects, subcollections as subprojects; an item in several collections
   is linked to each project (one reference).

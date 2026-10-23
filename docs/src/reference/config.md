@@ -13,12 +13,16 @@ file). Change them with `quire config set <key> <value>`; `*` is a name you choo
 | `library.default` | library used when none is chosen |
 | `libraries.*.path` | folder of a registered library (see `quire library new`) |
 | `peers.*.id` | a device to sync with: its ID (`quire sync id` on it) |
+| `hub.id` | the sync hub this device syncs through: its ID (`quire-hub id`) |
+| `files.download` | download every PDF at sync (all), or as they are opened (on-open) |
+| `files.cache_mb` | space for PDFs in MB; past it, files the hub holds are removed here (0: no limit) |
 | `access.downloads` | folder your browser saves downloads to (default: ~/Downloads) |
 | `export.*.format` | export profile: output format |
 | `export.*.omit` | export profile: fields left out, e.g. abstract,file,note |
 | `export.*.ascii` | export profile: non-ASCII as LaTeX commands (.bib) |
 | `export.*.months` | export profile: BibTeX months as 7 or jul |
 | `export.*.preprints` | export profile: preprints as @online (Biber) or @article (Typst) |
+| `export.*.encoding` | export profile: the file's encoding (windows-1252: .bib, other characters as LaTeX) |
 | `reader.width` | reader mode: text column width |
 | `reader.justify` | reader mode: justified text |
 | `reader.spacing` | reader mode: line spacing |

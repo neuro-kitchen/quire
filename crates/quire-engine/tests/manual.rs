@@ -62,3 +62,18 @@ async fn a_lookup_stores_nothing() {
     assert!(data.title().is_some_and(|t| t.contains("thermometry")), "{:?}", data.title());
     assert!(engine.list(None, false, false).await.unwrap().is_empty());
 }
+
+/// A `.bib` entry naming its PMID twice (`pmid` and a PubMed `eprint`) once failed the whole
+/// import with "UNIQUE constraint failed: reference_identifier": nothing was imported.
+#[tokio::test]
+async fn an_entry_with_a_repeated_identifier_imports() {
+    let dir = tempfile::tempdir().unwrap();
+    let engine = engine(dir.path(), None).await;
+    let bib = "@article{dup2019, title = {Twice the same PMID}, author = {Doe, J.}, year = {2019},
+               pmid = {31452104}, eprint = {31452104}, eprinttype = {pubmed}}
+               @article{other2020, title = {Another}, author = {Roe, R.}, year = {2020}}";
+    let added = engine.import_bib_text(bib, "test.bib", None).await.unwrap();
+    assert_eq!(added.len(), 2);
+    let (reference, _) = engine.show("dup2019").await.unwrap();
+    assert_eq!(reference.data.identifiers.len(), 1);
+}

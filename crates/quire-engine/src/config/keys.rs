@@ -16,6 +16,8 @@ pub enum ValueKind {
     LibraryName,
     /// Another device's sync ID (`quire sync id` prints one).
     DeviceId,
+    /// A web address (`http://` or `https://`).
+    Url,
     Bool,
     /// Comma-separated on the command line, an array in the file.
     List,
@@ -44,6 +46,19 @@ pub const KEYS: &[KeySpec] = &[
     key("library.default", ValueKind::LibraryName, "library used when none is chosen"),
     key("libraries.*.path", ValueKind::Path, "folder of a registered library (see `quire library new`)"),
     key("peers.*.id", ValueKind::DeviceId, "a device to sync with: its ID (`quire sync id` on it)"),
+    key("hub.id", ValueKind::DeviceId, "the sync hub this device syncs through: its ID (`quire-hub id`)"),
+    key("device.name", ValueKind::Text, "this device's name on your other devices (the hub cannot read it)"),
+    key("sync.relay", ValueKind::Url, "your own iroh relay (e.g. http://192.168.1.10:3340); unset: n0's public relays"),
+    key(
+        "files.download",
+        ValueKind::Choice(&["all", "on-open"]),
+        "download every PDF at sync (all), or as they are opened (on-open)",
+    ),
+    key(
+        "files.cache_mb",
+        ValueKind::Number(0, 10_000_000),
+        "space for PDFs in MB; past it, files the hub holds are removed here (0: no limit)",
+    ),
     key("access.downloads", ValueKind::Path, "folder your browser saves downloads to (default: ~/Downloads)"),
     key(
         "export.*.format",
@@ -57,6 +72,11 @@ pub const KEYS: &[KeySpec] = &[
         "export.*.preprints",
         ValueKind::Choice(&["online", "article"]),
         "export profile: preprints as @online (Biber) or @article (Typst)",
+    ),
+    key(
+        "export.*.encoding",
+        ValueKind::Choice(&["utf-8", "utf-8-bom", "windows-1252"]),
+        "export profile: the file's encoding (windows-1252: .bib, other characters as LaTeX)",
     ),
     key("reader.width", ValueKind::Number(40, 120), "reader mode: text column width"),
     key("reader.justify", ValueKind::Bool, "reader mode: justified text"),
@@ -96,6 +116,10 @@ pub(crate) fn to_toml(kind: ValueKind, text: &str) -> Result<toml_edit::Value> {
             return Err(bad("a device ID (`quire sync id` on that device prints it)"));
         }
         ValueKind::DeviceId => text.trim().into(),
+        ValueKind::Url => match url::Url::parse(text.trim()) {
+            Ok(url) if matches!(url.scheme(), "http" | "https") && url.has_host() => text.trim().into(),
+            _ => return Err(bad("a web address (http://… or https://…)")),
+        },
         ValueKind::Bool => match text {
             "true" | "yes" | "on" => true.into(),
             "false" | "no" | "off" => false.into(),
@@ -139,5 +163,11 @@ mod tests {
         assert_eq!(list.as_array().unwrap().len(), 2);
         assert!(to_toml(ValueKind::Choice(&["a", "b"]), "c").is_err());
         assert!(to_toml(ValueKind::DeviceId, "not a device").is_err());
+        assert_eq!(
+            to_toml(ValueKind::Url, " http://192.168.1.10:3340 ").unwrap().as_str(),
+            Some("http://192.168.1.10:3340")
+        );
+        assert!(to_toml(ValueKind::Url, "192.168.1.10:3340").is_err());
+        assert!(to_toml(ValueKind::Url, "ftp://relay.example").is_err());
     }
 }

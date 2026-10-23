@@ -22,6 +22,9 @@ pub(crate) fn migrations() -> Migrations<'static> {
         M::up(include_str!("014_alert.sql")),
         M::up(include_str!("015_field_clocks.sql")),
         M::up(include_str!("016_sharing.sql")),
+        M::up(include_str!("017_local_files.sql")),
+        M::up(include_str!("018_auto_export_options.sql")),
+        M::up(include_str!("019_activity.sql")),
     ])
 }
 

@@ -51,6 +51,7 @@ impl Added {
 /// Writes a changed `reference`, stamping the clocks of the parts that differ from the stored
 /// version (sync merges references part by part). Every change to a stored reference goes here.
 pub fn save(library: &mut impl Library, reference: &mut Reference) -> Result<()> {
+    reference.data.dedup_identifiers();
     if let Some(stored) = library.reference(reference.id)? {
         crate::sync::stamp_changes(&stored, reference);
     }
@@ -58,7 +59,8 @@ pub fn save(library: &mut impl Library, reference: &mut Reference) -> Result<()>
 }
 
 /// Adds a reference, or finds the one already holding one of its identifiers.
-pub fn add(library: &mut impl Library, request: AddRequest) -> Result<Added> {
+pub fn add(library: &mut impl Library, mut request: AddRequest) -> Result<Added> {
+    request.data.dedup_identifiers();
     let device = library.device();
     if let Some(mut existing) = find_duplicate(library, &request.data)? {
         if existing.meta.is_deleted() {
@@ -103,6 +105,7 @@ pub fn copy_in(library: &mut impl Library, reference: Reference, project: Option
     }
     let cite_key = free_key(reference.cite_key.as_str(), |key| library.cite_key_taken(key))?;
     let mut copy = Reference { cite_key, ..reference };
+    copy.data.dedup_identifiers();
     copy.meta.restore(library.device());
     library.insert_reference(&copy, None)?;
     if let Some(project) = project {
@@ -161,6 +164,7 @@ pub fn restore(library: &mut impl Library, query: &str) -> Result<Reference> {
 mod tests {
     use super::*;
     use crate::memory::MemoryLibrary;
+    use crate::ports::ReferenceStore;
     use quire_model::{Creator, CreatorRole, Date, EntryKind, TextField};
 
     fn article(doi: &str, family: &str) -> ReferenceData {
@@ -184,6 +188,21 @@ mod tests {
         assert!(matches!(first, Added::New(_)));
         assert!(matches!(&again, Added::Existing(r) if r.id == first.reference().id));
         assert_eq!(first.reference().cite_key.as_str(), "vaswaniAttentionAllYou2017");
+    }
+
+    /// Any importer could hand over an identifier twice; the store refuses a second copy for one
+    /// reference (its key is the identifier), so it is kept once.
+    #[test]
+    fn an_identifier_given_twice_is_stored_once() {
+        let mut lib = MemoryLibrary::default();
+        let mut data = article("10.1/a", "Vaswani");
+        data.identifiers.push(Identifier::parse("doi:10.1/A").unwrap());
+        let added = add(&mut lib, AddRequest::new(data, fetched())).unwrap();
+        assert_eq!(added.reference().data.identifiers.len(), 1);
+        let mut edited = added.reference().clone();
+        edited.data.identifiers.push(Identifier::parse("https://doi.org/10.1/a").unwrap());
+        save(&mut lib, &mut edited).unwrap();
+        assert_eq!(lib.reference(edited.id).unwrap().unwrap().data.identifiers.len(), 1);
     }
 
     #[test]

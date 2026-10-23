@@ -56,7 +56,7 @@ pub async fn run(engine: &Engine, args: &AlertArgs) -> anyhow::Result<ExitCode> 
             for alert in &alerts {
                 let checked =
                     alert.checked_at.map_or_else(|| "never checked".into(), |t| format!("checked {}", t.date()));
-                anstream::println!(
+                crate::out!(
                     "{}  {}  {}  {}",
                     style::paint(style::KEY, &alert.name),
                     alert.source,
@@ -84,7 +84,7 @@ pub async fn run(engine: &Engine, args: &AlertArgs) -> anyhow::Result<ExitCode> 
                         let added = engine.add_found(data, check.alert.source, project.as_ref()).await?;
                         output::report(Tone::Ok, "added", output::summary(added.reference()));
                     } else {
-                        anstream::println!("  {line}");
+                        crate::out!("  {line}");
                     }
                 }
             }

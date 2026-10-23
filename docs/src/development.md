@@ -12,8 +12,9 @@ terminal interface, the local server and the apps are thin front ends over one f
 | `quire-store` | SQLite: schema, migrations, the `Library` implementation, full-text index, change log |
 | `quire-fetch` | the network: metadata, PDF and full-text lookup (doi.org, Crossref, arXiv, NCBI, Europe PMC, Unpaywall) |
 | `quire-engine` | the facade: config, libraries, file store, exports, jobs; async API |
-| `quire-sync` | sync sessions and the iroh (QUIC) transport |
-| `quire-server` | `quire serve`, the endpoint for the browser extension |
+| `quire-sync` | sync sessions and the iroh (QUIC) transport; sealing and the hub protocol |
+| `quire-hub` | the sync hub (`quire-hub serve`): stores sealed batches and files it cannot read |
+| `quire-connector` | `quire serve`, the endpoint for the browser extension |
 | `quire-document` | a paper's content in any format: PDF checks, rendering and text layer (hayro); PDF, arXiv HTML and JATS → the reader's Markdown; the reading model |
 | `quire-ffi` | the engine for the Kotlin apps (UniFFI): flat records, `suspend` functions, PDF pages |
 | `quire-testkit` | test fixtures (a tiny PDF, the services' recorded responses); dev-dependency only |
@@ -22,7 +23,8 @@ terminal interface, the local server and the apps are thin front ends over one f
 | `app/quire-tui` | `quire tui` (ratatui) |
 | `app/quire-gui` | desktop app (Compose Multiplatform); Android and iOS later |
 
-Dependencies point one way: `model ← core ← {store, io, document, fetch, sync} ← engine ← {cli, tui, server, ffi}`.
+Dependencies point one way: `model ← core ← {store, io, document, fetch, sync} ← engine ← {cli, tui, connector, ffi}`;
+`quire-hub` uses `quire-sync` only (it never sees a library).
 The core defines what it needs from storage as a trait, so use cases are tested without a
 database, and the store can change without touching them.
 
@@ -59,10 +61,16 @@ cd app/quire-gui
 
 ```bash
 cargo build                      # target/debug/quire
-cargo test --workspace           # QUIRE_PDFIUM_DIR=<folder of libpdfium> also tests PDF pages
+cargo test --workspace
 cargo clippy --workspace --all-targets
 cargo fmt --all
 ```
+
+Debug builds and tests keep line tables only (`[profile.dev]`): panics still name file and line,
+and `target/` stays around 11 GB instead of ~90. For a debugger, `CARGO_PROFILE_DEV_DEBUG=full`.
+On a machine shared with other builds (the app's Gradle build compiles `quire-ffi` too),
+`nice -n 10 cargo test -j 6 --workspace` keeps it responsive; every test binary builds from
+scratch in about 3 minutes that way, and the tests run in about half a minute.
 
 The same checks run on every push and pull request (`.github/workflows/ci.yml`).
 

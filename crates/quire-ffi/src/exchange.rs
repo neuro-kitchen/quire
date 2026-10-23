@@ -4,6 +4,7 @@
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+use quire_engine::config::ExportProfile;
 use quire_engine::{AutoExportOutcome, ExportFormat, ExportRequest};
 
 use crate::{QuireError, QuireLibrary, Result, query};
@@ -22,14 +23,43 @@ pub struct ZoteroImportRecord {
     pub skipped: Vec<String>,
 }
 
-/// What to export: a project (with subprojects if `recursive`) or the library; a profile from the
-/// config and/or a format (`biblatex`, `bibtex`, `csl-json`, `hayagriva`).
+/// What to export: some references (IDs or cite keys), else a project (with subprojects if
+/// `recursive`) or the library; a profile from the config, or options given directly, and/or a
+/// format (`biblatex`, `bibtex`, `csl-json`, `hayagriva`).
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
 pub struct ExportSelection {
     pub project: Option<String>,
     pub recursive: bool,
+    #[uniffi(default = [])]
+    pub references: Vec<String>,
     pub profile: Option<String>,
+    #[uniffi(default = None)]
+    pub options: Option<ExportOptionsRecord>,
     pub format: Option<String>,
+}
+
+/// How to write an export: an export profile's settings.
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct ExportOptionsRecord {
+    /// `biblatex`, `bibtex`, `csl-json`, `hayagriva`; `None`: BibLaTeX.
+    pub format: Option<String>,
+    /// Fields left out (BibLaTeX names for .bib and Hayagriva; CSL names for CSL-JSON).
+    pub omit: Vec<String>,
+    /// .bib: non-ASCII as LaTeX commands.
+    pub ascii: bool,
+    /// BibTeX months as `jul` instead of `7`.
+    pub month_macros: bool,
+    /// .bib preprints as `@article` (Typst) instead of `@online` (Biber).
+    pub preprints_as_articles: bool,
+    /// `utf-8`, `utf-8-bom`, `windows-1252` (.bib); `None`: UTF-8.
+    pub encoding: Option<String>,
+}
+
+/// An export profile from the config, by name.
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct ExportProfileRecord {
+    pub name: String,
+    pub options: ExportOptionsRecord,
 }
 
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
@@ -103,6 +133,12 @@ pub fn export_formats() -> Vec<String> {
     ExportFormat::ALL.iter().map(|f| f.as_str().to_string()).collect()
 }
 
+/// The encodings an export file can be written in, by name.
+#[uniffi::export]
+pub fn export_encodings() -> Vec<String> {
+    quire_engine::Encoding::ALL.iter().map(|e| e.as_str().to_string()).collect()
+}
+
 #[uniffi::export]
 impl QuireLibrary {
     /// Imports the Zotero library in the data folder `dir` (collections under `project` if given;
@@ -135,6 +171,28 @@ impl QuireLibrary {
         self.with(|engine| async move {
             let (text, count) = engine.export(&request(&selection)?).await?;
             Ok(ExportedText { text, count: count as u32 })
+        })
+        .await
+    }
+
+    /// Writes the selection to `path` once, in its encoding; returns the file and the count.
+    pub async fn export_to(&self, selection: ExportSelection, path: String) -> Result<ExportedText> {
+        self.with(|engine| async move {
+            let (path, count, _) = engine.export_to(&request(&selection)?, Path::new(&path)).await?;
+            Ok(ExportedText { text: path.display().to_string(), count: count as u32 })
+        })
+        .await
+    }
+
+    /// The export profiles in the config.
+    pub async fn export_profiles(&self) -> Result<Vec<ExportProfileRecord>> {
+        self.with(|engine| async move {
+            Ok(engine
+                .config()
+                .export
+                .iter()
+                .map(|(name, profile)| ExportProfileRecord { name: name.clone(), options: options_record(profile) })
+                .collect())
         })
         .await
     }
@@ -263,7 +321,9 @@ fn request(selection: &ExportSelection) -> Result<ExportRequest> {
     Ok(ExportRequest {
         project: selection.project.as_deref().map(query::slug_path).transpose()?,
         recursive: selection.recursive,
+        references: selection.references.clone(),
         profile: selection.profile.clone(),
+        options: selection.options.as_ref().map(profile_of),
         format: selection
             .format
             .as_deref()
@@ -273,4 +333,26 @@ fn request(selection: &ExportSelection) -> Result<ExportRequest> {
             })
             .transpose()?,
     })
+}
+
+fn profile_of(options: &ExportOptionsRecord) -> ExportProfile {
+    ExportProfile {
+        format: options.format.clone(),
+        omit: options.omit.clone(),
+        ascii: options.ascii,
+        months: options.month_macros.then(|| "macro".into()),
+        preprints: options.preprints_as_articles.then(|| "article".into()),
+        encoding: options.encoding.clone(),
+    }
+}
+
+fn options_record(profile: &ExportProfile) -> ExportOptionsRecord {
+    ExportOptionsRecord {
+        format: profile.format.clone(),
+        omit: profile.omit.clone(),
+        ascii: profile.ascii,
+        month_macros: profile.months.as_deref() == Some("macro"),
+        preprints_as_articles: profile.preprints.as_deref() == Some("article"),
+        encoding: profile.encoding.clone(),
+    }
 }

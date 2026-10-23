@@ -1,0 +1,53 @@
+# quire sync hub, self-hosted. Your devices push their encrypted library here and pull each
+# other's changes; the hub cannot read any of it (`.knowledge/sync-hub.md`).
+#
+#   docker compose up -d          (or: podman compose up -d)
+#   docker compose logs hub       shows the hub's ID and the one-time setup code
+#   quire sync hub add <hub-id> <setup-code>     on your first device
+#
+# The book's "Self-hosting the hub" chapter has the rest: building the image yourself, starting
+# at boot with Podman, upgrades, backups.
+#
+# No port to open: devices reach the hub by its ID over iroh (QUIC), through your router.
+services:
+  hub:
+    # A published image, or one you built (`QUIRE_HUB_IMAGE=localhost/quire-hub`, `QUIRE_HUB_VERSION=local`).
+    image: ${QUIRE_HUB_IMAGE:-ghcr.io/neuro-kitchen/quire-hub}:${QUIRE_HUB_VERSION:-latest}
+    restart: unless-stopped
+    volumes:
+      - quire-hub-data:/data
+    environment:
+      # Storage limit per account in megabytes (0: none).
+      QUIRE_HUB_QUOTA_MB: ${QUIRE_HUB_QUOTA_MB:-0}
+      # Your own iroh relay (optional; default: n0's public relays and address lookup). With the
+      # `relay` service below: http://<this machine's LAN address>:3340, and the same URL as
+      # `sync.relay` in every app. Then nothing goes to n0.
+      QUIRE_HUB_RELAY: ${QUIRE_HUB_RELAY:-}
+      # Sessions served at once.
+      QUIRE_HUB_MAX_SESSIONS: ${QUIRE_HUB_MAX_SESSIONS:-64}
+      RUST_LOG: ${RUST_LOG:-quire_hub=info,warn}
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/quire-hub", "health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+    # Devices on the same network connect directly when the hub shares the host's network;
+    # without it they still connect (through hole punching or a relay).
+    # Rootless Podman's bridge network cannot be reached from the host, so devices would fall
+    # back to a relay even on the same machine (seen: ~1 MB/s through a public relay).
+    # network_mode: host
+
+  # Your own iroh relay, instead of n0's: `podman compose --profile relay up -d`. Plain HTTP on
+  # port 3340, for a home network (open to anyone who reaches that port); on the internet run it
+  # with TLS, as `cloud/docker-compose.yml` does.
+  relay:
+    image: docker.io/n0computer/iroh-relay:v1.3.0
+    profiles: ["relay"]
+    restart: unless-stopped
+    command: ["--dev", "--config-path", "/etc/iroh-relay.toml"]
+    volumes:
+      - ./iroh-relay.toml:/etc/iroh-relay.toml:ro,Z
+    network_mode: host
+
+volumes:
+  quire-hub-data:

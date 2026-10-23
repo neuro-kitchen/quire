@@ -2,7 +2,8 @@ package dev.neurokitchen.quire.presentation.screens.tools
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.neurokitchen.quire.domain.model.ExportSelection
+import dev.neurokitchen.quire.domain.model.LinkJoin
+import dev.neurokitchen.quire.domain.model.LinkOffer
 import dev.neurokitchen.quire.domain.model.Reference
 import dev.neurokitchen.quire.domain.repository.AttachmentRepository
 import dev.neurokitchen.quire.domain.repository.CurationRepository
@@ -12,6 +13,7 @@ import dev.neurokitchen.quire.domain.repository.LibraryRepository
 import dev.neurokitchen.quire.domain.repository.SettingsRepository
 import dev.neurokitchen.quire.domain.repository.SyncRepository
 import dev.neurokitchen.quire.presentation.components.notice.Notice
+import dev.neurokitchen.quire.presentation.platform.deviceName
 import dev.neurokitchen.quire.presentation.components.reference_card.ReferenceCardState
 import dev.neurokitchen.quire.resources.Res
 import dev.neurokitchen.quire.resources.notice_added
@@ -21,9 +23,13 @@ import dev.neurokitchen.quire.resources.tools_auto_ran
 import dev.neurokitchen.quire.resources.tools_auto_stopped
 import dev.neurokitchen.quire.resources.tools_backed_up
 import dev.neurokitchen.quire.resources.tools_dismissed
-import dev.neurokitchen.quire.resources.tools_exported
-import dev.neurokitchen.quire.resources.tools_key_imported
-import dev.neurokitchen.quire.resources.tools_kept_updated
+import dev.neurokitchen.quire.resources.tools_hub_revoked
+import dev.neurokitchen.quire.resources.tools_hub_revoked_left_out
+import dev.neurokitchen.quire.resources.tools_hub_saved
+import dev.neurokitchen.quire.resources.tools_hub_synced
+import dev.neurokitchen.quire.resources.tools_link_allowed
+import dev.neurokitchen.quire.resources.tools_link_refused
+import dev.neurokitchen.quire.resources.tools_linked
 import dev.neurokitchen.quire.resources.tools_library_created
 import dev.neurokitchen.quire.resources.tools_library_default
 import dev.neurokitchen.quire.resources.tools_library_opened
@@ -35,6 +41,9 @@ import dev.neurokitchen.quire.resources.tools_synced
 import dev.neurokitchen.quire.resources.tools_unshared
 import dev.neurokitchen.quire.resources.tools_zotero_imported
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -57,6 +66,11 @@ class ToolsViewModel(
 ) : ViewModel() {
     private val _state = MutableStateFlow(ToolsState())
     val state: StateFlow<ToolsState> = _state.asStateFlow()
+
+    /** The link going on (one at a time): this device's offer, or its join of another's code. */
+    private var offer: LinkOffer? = null
+    private var join: LinkJoin? = null
+    private var linkJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -84,10 +98,15 @@ class ToolsViewModel(
                         loadDuplicates()
                         Notice.Done(Res.string.tools_merged, listOf(confirm.keep.title))
                     }
-                    is ToolsConfirm.ImportKey -> act {
-                        val userId = sync.importUserKey(confirm.key.trim())
-                        loadSync()
-                        Notice.Done(Res.string.tools_key_imported, listOf(userId))
+                    is ToolsConfirm.RevokeHubDevice -> act {
+                        val unlinked = sync.unlinkHubDevice(confirm.device)
+                        loadHubDevices()
+                        // The key rotated: what the recovery kit holds is out of date.
+                        if (unlinked.leftOut > 0) {
+                            Notice.Done(Res.string.tools_hub_revoked_left_out, listOf(confirm.name, unlinked.leftOut))
+                        } else {
+                            Notice.Done(Res.string.tools_hub_revoked, listOf(confirm.name))
+                        }
                     }
                 }
             }
@@ -120,20 +139,10 @@ class ToolsViewModel(
                 null
             }
 
-            is ToolsEvent.OnExportChange -> _state.update { it.copy(export = event.form, exportPreview = null) }
-            ToolsEvent.OnExportPreview -> act {
-                val (text, count) = exchange.export(selection())
-                _state.update { it.copy(exportPreview = text, exportCount = count) }
-                null
-            }
-            is ToolsEvent.OnExportSave -> act {
-                val count = exchange.exportTo(selection(), event.path)
-                Notice.Done(Res.string.tools_exported, listOf(count, event.path))
-            }
-            is ToolsEvent.OnKeepUpdated -> act {
-                val count = exchange.keepUpdated(selection(), event.path)
-                loadExport()
-                Notice.Done(Res.string.tools_kept_updated, listOf(count, event.path))
+            is ToolsEvent.OnShowExport -> _state.update { it.copy(isExportOpen = event.open) }
+            is ToolsEvent.OnExportDone -> {
+                _state.update { it.copy(isExportOpen = false, notice = event.notice) }
+                viewModelScope.launch { runCatching { loadExport() } }
             }
             is ToolsEvent.OnStopAutoExport -> act {
                 exchange.stopAutoExport(event.path)
@@ -184,12 +193,46 @@ class ToolsViewModel(
                 Notice.Done(Res.string.tools_backed_up, listOf(backup.files, backup.path))
             }
 
-            ToolsEvent.OnRevealKey -> act {
-                val key = sync.exportUserKey()
-                _state.update { it.copy(sync = it.sync.copy(revealedKey = key)) }
-                null
+            ToolsEvent.OnLinkDevice -> linking {
+                val started = sync.linkOffer().also { offer = it }
+                setLinking(LinkingState.Showing(started.uri))
+                val request = started.nextRequest()
+                setLinking(LinkingState.Asking(request.name, request.words))
             }
-            ToolsEvent.OnHideKey -> _state.update { it.copy(sync = it.sync.copy(revealedKey = null)) }
+            ToolsEvent.OnAllowLink -> {
+                val asking = _state.value.sync.linking as? LinkingState.Asking ?: return
+                val allowed = offer ?: return
+                offer = null
+                setLinking(null)
+                act {
+                    allowed.allow()
+                    Notice.Done(Res.string.tools_link_allowed, listOf(asking.name))
+                }
+            }
+            ToolsEvent.OnRefuseLink -> {
+                val refused = offer ?: return
+                offer = null
+                setLinking(null)
+                act {
+                    refused.refuse()
+                    Notice.Done(Res.string.tools_link_refused)
+                }
+            }
+            ToolsEvent.OnCancelLink -> stopLinking()
+            is ToolsEvent.OnJoinLink -> linking {
+                setLinking(LinkingState.Joining(emptyList()))
+                val joining = sync.linkJoin(event.code.trim(), event.name).also { join = it }
+                setLinking(LinkingState.Joining(joining.words))
+                val userId = joining.finish()
+                join = null
+                setLinking(null)
+                // The user key, hub and relay changed: the engine reads them when the library opens.
+                library.reopen()
+                loadSync()
+                _state.update { it.copy(notice = Notice.Done(Res.string.tools_linked, listOf(userId))) }
+                // Then the library, from the hub the other device uses.
+                if (_state.value.sync.hubId != null) onEvent(ToolsEvent.OnSyncHub(""))
+            }
             is ToolsEvent.OnAddPeer -> act {
                 settings.set(peerKey(event.name.trim()), event.deviceId.trim())
                 loadSync()
@@ -227,7 +270,99 @@ class ToolsViewModel(
                     Notice.Done(Res.string.tools_unshared, listOf(name))
                 }
             }
+
+            is ToolsEvent.OnSaveHub -> act {
+                saveSetting(HUB_KEY, event.hubId)
+                saveSetting(RELAY_KEY, event.relay)
+                // The engine reads both when the library opens.
+                library.reopen()
+                loadSync()
+                Notice.Done(Res.string.tools_hub_saved)
+            }
+            is ToolsEvent.OnUseHubLink -> act {
+                val link = sync.parseHubLink(event.link)
+                saveSetting(HUB_KEY, link.id)
+                saveSetting(RELAY_KEY, link.relay.orEmpty())
+                library.reopen()
+                loadSync()
+                val report = sync.syncWithHub(link.code)
+                _state.update { it.copy(sync = it.sync.copy(hubReport = report)) }
+                Notice.Done(Res.string.tools_hub_synced, listOf(report.pushed, report.applied, report.filesUploaded, report.filesDownloaded))
+            }
+            is ToolsEvent.OnSyncHub -> act {
+                val report = sync.syncWithHub(event.code.trim().ifEmpty { null })
+                _state.update { it.copy(sync = it.sync.copy(hubReport = report)) }
+                Notice.Done(Res.string.tools_hub_synced, listOf(report.pushed, report.applied, report.filesUploaded, report.filesDownloaded))
+            }
+            ToolsEvent.OnLoadHubDevices -> act { loadHubDevices(); null }
+            ToolsEvent.OnRevealRecoveryKit -> act {
+                val kit = sync.recoveryKit()
+                _state.update { it.copy(sync = it.sync.copy(recoveryKit = kit)) }
+                null
+            }
+            ToolsEvent.OnHideRecoveryKit -> _state.update { it.copy(sync = it.sync.copy(recoveryKit = null)) }
         }
+    }
+
+    /** Runs a link (it waits on the person and the other device: no working mark); a failure ends it. */
+    private fun linking(block: suspend () -> Unit) {
+        stopLinking()
+        linkJob = viewModelScope.launch {
+            try {
+                block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                offer = null
+                join = null
+                setLinking(null)
+                report(e)
+            }
+        }
+    }
+
+    private fun setLinking(linking: LinkingState?) = _state.update { it.copy(sync = it.sync.copy(linking = linking)) }
+
+    /** Ends any link going on: its code stops working, a wait ends. */
+    private fun stopLinking() {
+        linkJob?.cancel()
+        linkJob = null
+        val (stoppedOffer, stoppedJoin) = offer to join
+        offer = null
+        join = null
+        setLinking(null)
+        if (stoppedOffer != null || stoppedJoin != null) {
+            viewModelScope.launch {
+                runCatching { stoppedOffer?.cancel() }
+                runCatching { stoppedJoin?.cancel() }
+            }
+        }
+    }
+
+    override fun onCleared() {
+        // The scope is gone: stop the offer or join on the engine's own runtime.
+        val (stoppedOffer, stoppedJoin) = offer to join
+        if (stoppedOffer != null || stoppedJoin != null) {
+            CoroutineScope(Dispatchers.Default).launch {
+                runCatching { stoppedOffer?.cancel() }
+                runCatching { stoppedJoin?.cancel() }
+            }
+        }
+    }
+
+    /** Sets [key] to [value], or unsets it when blank. */
+    private suspend fun saveSetting(key: String, value: String) {
+        val text = value.trim()
+        if (text.isEmpty()) {
+            if (settings.entries().any { it.key == key }) settings.unset(key)
+        } else {
+            settings.set(key, text)
+        }
+    }
+
+    private suspend fun loadHubDevices() {
+        val devices = sync.hubDevices()
+        _state.update { it.copy(sync = it.sync.copy(hubDevices = devices)) }
     }
 
     /** What a section shows without asking: everything local; online checks wait for a click. */
@@ -254,12 +389,8 @@ class ToolsViewModel(
     }
 
     private suspend fun loadExport() {
-        val formats = runCatching { exchange.exportFormats() }.getOrDefault(emptyList())
         val autos = exchange.autoExports()
-        _state.update { s ->
-            val format = s.export.format.takeIf { it in formats } ?: formats.firstOrNull() ?: s.export.format
-            s.copy(formats = formats, autoExports = autos, export = s.export.copy(format = format))
-        }
+        _state.update { it.copy(autoExports = autos) }
     }
 
     private suspend fun loadLibraries() {
@@ -270,16 +401,21 @@ class ToolsViewModel(
     private suspend fun loadSync() {
         val deviceId = sync.deviceId()
         val userId = sync.userId()
-        val peers = settings.entries().mapNotNull { entry -> PEER.matchEntire(entry.key)?.let { PeerState(it.groupValues[1], entry.value) } }
-        _state.update { it.copy(sync = it.sync.copy(deviceId = deviceId, userId = userId, peers = peers)) }
+        val entries = settings.entries()
+        val peers = entries.mapNotNull { entry -> PEER.matchEntire(entry.key)?.let { PeerState(it.groupValues[1], entry.value) } }
+        val hubId = entries.firstOrNull { it.key == HUB_KEY }?.value
+        val relay = entries.firstOrNull { it.key == RELAY_KEY }?.value
+        // This device's name for the others (sealed on its way to the hub): the model or host name.
+        if (entries.none { it.key == NAME_KEY }) runCatching { settings.set(NAME_KEY, deviceName()) }
+        _state.update { it.copy(sync = it.sync.copy(deviceId = deviceId, userId = userId, peers = peers, hubId = hubId, relay = relay)) }
+        // The device list, when there is a hub (it asks the hub: a failure is not this section's).
+        if (hubId != null) runCatching { loadHubDevices() }
     }
 
     private suspend fun loadMembers(path: String) {
         val members = sync.projectMembers(path)
         _state.update { it.copy(sync = it.sync.copy(members = members)) }
     }
-
-    private fun selection() = _state.value.export.let { ExportSelection(it.projectPath, it.recursive, format = it.format) }
 
     /** Runs an action with the working mark, then reports its notice (none if `null`) or failure. */
     private fun act(action: suspend () -> Notice?) {
@@ -301,6 +437,9 @@ class ToolsViewModel(
     private companion object {
         /** Settings keys of the other devices: `peers.<name>.id` = device ID. */
         val PEER = Regex("""peers\.(.+)\.id""")
+        const val HUB_KEY = "hub.id"
+        const val RELAY_KEY = "sync.relay"
+        const val NAME_KEY = "device.name"
 
         fun peerKey(name: String) = "peers.$name.id"
     }

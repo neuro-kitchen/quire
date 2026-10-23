@@ -1,10 +1,21 @@
 package dev.neurokitchen.quire.presentation.screens.settings
 
+import dev.neurokitchen.quire.presentation.designsystem.components.settings.SettingsGroup
+import dev.neurokitchen.quire.presentation.designsystem.components.settings.SettingsHeader
+import androidx.compose.ui.graphics.Shape
+import dev.neurokitchen.quire.resources.settings_hint_appearance
+import dev.neurokitchen.quire.resources.settings_hint_reader
+import dev.neurokitchen.quire.resources.settings_hint_general
+import dev.neurokitchen.quire.resources.settings_hint_libraries
+import dev.neurokitchen.quire.resources.settings_hint_export
+import dev.neurokitchen.quire.resources.settings_hint_shortcuts
+import dev.neurokitchen.quire.resources.settings_hint_config
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -85,60 +97,119 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     val colors = QuireTheme.colors
-    Row(modifier.fillMaxSize()) {
-        SettingsSidebar(state.section, onClick = { onEvent(SettingsEvent.OnSectionClick(it)) }, Modifier.width(200.dp))
-        VerticalDivider(color = colors.paneDivider)
-        Column(Modifier.weight(1f).padding(Dimens.SpaceMd)) {
-            // Category Header
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(state.section.displayTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = colors.fillPrimary)
-                    Text(
-                        if (state.configPath.isNotEmpty()) stringResource(Res.string.settings_file_location, state.configPath)
-                        else "Configure preferences, appearance, shortcuts, and sync",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.fillSecondary,
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val isNarrow = maxWidth < 600.dp
+        if (isNarrow) {
+            Column(Modifier.fillMaxSize()) {
+                // Category tabs: horizontal scrollable chips
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(colors.cardBackground)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(SettingsSection.entries) { section ->
+                        val selected = section == state.section
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(Dimens.RadiusFull))
+                                .background(if (selected) colors.accent else colors.fillQuinary)
+                                .border(
+                                    1.dp,
+                                    if (selected) colors.accent else colors.border.copy(alpha = 0.5f),
+                                    RoundedCornerShape(Dimens.RadiusFull),
+                                )
+                                .clickable { onEvent(SettingsEvent.OnSectionClick(section)) }
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                        ) {
+                            Text(
+                                text = section.displayTitle,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (selected) colors.onAccent else colors.fillPrimary,
+                                ),
+                            )
+                        }
+                    }
+                }
+                HorizontalDivider(color = colors.paneDivider)
+                SettingsCategoryContent(state, onEvent, Modifier.fillMaxSize().padding(Dimens.SpaceMd))
+            }
+        } else {
+            // Desktop side-by-side
+            Row(Modifier.fillMaxSize()) {
+                SettingsSidebar(state.section, onClick = { onEvent(SettingsEvent.OnSectionClick(it)) }, Modifier.width(200.dp))
+                VerticalDivider(color = colors.paneDivider)
+                SettingsCategoryContent(state, onEvent, Modifier.weight(1f).padding(Dimens.SpaceMd))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsCategoryContent(
+    state: SettingsState,
+    onEvent: (SettingsEvent) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = QuireTheme.colors
+    Column(modifier) {
+        // The section in large type and what it is for; the file's path only where the file is edited.
+        SettingsHeader(
+            state.section.displayTitle,
+            if (state.section == SettingsSection.ConfigFile && state.configPath.isNotEmpty()) {
+                stringResource(Res.string.settings_file_location, state.configPath)
+            } else {
+                stringResource(state.section.hint())
+            },
+            horizontalPadding = 0.dp,
+        )
+
+        val error = state.error
+        when {
+            error != null -> Column {
+                Text(stringResource(Res.string.settings_load_failed), color = colors.accentRed, style = MaterialTheme.typography.titleMedium)
+                Text(error, color = colors.fillSecondary, style = MaterialTheme.typography.bodyMedium)
+            }
+            state.section == SettingsSection.Appearance -> AppearanceSectionView(state.appTheme, onEvent)
+            state.section == SettingsSection.Shortcuts -> ShortcutsSectionView()
+            state.section == SettingsSection.Reader -> ReaderDefaultsSectionView(state.readerFont, state.readerTheme, state.readerFontSize, onEvent)
+            state.section == SettingsSection.ConfigFile -> RawConfigEditor(
+                state.raw,
+                onChange = { onEvent(SettingsEvent.OnRawChange(it)) },
+                onSave = { onEvent(SettingsEvent.OnRawSave) },
+                onRevert = { onEvent(SettingsEvent.OnRawRevert) },
+            )
+            else -> LazyColumn(Modifier.weight(1f)) {
+                item {
+                    // One segmented group: each setting its own rounded block.
+                    SettingsGroup(
+                        horizontalPadding = 0.dp,
+                        rows = state.fields.map { field ->
+                            @Composable { shape: Shape ->
+                                Box(Modifier.fillMaxWidth().clip(shape).background(colors.cardBackground).padding(horizontal = Dimens.SpaceMd, vertical = Dimens.SpaceXs)) {
+                                    SettingRow(
+                                        field,
+                                        onDraftChange = { onEvent(SettingsEvent.OnDraftChange(field.key, it)) },
+                                        onApply = { onEvent(SettingsEvent.OnApply(field.key)) },
+                                        onReset = { onEvent(SettingsEvent.OnReset(field.key)) },
+                                    )
+                                }
+                            }
+                        },
                     )
                 }
-            }
-            HorizontalDivider(color = colors.fillQuarternary, modifier = Modifier.padding(vertical = Dimens.SpaceSm))
-
-            val error = state.error
-            when {
-                error != null -> Column {
-                    Text(stringResource(Res.string.settings_load_failed), color = colors.accentRed, style = MaterialTheme.typography.titleMedium)
-                    Text(error, color = colors.fillSecondary, style = MaterialTheme.typography.bodyMedium)
+                if (!state.isLoading && state.fields.isEmpty()) {
+                    item { Text(stringResource(Res.string.settings_none_named), color = colors.fillSecondary, style = MaterialTheme.typography.bodyMedium) }
                 }
-                state.section == SettingsSection.Appearance -> AppearanceSectionView()
-                state.section == SettingsSection.Shortcuts -> ShortcutsSectionView()
-                state.section == SettingsSection.Reader -> ReaderDefaultsSectionView()
-                state.section == SettingsSection.Export -> ExportSectionView()
-                state.section == SettingsSection.ConfigFile -> RawConfigEditor(
-                    state.raw,
-                    onChange = { onEvent(SettingsEvent.OnRawChange(it)) },
-                    onSave = { onEvent(SettingsEvent.OnRawSave) },
-                    onRevert = { onEvent(SettingsEvent.OnRawRevert) },
-                )
-                else -> LazyColumn(Modifier.weight(1f)) {
-                    items(state.fields, key = { it.key }) { field ->
-                        SettingRow(
-                            field,
-                            onDraftChange = { onEvent(SettingsEvent.OnDraftChange(field.key, it)) },
-                            onApply = { onEvent(SettingsEvent.OnApply(field.key)) },
-                            onReset = { onEvent(SettingsEvent.OnReset(field.key)) },
-                        )
-                    }
-                    if (!state.isLoading && state.fields.isEmpty()) {
-                        item { Text(stringResource(Res.string.settings_none_named), color = colors.fillSecondary, style = MaterialTheme.typography.bodyMedium) }
-                    }
-                    item {
-                        Text(
-                            "${stringResource(Res.string.settings_version)} ${state.version}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.fillTertiary,
-                            modifier = Modifier.padding(top = Dimens.SpaceLg),
-                        )
-                    }
+                item {
+                    Text(
+                        "${stringResource(Res.string.settings_version)} ${state.version}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.fillTertiary,
+                        modifier = Modifier.padding(top = Dimens.SpaceLg),
+                    )
                 }
             }
         }
@@ -147,9 +218,11 @@ fun SettingsScreen(
 
 /** Appearance & Full App Theming preferences */
 @Composable
-private fun AppearanceSectionView() {
+private fun AppearanceSectionView(
+    activeTheme: AppTheme,
+    onEvent: (SettingsEvent) -> Unit,
+) {
     val colors = QuireTheme.colors
-    var activeTheme by remember { mutableStateOf(AppTheme.Obsidian) }
 
     Column(
         modifier = Modifier
@@ -171,7 +244,7 @@ private fun AppearanceSectionView() {
                     modifier = Modifier
                         .fillMaxWidth()
                         .border(if (isSelected) 1.5.dp else 1.dp, if (isSelected) colors.accent else colors.border, RoundedCornerShape(Dimens.RadiusBase))
-                        .clickable { activeTheme = theme },
+                        .clickable { onEvent(SettingsEvent.OnSetAppTheme(theme)) },
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -217,38 +290,18 @@ private fun AppearanceSectionView() {
                 }
             }
         }
-
-        HorizontalDivider(color = colors.fillQuarternary, modifier = Modifier.padding(vertical = Dimens.SpaceXs))
-
-        Text("Display Density & Metrics", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = colors.fillPrimary)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(Dimens.RadiusBase))
-                    .background(colors.accent)
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-            ) {
-                Text("Comfortable (Default)", style = MaterialTheme.typography.labelSmall, color = colors.onAccent, fontWeight = FontWeight.SemiBold)
-            }
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(Dimens.RadiusBase))
-                    .background(colors.fillQuarternary)
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-            ) {
-                Text("Compact Desktop", style = MaterialTheme.typography.labelSmall, color = colors.fillPrimary)
-            }
-        }
     }
 }
 
 /** Reader Defaults preferences */
 @Composable
-private fun ReaderDefaultsSectionView() {
+private fun ReaderDefaultsSectionView(
+    selectedFont: ReaderFont,
+    selectedTheme: ReaderTheme,
+    defaultFontSize: Int,
+    onEvent: (SettingsEvent) -> Unit,
+) {
     val colors = QuireTheme.colors
-    var selectedFont by remember { mutableStateOf(ReaderFont.Serif) }
-    var selectedTheme by remember { mutableStateOf(ReaderTheme.Dark) }
-    var defaultFontSize by remember { mutableIntStateOf(16) }
 
     Column(
         modifier = Modifier
@@ -300,7 +353,7 @@ private fun ReaderDefaultsSectionView() {
                         .clip(RoundedCornerShape(Dimens.RadiusBase))
                         .background(if (isSelected) colors.accent else colors.sidepane)
                         .border(1.dp, if (isSelected) colors.accent else colors.border, RoundedCornerShape(Dimens.RadiusBase))
-                        .clickable { selectedFont = font }
+                        .clickable { onEvent(SettingsEvent.OnSetReaderFont(font)) }
                         .padding(vertical = 8.dp),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -333,75 +386,43 @@ private fun ReaderDefaultsSectionView() {
                         .clip(CircleShape)
                         .background(themeCol.background)
                         .border(if (isSelected) 2.5.dp else 1.dp, if (isSelected) colors.accent else colors.border, CircleShape)
-                        .clickable { selectedTheme = theme },
+                        .clickable { onEvent(SettingsEvent.OnSetReaderTheme(theme)) },
                     contentAlignment = Alignment.Center,
                 ) {
                     Text("Aa", style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp, fontWeight = FontWeight.Bold), color = themeCol.text)
                 }
             }
         }
-    }
-}
-
-/** CiteKey & BibTeX Export Settings */
-@Composable
-private fun ExportSectionView() {
-    val colors = QuireTheme.colors
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(Dimens.SpaceMd),
-    ) {
-        Text("CiteKey Generation Pattern", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = colors.fillPrimary)
-        Text("Template used when generating citation keys from author and publication metadata.", style = MaterialTheme.typography.bodySmall, color = colors.fillSecondary)
-
-        Card(
-            shape = RoundedCornerShape(Dimens.RadiusBase),
-            colors = CardDefaults.cardColors(containerColor = colors.sidepane),
-            modifier = Modifier.fillMaxWidth().border(1.dp, colors.border, RoundedCornerShape(Dimens.RadiusBase)).padding(Dimens.SpaceMd),
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Pattern Template:", style = MaterialTheme.typography.labelMedium, color = colors.fillSecondary)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(Dimens.RadiusSmall))
-                        .background(colors.background)
-                        .border(1.dp, colors.border, RoundedCornerShape(Dimens.RadiusSmall))
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                ) {
-                    Text("[auth][year]", style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace), color = colors.accent)
-                }
-                Text("Example output: hodgkin1952, vaswani2017", style = MaterialTheme.typography.bodySmall, color = colors.fillTertiary)
-            }
-        }
 
         HorizontalDivider(color = colors.fillQuarternary)
 
-        Text("BibTeX / BibLaTeX Export", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = colors.fillPrimary)
+        Text("Default Reading Font Size", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = colors.fillPrimary)
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Dimens.RadiusBase))
-                .background(colors.sidepane)
-                .padding(Dimens.SpaceMd),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Icon(painterResource(Res.drawable.ic_link), null, tint = colors.accent, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text("Auto-export .bib on library changes", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = colors.fillPrimary)
-                Text("Automatically writes references.bib in the project root", style = MaterialTheme.typography.bodySmall, color = colors.fillSecondary)
-            }
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(Dimens.RadiusFull))
-                    .background(colors.accent)
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                    .background(colors.sidepane)
+                    .border(1.dp, colors.border, RoundedCornerShape(Dimens.RadiusSmall))
+                    .clickable { onEvent(SettingsEvent.OnSetReaderFontSize(maxOf(12, defaultFontSize - 1))) },
+                contentAlignment = Alignment.Center,
             ) {
-                Text("Enabled", style = MaterialTheme.typography.labelSmall, color = colors.onAccent)
+                Text("−", style = MaterialTheme.typography.titleMedium, color = colors.fillPrimary)
+            }
+            Text("${defaultFontSize}sp", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = colors.fillPrimary)
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(Dimens.RadiusSmall))
+                    .background(colors.sidepane)
+                    .border(1.dp, colors.border, RoundedCornerShape(Dimens.RadiusSmall))
+                    .clickable { onEvent(SettingsEvent.OnSetReaderFontSize(minOf(28, defaultFontSize + 1))) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("+", style = MaterialTheme.typography.titleMedium, color = colors.fillPrimary)
             }
         }
     }
@@ -423,6 +444,7 @@ private fun ShortcutsSectionView() {
         ShortcutCategoryCard(
             title = "Navigation & Windows",
             shortcuts = listOf(
+                "Ctrl + K" to "Universal Command Palette & Quick Switcher",
                 "Ctrl + B" to "Toggle Left Navigation Sidebar",
                 "Ctrl + I" to "Toggle Right Inspector Panel",
                 "Ctrl + R" to "Sync / Reload Library",
@@ -434,6 +456,7 @@ private fun ShortcutsSectionView() {
         ShortcutCategoryCard(
             title = "Library & References",
             shortcuts = listOf(
+                "Space" to "Quick Look Peek Modal on Selected Paper",
                 "Ctrl + N" to "Add Reference (DOI, arXiv, BibTeX)",
                 "Ctrl + A" to "Select All Items",
                 "Ctrl + F / Ctrl + S" to "Search Library Items",
@@ -447,12 +470,14 @@ private fun ShortcutsSectionView() {
         )
 
         ShortcutCategoryCard(
-            title = "Reader & Document View",
+            title = "Reader & Knowledge Tools",
             shortcuts = listOf(
                 "Ctrl + + / Ctrl + =" to "Zoom In (PDF) / Increase Font Size (Text)",
                 "Ctrl + -" to "Zoom Out (PDF) / Decrease Font Size (Text)",
                 "Ctrl + 0" to "Reset Zoom (100%) / Reset Font Size (16px)",
                 "Ctrl + F" to "Toggle In-Document Search Bar",
+                "Drag on PDF" to "Area Snapshot tool to extract visual quote into notes",
+                "[[citeKey]]" to "Bidirectional Wikilink in notes (auto-tracks backlinks)",
                 "Aa Button" to "Select Typography & Reader Palette",
                 "Bottom Action Palette" to "Annotate Highlight (Yellow, Green, Blue, Purple, Red)",
             ),
@@ -493,3 +518,14 @@ private fun ShortcutCategoryCard(title: String, shortcuts: List<Pair<String, Str
     }
 }
 
+
+/** What each section is for, under its title. */
+private fun SettingsSection.hint() = when (this) {
+    SettingsSection.Appearance -> Res.string.settings_hint_appearance
+    SettingsSection.Reader -> Res.string.settings_hint_reader
+    SettingsSection.General -> Res.string.settings_hint_general
+    SettingsSection.Libraries -> Res.string.settings_hint_libraries
+    SettingsSection.Export -> Res.string.settings_hint_export
+    SettingsSection.Shortcuts -> Res.string.settings_hint_shortcuts
+    SettingsSection.ConfigFile -> Res.string.settings_hint_config
+}

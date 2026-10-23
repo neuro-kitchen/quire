@@ -34,15 +34,16 @@ pub mod zotero;
 pub use config::Config;
 pub use engine::{
     AbstractOutcome, AlertCheck, Attached, AutoExportInfo, AutoExportOutcome, Change, CiteUse, DuplicateGroup, Engine,
-    ExportRequest, GraphEntry, GraphKind, ManuscriptCheck, OcrOutcome, OpenOptions, PaperText, PdfOutcome, PdfStatus,
-    ProjectSummary, RetractionCheck, SEARCH_LIMIT, TextSource, UnknownKey, ZoteroImport, online_candidate,
-    suggest_keys, write_if_changed,
+    Eviction, ExportRequest, GraphEntry, GraphKind, ManuscriptCheck, OcrOutcome, OpenOptions, OpenedPdf, PaperText,
+    PdfOutcome, PdfSource, PdfStatus, ProjectSummary, RetractionCheck, SEARCH_LIMIT, TextSource, UnknownKey,
+    ZoteroImport, online_candidate, suggest_keys, write_if_changed,
 };
 pub use error::{EngineError, Result};
 pub use folder::FolderFile;
 pub use libraries::{LibraryChoice, LibraryInfo};
 
 // Types front ends receive from the engine.
+pub use engine::activity;
 pub use quire_core::library::duplicates::{Merged, Reason as DuplicateReason};
 pub use quire_core::library::update::{FieldChange, Outcome, Updated};
 pub use quire_core::{Added, Checked, CoreError, FailedInput, SearchHit};
@@ -50,12 +51,16 @@ pub use quire_document::pdf::PdfMatch;
 pub use quire_document::{paper_markdown, reading};
 pub use quire_fetch::crossref::{Update, UpdateKind};
 pub use quire_fetch::{Endpoints, FetchError};
-pub use quire_io::{ExportFormat, ExportOptions};
+pub use quire_io::{Encoding, ExportFormat, ExportOptions};
 pub use quire_model::{
     Alert, AlertSource, Attachment, Field, Highlight, HighlightId, Issue, IssueCode, Note, NoteId, PdfAttempt, PdfKind,
     Project, Reading, ReadingStatus, Reference, SavedSearch, Severity, SlugPath, Tag, TagKind,
 };
 pub use quire_model::{ProjectMember, Role as MemberRole, UserId};
+pub use quire_store::Activity;
+pub use quire_sync::hub::{HubReport, SyncOptions as HubOptions};
+pub use quire_sync::link::HubLink;
+pub use quire_sync::pairing::{Grant as LinkGrant, Join as LinkJoin, Offer as LinkOffer, Request as LinkRequest};
 pub use quire_sync::transport::is_device_id;
 pub use quire_sync::{Report as SyncReport, Side as SyncSide};
 pub use secrets::Store as SecretStore;

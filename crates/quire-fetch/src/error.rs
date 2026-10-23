@@ -25,6 +25,9 @@ pub enum FetchError {
     #[error("unreadable response from {url}: {message}")]
     Parse { url: String, message: String },
 
+    /// A response larger than quire reads (whatever its `Content-Length` said, if anything).
+    #[error("{url} sent more than {limit_mb} MB")]
+    TooLarge { url: String, limit_mb: u64 },
     /// A link that should give a PDF gave something else (and not a challenge page).
     #[error("{0} did not return a PDF")]
     NotPdf(String),

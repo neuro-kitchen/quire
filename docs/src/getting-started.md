@@ -22,7 +22,7 @@ the PDF and for metadata issues. `--json` prints JSON for scripts.
 ```bash
 quire project new Thesis
 quire project new "Chapter 2" --parent thesis
-quire ref link vaswaniAttentionAllYou2017 -p chapter-2
+quire ref link vaswaniAttentionAllYou2017 -p thesis/chapter-2   # a subproject by its path
 quire list -p thesis -r          # the project and its subprojects
 ```
 

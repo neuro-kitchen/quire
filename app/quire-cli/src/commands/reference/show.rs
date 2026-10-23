@@ -44,7 +44,7 @@ pub async fn run(engine: &Engine, args: &ShowArgs) -> anyhow::Result<()> {
             notes: notes.iter().map(|n| (n.id.to_string(), n.title())).collect(),
             related: related.iter().map(|r| r.cite_key.to_string()).collect(),
         };
-        anstream::println!("{}", reference::block(&found, &context));
+        crate::out!("{}", reference::block(&found, &context));
     }
     Ok(())
 }

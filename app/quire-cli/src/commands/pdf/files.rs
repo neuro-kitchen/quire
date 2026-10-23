@@ -40,8 +40,8 @@ pub async fn list(context: &Context, args: &ListArgs) -> anyhow::Result<()> {
                     Some(PdfKind::Mixed) => ", partly scanned",
                     _ => "",
                 };
-                let facts = format!("{} pages{kind}", attachment.pages.unwrap_or(0));
-                anstream::println!(
+                let facts = format!("{}{kind}", output::count(attachment.pages.unwrap_or(0), "page", "pages"));
+                crate::out!(
                     "{}  {}  {}",
                     style::paint(style::KEY, &reference.cite_key),
                     style::paint(style::DIM, facts),
@@ -51,11 +51,7 @@ pub async fn list(context: &Context, args: &ListArgs) -> anyhow::Result<()> {
         }
     }
     for reference in &missing {
-        anstream::println!(
-            "{}  {}",
-            style::paint(style::KEY, &reference.cite_key),
-            style::paint(style::WARN, "no PDF")
-        );
+        crate::out!("{}  {}", style::paint(style::KEY, &reference.cite_key), style::paint(style::WARN, "no PDF"));
     }
     output::hint(format!("{} with a PDF, {} without (`quire pdf get` finds them)", have.len(), missing.len()));
     Ok(())
@@ -90,19 +86,68 @@ pub async fn verify(context: &Context, args: &ListArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Opens the PDF, fetching it first if it is not on this device (the hub, another of your
+/// devices, then the source: lazy PDFs, `.knowledge/sync-hub.md`).
 pub async fn open(engine: &Engine, args: &QueryArgs) -> anyhow::Result<()> {
-    let (reference, pdfs) = engine.pdfs_of(&args.query).await?;
-    let (_, path) = pdfs.first().ok_or_else(|| {
-        anyhow::anyhow!("`{}` has no PDF; `quire pdf get {}` looks for one", reference.cite_key, reference.cite_key)
-    })?;
-    Ok(quire_engine::tools::open(&path.display().to_string())?)
+    let opened = engine.open_pdf(&args.query).await?;
+    match &opened.source {
+        quire_engine::PdfSource::Here => {}
+        quire_engine::PdfSource::Hub => output::hint("downloaded from your sync hub"),
+        quire_engine::PdfSource::Peer(name) => output::hint(format!("fetched from your device {name}")),
+        quire_engine::PdfSource::Found(source) => output::hint(format!("found again ({source}) and attached")),
+    }
+    Ok(quire_engine::tools::open(&opened.path.display().to_string())?)
+}
+
+#[derive(Args, Debug)]
+pub struct KeepArgs {
+    /// Cite key, DOI / arXiv ID / PMID, or reference ID; with --project, a project path
+    target: String,
+    /// TARGET is a project (its subprojects too)
+    #[arg(long)]
+    project: bool,
+    /// Stop keeping it downloaded
+    #[arg(long)]
+    off: bool,
+}
+
+/// Keeps a paper's (or a project's) PDFs downloaded on this device, whatever `files.download`.
+pub async fn keep(engine: &Engine, args: &KeepArgs) -> anyhow::Result<()> {
+    let changed = if args.project {
+        engine.keep_project_offline(&args.target.parse()?, !args.off).await?
+    } else {
+        engine.keep_reference_offline(&args.target, !args.off).await?
+    };
+    let what = if args.off { "no longer kept offline" } else { "kept offline (downloaded at the next sync)" };
+    output::report(
+        if changed { Tone::Ok } else { Tone::Info },
+        if changed { "done" } else { "unchanged" },
+        format!("{}: {what}", args.target),
+    );
+    Ok(())
+}
+
+/// Removes PDFs past `files.cache_mb` (only those your sync hub holds; never one kept offline).
+pub async fn evict(engine: &Engine) -> anyhow::Result<()> {
+    let eviction = engine.evict_pdfs().await?;
+    output::report(
+        Tone::Ok,
+        "evicted",
+        format!(
+            "{} PDF(s), {} MB freed; {} MB of PDFs here",
+            eviction.removed,
+            eviction.freed / (1024 * 1024),
+            eviction.kept / (1024 * 1024)
+        ),
+    );
+    Ok(())
 }
 
 pub async fn path(engine: &Engine, args: &QueryArgs) -> anyhow::Result<()> {
     let (reference, pdfs) = engine.pdfs_of(&args.query).await?;
     anyhow::ensure!(!pdfs.is_empty(), "`{}` has no PDF", reference.cite_key);
     for (_, path) in pdfs {
-        println!("{}", path.display());
+        crate::out!("{}", path.display());
     }
     Ok(())
 }
@@ -123,7 +168,7 @@ pub async fn text(engine: &Engine, args: &TextArgs) -> anyhow::Result<()> {
         engine.forget_text(&args.query).await?;
     }
     let (reference, text) = engine.reader_text(&args.query).await?;
-    print!("{}", text.markdown);
+    crate::data!("{}", text.markdown);
     output::hint(format!("{}: {} text in {} ms", reference.cite_key, text.source.label(), start.elapsed().as_millis()));
     Ok(())
 }
@@ -166,7 +211,7 @@ pub async fn extract(context: &Context, args: &ExtractArgs) -> anyhow::Result<()
             Ok((reference, text)) => {
                 done += 1;
                 let stats = TextStats::of(&text.markdown);
-                anstream::println!(
+                crate::out!(
                     "{}  {}",
                     style::paint(style::KEY, &reference.cite_key),
                     style::paint(style::DIM, format!("{}  {stats}", text.source.label()))
@@ -178,7 +223,7 @@ pub async fn extract(context: &Context, args: &ExtractArgs) -> anyhow::Result<()
             }
         }
     }
-    output::hint(format!("{done} texts extracted, {failed} failed"));
+    output::hint(format!("{} extracted, {failed} failed", output::count(done, "text", "texts")));
     Ok(())
 }
 

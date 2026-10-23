@@ -107,6 +107,17 @@ fn extra_text(value: &Value) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A month or day past 255 once wrapped around (`[2017, 257]` was January).
+    #[test]
+    fn date_parts_do_not_wrap() {
+        let item = |parts: &str| {
+            from_csl_json(&format!(r#"{{"type": "book", "issued": {{"date-parts": [{parts}]}}}}"#)).unwrap()
+        };
+        assert_eq!(item("[2017, 257]")[0].issued, None);
+        assert_eq!(item("[2017, 6, 268]")[0].issued, None);
+        assert_eq!(item("[2017, 6, 12]")[0].issued.unwrap().to_string(), "2017-06-12");
+    }
     use quire_model::{EntryKind, IdentifierKind};
     use serde_json::json;
 

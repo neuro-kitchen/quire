@@ -47,3 +47,27 @@ fn pages_text_and_hit_testing() {
     assert_eq!(selected, "Place");
     assert_eq!(rects.len(), 1);
 }
+
+/// A figure is the area above its caption; an empty area there (a caption whose figure is on
+/// another page, as manuscripts place them) is not one. Seen in real preprints: a crop of blank
+/// page with a line number.
+#[test]
+fn figures_are_found_above_their_captions_and_empty_areas_left_out() {
+    let body = "BT /F1 10 Tf 72 720 Td (Place cells fire in one place and grid cells tile the space around) Tj ET";
+    let chart = "100 450 m 500 450 l 500 650 l 100 650 l s 100 450 m 300 600 l 500 500 l S";
+    let caption = "BT /F1 10 Tf 72 420 Td (Figure 1. Firing rate over the arena.) Tj ET";
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("figures.pdf");
+    std::fs::write(
+        &path,
+        quire_testkit::pdf_pages(&[&format!("{body} {chart} {caption}"), &format!("{body} {caption}")]),
+    )
+    .unwrap();
+    let found = quire_document::pdf::figures(&path).unwrap();
+    assert_eq!(found.len(), 1, "{found:?}");
+    let figure = &found[0];
+    assert_eq!((figure.page, figure.label.as_str()), (0, "Figure 1"));
+    assert!(figure.caption.starts_with("Figure 1. Firing rate"));
+    // The chart spans 142-342 pt from the top: inside the figure.
+    assert!(figure.rect.top <= 142.0 && figure.rect.bottom >= 342.0, "{:?}", figure.rect);
+}

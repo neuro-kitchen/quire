@@ -66,6 +66,14 @@ impl ReferenceData {
         };
     }
 
+    /// Drops identifiers that repeat an earlier one (same kind and key: `doi:10.1/a` and
+    /// `https://doi.org/10.1/A` are one), keeping the first as written. Importers can hand over
+    /// one twice; the store keys identifiers by kind and key.
+    pub fn dedup_identifiers(&mut self) {
+        let mut seen = std::collections::HashSet::new();
+        self.identifiers.retain(|id| seen.insert((id.kind(), id.key())));
+    }
+
     pub fn title(&self) -> Option<&str> {
         self.get(TextField::Title)
     }

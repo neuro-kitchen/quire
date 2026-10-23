@@ -21,6 +21,8 @@
 - [Search, saved searches, reading list](guide/search.md)
 - [Finding and watching papers](guide/discover.md)
 - [Sync between devices](guide/sync.md)
+- [Sync hub: your own always-on sync](guide/sync-hub.md)
+  - [Self-hosting the hub](guide/self-hosting.md)
 - [Browser extension](guide/extension.md)
 
 # Reference

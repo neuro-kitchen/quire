@@ -5,6 +5,7 @@
 //! - [`csl`]: CSL-JSON (what DOI services return; Pandoc, Zotero).
 //! - [`edit`]: a reference as an editable TOML document (`quire ref edit`).
 //! - [`manuscript`]: the cite keys a Typst, LaTeX or Markdown document uses.
+//! - [`encoding`]: the character encoding an export file is written in.
 //! - [`export`]: every output format, with an export profile's settings (Hayagriva via Typst's crate).
 //! - [`text`]: plain text from markup (tags, entities, whitespace).
 //! - [`zotero`]: a Zotero library's items, notes and fields as quire's model.
@@ -15,6 +16,7 @@ pub mod annotations;
 pub mod bib;
 pub mod csl;
 pub mod edit;
+pub mod encoding;
 pub mod error;
 pub mod export;
 pub mod manuscript;
@@ -24,5 +26,6 @@ pub mod zotero;
 pub use bib::{BibFormat, BibOptions, BibRecord, PreprintForm, from_bib, to_bib};
 pub use csl::{from_csl_json, from_csl_value, to_csl_json};
 pub use edit::{from_edit_toml, to_edit_toml};
+pub use encoding::Encoding;
 pub use error::{IoError, Result};
 pub use export::{ExportFormat, ExportOptions, export};

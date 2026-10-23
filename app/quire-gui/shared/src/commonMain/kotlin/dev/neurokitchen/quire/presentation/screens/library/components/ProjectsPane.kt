@@ -1,5 +1,7 @@
 package dev.neurokitchen.quire.presentation.screens.library.components
 
+import dev.neurokitchen.quire.resources.export_menu
+import dev.neurokitchen.quire.presentation.components.export_dialog.ExportTarget
 import dev.neurokitchen.quire.resources.ic_search
 import dev.neurokitchen.quire.resources.menu_remove
 import androidx.compose.foundation.border
@@ -52,6 +54,7 @@ import dev.neurokitchen.quire.presentation.designsystem.components.ToolbarIconBu
 import dev.neurokitchen.quire.presentation.screens.library.LibraryEvent
 import dev.neurokitchen.quire.presentation.screens.library.LibraryState
 import dev.neurokitchen.quire.resources.Res
+import dev.neurokitchen.quire.resources.ic_auto_fix_high
 import dev.neurokitchen.quire.resources.ic_chevron_right
 import dev.neurokitchen.quire.resources.ic_create_new_folder
 import dev.neurokitchen.quire.resources.ic_delete
@@ -86,6 +89,14 @@ fun ProjectsPane(
                 Res.drawable.ic_create_new_folder,
                 stringResource(Res.string.library_new_project),
                 onClick = { onEvent(LibraryEvent.OnNameDialog(NameDialog.NewProject())) },
+            )
+            ToolbarIconButton(
+                Res.drawable.ic_auto_fix_high,
+                "New Smart Collection...",
+                onClick = {
+                    val q = if (state.query.isNotBlank()) state.query else "status:unread"
+                    onEvent(LibraryEvent.OnNameDialog(NameDialog.SaveSearch(q)))
+                },
             )
             Spacer(Modifier.weight(1f))
             Box(
@@ -146,13 +157,12 @@ fun ProjectsPane(
                     )
                     ProjectMenu(menuOpen, onDismiss = { menuOpen = false }) { action ->
                         menuOpen = false
-                        onEvent(
-                            when (action) {
-                                ProjectAction.NewSubproject -> LibraryEvent.OnNameDialog(NameDialog.NewProject(parentPath = project.id))
-                                ProjectAction.Rename -> LibraryEvent.OnNameDialog(NameDialog.RenameProject(project.id, project.name))
-                                ProjectAction.Delete -> LibraryEvent.OnConfirm(Confirm.DeleteProject(project.id, project.name))
-                            },
-                        )
+                        when (action) {
+                            ProjectAction.NewSubproject -> onEvent(LibraryEvent.OnNameDialog(NameDialog.NewProject(parentPath = project.id)))
+                            ProjectAction.Rename -> onEvent(LibraryEvent.OnNameDialog(NameDialog.RenameProject(project.id, project.name)))
+                            ProjectAction.Delete -> onEvent(LibraryEvent.OnConfirm(Confirm.DeleteProject(project.id, project.name)))
+                            ProjectAction.Export -> onEvent(LibraryEvent.OnShowExport(ExportTarget(projectPath = project.id)))
+                        }
                     }
                 }
             }
@@ -161,7 +171,7 @@ fun ProjectsPane(
                 Box {
                     SourceRow(
                         modifier = Modifier.onSecondaryClick { menuOpen = true },
-                        icon = Res.drawable.ic_search,
+                        icon = Res.drawable.ic_auto_fix_high,
                         name = saved.name,
                         depth = 1,
                         isSelected = saved.isActive,
@@ -286,13 +296,14 @@ private fun Twisty(expanded: Boolean, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
-private enum class ProjectAction { NewSubproject, Rename, Delete }
+private enum class ProjectAction { NewSubproject, Rename, Export, Delete }
 
 @Composable
 private fun ProjectMenu(expanded: Boolean, onDismiss: () -> Unit, onAction: (ProjectAction) -> Unit) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         DropdownMenuItem(text = { Text(stringResource(Res.string.menu_new_subproject)) }, onClick = { onAction(ProjectAction.NewSubproject) })
         DropdownMenuItem(text = { Text(stringResource(Res.string.menu_rename)) }, onClick = { onAction(ProjectAction.Rename) })
+        DropdownMenuItem(text = { Text(stringResource(Res.string.export_menu)) }, onClick = { onAction(ProjectAction.Export) })
         DropdownMenuItem(
             text = { Text(stringResource(Res.string.menu_delete), color = MaterialTheme.colorScheme.error) },
             onClick = { onAction(ProjectAction.Delete) },

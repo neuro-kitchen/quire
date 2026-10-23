@@ -87,10 +87,15 @@ impl FromStr for Date {
             let digits = !part.is_empty() && part.len() <= 4 && part.bytes().all(|b| b.is_ascii_digit());
             digits.then(|| part.parse().ok()).flatten().ok_or_else(|| invalid("expected YYYY, YYYY-MM or YYYY-MM-DD"))
         };
+        // A month or day is one or two digits (narrowing a longer number would wrap: `257` → 1).
+        let small = |part: &str| -> Result<u8> {
+            let digits = !part.is_empty() && part.len() <= 2 && part.bytes().all(|b| b.is_ascii_digit());
+            digits.then(|| part.parse().ok()).flatten().ok_or_else(|| invalid("expected YYYY, YYYY-MM or YYYY-MM-DD"))
+        };
         let mut parts = s.trim().split('-');
         let year = number(parts.next().unwrap_or_default())?;
-        let month = parts.next().map(number).transpose()?.map(|m| m as u8);
-        let day = parts.next().map(number).transpose()?.map(|d| d as u8);
+        let month = parts.next().map(small).transpose()?;
+        let day = parts.next().map(small).transpose()?;
         if parts.next().is_some() {
             return Err(invalid("expected YYYY, YYYY-MM or YYYY-MM-DD"));
         }
@@ -132,6 +137,14 @@ mod tests {
             assert!(text.parse::<Date>().is_err(), "{text}");
         }
         assert!(Date::new(2017, None, Some(3)).is_err());
+    }
+
+    /// A month or day past 255 once wrapped around (`2017-257` was January) instead of failing.
+    #[test]
+    fn months_and_days_do_not_wrap() {
+        for text in ["2017-257", "2017-06-268", "2017-0001", "2017-06-0012"] {
+            assert!(text.parse::<Date>().is_err(), "{text}");
+        }
     }
 
     #[test]
