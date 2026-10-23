@@ -10,7 +10,7 @@ service holds no readable library data (`.knowledge/sync-hub.md`).
 |---|---|---|
 | `hub` | `ghcr.io/neuro-kitchen/quire-hub` | accounts, devices, sealed batches and files |
 | `litestream` | `litestream/litestream:0.5.17` | the hub's database to object storage, continuously |
-| `files-backup` | `rclone/rclone:1.75.1` | sealed files to the same storage, every 10 minutes |
+| `files-backup` | `rclone/rclone:1.75.1` | syncs sealed files to the same storage every 10 minutes (purging deleted accounts) |
 | `relay` | `n0computer/iroh-relay:v1.3.0` | relay for devices that cannot connect directly |
 
 One small server (2 vCPU, 4 GB, a disk sized for the files) runs it all; object storage holds the
@@ -41,7 +41,9 @@ docker compose exec hub quire-hub account new --quota-mb 10240   # account <id>,
 
 The customer enters it once in the app (`quire sync hub add <hub-id> <link-code>`). Deleting an
 account (their request, or the end of their subscription after the notice period) removes its
-batches, snapshots, files and devices:
+batches, snapshots, files and devices immediately (`secure_delete = ON` + WAL checkpoint), and the
+next `files-backup` pass (`rclone sync`) purges its directory from the object-storage bucket so no
+orphan blobs remain:
 
 ```bash
 docker compose exec hub quire-hub account delete <id>

@@ -61,6 +61,7 @@ import dev.neurokitchen.quire.presentation.designsystem.ReaderFont
 import dev.neurokitchen.quire.presentation.designsystem.ReaderTheme
 import dev.neurokitchen.quire.presentation.designsystem.quireColors
 import dev.neurokitchen.quire.presentation.designsystem.readerColors
+import dev.neurokitchen.quire.presentation.mobile.screens.AboutAndLegalPage
 import dev.neurokitchen.quire.presentation.screens.settings.components.RawConfigEditor
 import dev.neurokitchen.quire.presentation.screens.settings.components.SettingRow
 import dev.neurokitchen.quire.presentation.screens.settings.components.SettingsSidebar
@@ -69,6 +70,7 @@ import dev.neurokitchen.quire.resources.Res
 import dev.neurokitchen.quire.resources.ic_description
 import dev.neurokitchen.quire.resources.ic_link
 import dev.neurokitchen.quire.resources.ic_picture_as_pdf
+import dev.neurokitchen.quire.resources.mobile_settings_about_hint
 import dev.neurokitchen.quire.resources.settings_file_location
 import dev.neurokitchen.quire.resources.settings_load_failed
 import dev.neurokitchen.quire.resources.settings_none_named
@@ -181,6 +183,11 @@ private fun SettingsCategoryContent(
                 onSave = { onEvent(SettingsEvent.OnRawSave) },
                 onRevert = { onEvent(SettingsEvent.OnRawRevert) },
             )
+            state.section == SettingsSection.About -> LazyColumn(Modifier.weight(1f)) {
+                item {
+                    AboutAndLegalPage(version = state.version)
+                }
+            }
             else -> LazyColumn(Modifier.weight(1f)) {
                 item {
                     // One segmented group: each setting its own rounded block.
@@ -528,4 +535,5 @@ private fun SettingsSection.hint() = when (this) {
     SettingsSection.Export -> Res.string.settings_hint_export
     SettingsSection.Shortcuts -> Res.string.settings_hint_shortcuts
     SettingsSection.ConfigFile -> Res.string.settings_hint_config
+    SettingsSection.About -> Res.string.mobile_settings_about_hint
 }
