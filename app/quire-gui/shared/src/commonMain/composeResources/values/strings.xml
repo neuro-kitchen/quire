@@ -695,6 +695,14 @@
     <string name="home_days_read">Days Read</string>
     <string name="home_days_count">%1$d days</string>
     <string name="home_streak_badge">🔥 %1$d day streak</string>
+    <plurals name="home_days_count_plural">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
+    <plurals name="home_streak_badge_plural">
+        <item quantity="one">🔥 %1$d day streak</item>
+        <item quantity="other">🔥 %1$d days streak</item>
+    </plurals>
     <string name="home_continue_sub">Pick up where you left off</string>
     <string name="home_up_next">Up next</string>
     <string name="home_up_next_sub">Ready in your reading queue</string>
@@ -706,4 +714,13 @@
     <string name="home_projects_sub">Jump into a collection</string>
     <string name="home_recent_sub">Latest additions to your library</string>
     <string name="home_status_completed">Completed</string>
+    <string name="settings_profile_unset">Set up your profile</string>
+    <string name="settings_profile_sub_unset">Tap to add your name and lookup email</string>
+    <string name="settings_not_set">Not set</string>
+    <string name="settings_appearance_reading">Appearance &amp; reading</string>
+    <string name="settings_appearance_reading_sub">%1$s theme · %2$s page · %3$s %4$d pt</string>
+    <string name="settings_choose_theme">Choose theme</string>
+    <string name="settings_choose_font">Choose typeface</string>
+    <string name="settings_display_section">Display</string>
+    <string name="settings_reader_preview_sample">The fundamental problem of communication is that of reproducing at one point either exactly or approximately a message selected at another point.</string>
 </resources>
