@@ -29,6 +29,10 @@ class MobileNavigation internal constructor(
     var tab: Tab by tab
         private set
 
+    /** Whether the last tab switch moved to a tab to the right (`true`) or to the left (`false`). */
+    var movingForward: Boolean = true
+        private set
+
     /** What is on screen. */
     val current: NavKey get() = stack(tab).last()
 
@@ -41,6 +45,7 @@ class MobileNavigation internal constructor(
             val stack = stack(target)
             while (stack.size > 1) stack.removeAt(stack.lastIndex)
         } else {
+            movingForward = target.ordinal >= tab.ordinal
             tab = target
         }
     }
@@ -53,6 +58,7 @@ class MobileNavigation internal constructor(
     fun swipe(forward: Boolean) {
         if (!isAtTabRoot) return
         val next = Tab.entries.getOrNull(tab.ordinal + if (forward) 1 else -1) ?: return
+        movingForward = forward
         tab = next
     }
 
@@ -65,7 +71,10 @@ class MobileNavigation internal constructor(
         val stack = stack(tab)
         when {
             stack.size > 1 -> stack.removeAt(stack.lastIndex)
-            tab != Tab.Home -> tab = Tab.Home
+            tab != Tab.Home -> {
+                movingForward = false
+                tab = Tab.Home
+            }
         }
     }
 

@@ -304,24 +304,25 @@ private val WideWindow = 600.dp
 private fun entryProvider(navigation: MobileNavigation) = entryProvider<NavKey> {
     val openDetails = { id: String -> navigation.open { tab -> Route.Details(tab, id) } }
     val openReader = { id: String, title: String -> navigation.open { tab -> Route.Reader(tab, id, title) } }
-    entry<Route.Home>(metadata = TabRootTransitions) {
+    val tabTransitions = tabRootTransitions(navigation)
+    entry<Route.Home>(metadata = tabTransitions) {
         HomeTab(
             onOpenDetails = openDetails,
             onOpenReader = openReader,
             onOpenShelf = { shelf -> navigation.open { Route.Shelf(it, shelf) } },
         )
     }
-    entry<Route.Library>(metadata = TabRootTransitions) {
+    entry<Route.Library>(metadata = tabTransitions) {
         LibraryTab(
             onOpenDetails = openDetails,
             onOpenReader = openReader,
             onOpenShelf = { shelf -> navigation.open { Route.Shelf(it, shelf) } },
         )
     }
-    entry<Route.Search>(metadata = TabRootTransitions) {
+    entry<Route.Search>(metadata = tabTransitions) {
         SearchTab(onOpenDetails = openDetails, onOpenReader = openReader)
     }
-    entry<Route.Settings>(metadata = TabRootTransitions) {
+    entry<Route.Settings>(metadata = tabTransitions) {
         SettingsTab(onOpen = { page -> navigation.open { Route.SettingsPage(it, page) } })
     }
     entry<Route.SettingsPage> { key ->
@@ -362,7 +363,17 @@ private fun AnimatedContentTransitionScope<Scene<NavKey>>.pop(): ContentTransfor
     (slideInHorizontally(tween(300)) { -it / 4 } + fadeIn(tween(300))) togetherWith
         (slideOutHorizontally(tween(300)) { it } + fadeOut(tween(300)))
 
-/** Switching tabs cross-fades: a tab is a place, not a step forward. */
-private val TabRootTransitions: Map<String, Any> =
-    NavDisplay.transitionSpec { fadeIn(tween(200)) togetherWith fadeOut(tween(200)) } +
-        NavDisplay.popTransitionSpec { fadeIn(tween(200)) togetherWith fadeOut(tween(200)) }
+/** Switching tabs slides horizontally in the direction of the tab change. */
+private fun tabRootTransitions(navigation: MobileNavigation): Map<String, Any> =
+    NavDisplay.transitionSpec { tabSlide(navigation.movingForward) } +
+        NavDisplay.popTransitionSpec { tabSlide(navigation.movingForward) } +
+        NavDisplay.predictivePopTransitionSpec { tabSlide(forward = false) }
+
+private fun tabSlide(forward: Boolean): ContentTransform =
+    if (forward) {
+        (slideInHorizontally(tween(280)) { it } + fadeIn(tween(280))) togetherWith
+            (slideOutHorizontally(tween(280)) { -it } + fadeOut(tween(280)))
+    } else {
+        (slideInHorizontally(tween(280)) { -it } + fadeIn(tween(280))) togetherWith
+            (slideOutHorizontally(tween(280)) { it } + fadeOut(tween(280)))
+    }
